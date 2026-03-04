@@ -762,9 +762,39 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     <div class="nav-right">
       <div class="demo-badge" id="demo-badge" style="display:none">MODE DÉMO</div>
       <div class="balance-pill" id="nav-balance" style="display:none"></div>
-      <div class="user-avatar" id="user-avatar" onclick="toggleUserMenu()">
-        <span id="avatar-initials">?</span>
-        <div class="notif-badge" id="notif-badge" style="display:none">0</div>
+      <div style="position:relative">
+        <div class="user-avatar" id="user-avatar" onclick="toggleUserMenu()">
+          <span id="avatar-initials">?</span>
+          <div class="notif-badge" id="notif-badge" style="display:none">0</div>
+        </div>
+        <div id="user-dropdown" style="
+          display:none;
+          position:absolute;
+          top:44px;right:0;
+          background:var(--surface);
+          border:1px solid var(--border);
+          border-radius:var(--radius);
+          min-width:180px;
+          box-shadow:var(--shadow);
+          z-index:300;
+          overflow:hidden;
+        ">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+            <div style="font-size:.85rem;font-weight:600;color:var(--text)" id="dropdown-name">—</div>
+            <div style="font-size:.78rem;color:var(--text3)" id="dropdown-email">—</div>
+          </div>
+          <button onclick="logout()" style="
+            width:100%;text-align:left;
+            padding:12px 16px;
+            background:none;border:none;
+            color:var(--accent3);font-size:.9rem;
+            cursor:pointer;display:flex;align-items:center;gap:8px;
+            transition:background var(--transition);
+          " onmouseover="this.style.background='rgba(224,112,96,0.08)'" onmouseout="this.style.background='none'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Déconnexion
+          </button>
+        </div>
       </div>
     </div>
   </nav>
@@ -779,7 +809,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
           <div class="balance-label">Solde disponible</div>
           <div>
             <span class="balance-amount" id="balance-amount">0</span>
-            <span class="balance-unit">crédits</span>
+            <span class="balance-unit">CAD</span>
           </div>
         </div>
         <div style="text-align:right">
@@ -1273,8 +1303,8 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 // CONFIGURATION SUPABASE
 // ==========================================
 // ⚠️  REMPLACEZ CES VALEURS PAR VOS CLÉS SUPABASE
-const SUPABASE_URL = 'https://uwyhrdjlwetcbtskijrs.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3eWhyZGpsd2V0Y2J0c2tpanJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NzMxNjYsImV4cCI6MjA4ODE0OTE2Nn0.NHo_RY4DjTmtkFcjOJ3dFPzNRN1rCwBCDXyIixOSrn4';
+const SUPABASE_URL = 'https://VOTRE_PROJECT_ID.supabase.co';
+const SUPABASE_ANON_KEY = 'VOTRE_ANON_KEY';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -1429,13 +1459,18 @@ function buildNav() {
   const balancePill = document.getElementById('nav-balance');
   if (!isDemo && currentProfile) {
     balancePill.style.display = 'flex';
-    balancePill.textContent = `₡ ${(currentProfile.virtual_balance || 0).toFixed(2)}`;
+    balancePill.textContent = `${(currentProfile.virtual_balance || 0).toFixed(2)} $ $`;
   }
 
   // Admin settings tab
   if (currentProfile?.role === 'principal_admin') {
     document.getElementById('settings-tab').style.display = '';
   }
+  // Dropdown user info
+  const ddName = document.getElementById('dropdown-name');
+  const ddEmail = document.getElementById('dropdown-email');
+  if (ddName) ddName.textContent = currentProfile?.full_name || 'Utilisateur';
+  if (ddEmail) ddEmail.textContent = currentProfile?.email || '';
 }
 
 function navigateTo(page) {
@@ -1507,7 +1542,7 @@ async function loadDashboard() {
     stats = [
       { label: 'Réservations d\'espaces', value: sRes?.length || 0 },
       { label: 'Covoiturages', value: tBook?.length || 0 },
-      { label: 'Solde', value: `₡ ${(currentProfile.virtual_balance || 0).toFixed(2)}` },
+      { label: 'Solde', value: `${(currentProfile.virtual_balance || 0).toFixed(2)} $` },
     ];
     if (currentProfile.is_approved_driver) {
       const { data: myTrips } = await sb.from('trips').select('id').eq('driver_id', currentProfile.id);
@@ -1555,7 +1590,7 @@ async function loadDashboard() {
             <td><span class="badge badge-gray">${r.type}</span></td>
             <td>${r.name || '—'}</td>
             <td>${r.date ? new Date(r.date).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
-            <td>₡ ${(r.cost || 0).toFixed(2)}</td>
+            <td>${(r.cost || 0).toFixed(2)} $</td>
             <td><span class="badge ${statusBadge(r.status)}">${statusLabel(r.status)}</span></td>
           </tr>
         `).join('')}</tbody>
@@ -1609,7 +1644,7 @@ function renderSpaces(spaces) {
         <span class="meta-item">👥 ${s.capacity} personnes</span>
         ${s.description ? `<span class="meta-item">📝 ${s.description.slice(0,40)}${s.description.length > 40 ? '…' : ''}</span>` : ''}
       </div>
-      <div class="card-price">₡ ${price.toFixed(2)} <small style="font-size:.75rem;color:var(--text2)">/ 15 min</small></div>
+      <div class="card-price">${price.toFixed(2)} $ <small style="font-size:.75rem;color:var(--text2)">/ 15 min</small></div>
       <div class="card-actions">
         ${!isDemo 
           ? `<button class="btn btn-primary btn-sm" onclick="openBookSpace('${s.id}', '${escHtml(s.name)}')">Réserver</button>`
@@ -1649,7 +1684,7 @@ function updateBookCostPreview() {
     const slots = Math.ceil(minutes / 15);
     const cost = slots * price;
     document.getElementById('book-cost-preview').innerHTML = 
-      `<strong>${slots} tranche(s) de 15 min</strong> — Coût total: <strong>₡ ${cost.toFixed(2)}</strong>`;
+      `<strong>${slots} tranche(s) de 15 min</strong> — Coût total: <strong>${cost.toFixed(2)} $</strong>`;
   }
 }
 
@@ -1713,7 +1748,7 @@ async function confirmBookSpace() {
   });
 
   currentProfile.virtual_balance -= cost;
-  document.getElementById('nav-balance').textContent = `₡ ${currentProfile.virtual_balance.toFixed(2)}`;
+  document.getElementById('nav-balance').textContent = `${currentProfile.virtual_balance.toFixed(2)}`;
 
   toast('Réservation confirmée !', 'success');
   closeModal('modal-book-space');
@@ -1805,7 +1840,7 @@ function renderAvailableTrips(trips) {
       <div class="card-meta">
         <span class="meta-item">🚗 ${escHtml(t.vehicle_model)}</span>
         <span class="meta-item">📦 Cargo: ${cargoLeft}% dispo</span>
-        ${t.price_per_minute ? `<span class="meta-item">₡ ${t.price_per_minute}/min + ${t.price_per_km}/km</span>` : ''}
+        ${t.price_per_minute ? `<span class="meta-item">${t.price_per_minute}/min + ${t.price_per_km}/km</span>` : ''}
       </div>
       <div class="card-actions">
         ${!isDemo && currentProfile?.id !== t.driver_id && seatsLeft > 0
@@ -1862,7 +1897,7 @@ function renderTripBookings(bookings) {
         <td>${b.trips?.title || '—'}</td>
         <td>${b.trips?.departure_time ? new Date(b.trips.departure_time).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
         <td>${b.pickup_location || '—'}</td>
-        <td>₡ ${(b.total_cost || 0).toFixed(2)}</td>
+        <td>${(b.total_cost || 0).toFixed(2)} $</td>
         <td><span class="badge ${statusBadge(b.status)}">${statusLabel(b.status)}</span></td>
         <td>${b.status === 'pending' || b.status === 'accepted' ? `<button class="btn btn-danger btn-sm" onclick="cancelBooking('${b.id}')">Annuler</button>` : ''}</td>
       </tr>
@@ -1905,7 +1940,7 @@ function openBookTrip(tripId) {
       </div>
     </div>
     <div class="info-box">
-      <strong>Tarification:</strong> ₡ ${trip.price_per_minute}/min + ₡ ${trip.price_per_km}/km<br>
+      <strong>Tarification:</strong> ${trip.price_per_minute}/min + ${trip.price_per_km}/km<br>
       Les détours par rapport à la route principale seront facturés séparément.
       Le chauffeur devra accepter votre demande.
     </div>
@@ -2157,9 +2192,9 @@ async function loadTransactions() {
       <td style="white-space:nowrap">${new Date(t.created_at).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' })}</td>
       <td>${escHtml(t.description || txLabel(t.type))}</td>
       <td style="color:${t.amount >= 0 ? 'var(--accent2)' : 'var(--accent3)'};font-weight:600">
-        ${t.amount >= 0 ? '+' : ''}₡ ${t.amount.toFixed(2)}
+        ${t.amount >= 0 ? '+' : ''}${t.amount.toFixed(2)}
       </td>
-      <td>₡ ${t.balance_after.toFixed(2)}</td>
+      <td>${t.balance_after.toFixed(2)}</td>
     </tr>
   `).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--text3)">Aucune transaction</td></tr>`;
 }
@@ -2211,7 +2246,7 @@ async function loadTenants() {
       <td>${t.unit || '—'}</td>
       <td><span class="badge badge-gray">${t.role}</span></td>
       <td>${t.is_approved_driver ? '<span class="badge badge-green">✓ Chauffeur</span>' : '—'}</td>
-      <td>₡ ${(t.virtual_balance || 0).toFixed(2)}</td>
+      <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
       <td class="td-actions">
         <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Modifier</button>
       </td>
@@ -2270,7 +2305,7 @@ async function loadAdminSpaces() {
       <td>${escHtml(s.name)}</td>
       <td>${s.capacity}</td>
       <td>${s.location || '—'}</td>
-      <td>₡ ${(s.space_pricing?.[0]?.price_per_slot || 0).toFixed(2)}</td>
+      <td>${(s.space_pricing?.[0]?.price_per_slot || 0).toFixed(2)} $</td>
       <td><span class="badge ${s.is_available ? 'badge-green' : 'badge-red'}">${s.is_available ? 'Oui' : 'Non'}</span></td>
       <td class="td-actions">
         <button class="btn btn-secondary btn-sm" onclick="editSpace('${s.id}')">Modifier</button>
@@ -2344,8 +2379,8 @@ async function loadAdminVehicles() {
       <td>${v.license_plate}</td>
       <td>${v.seat_count}</td>
       <td>${v.cargo_capacity_m3 || 0}</td>
-      <td>₡ ${(v.vehicle_pricing?.[0]?.price_per_minute || 0).toFixed(2)}</td>
-      <td>₡ ${(v.vehicle_pricing?.[0]?.price_per_km || 0).toFixed(2)}</td>
+      <td>${(v.vehicle_pricing?.[0]?.price_per_minute || 0).toFixed(2)} $</td>
+      <td>${(v.vehicle_pricing?.[0]?.price_per_km || 0).toFixed(2)} $</td>
       <td><span class="badge ${v.is_available ? 'badge-green' : 'badge-red'}">${v.is_available ? 'Oui' : 'Non'}</span></td>
       <td class="td-actions">
         <button class="btn btn-secondary btn-sm" onclick="editVehicle('${v.id}')">Modifier</button>
@@ -2436,7 +2471,7 @@ async function loadAdminPayments() {
       <td>${new Date(p.created_at).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' })}</td>
       <td>${p.profiles?.full_name || '—'}</td>
       <td>$ ${p.amount_real.toFixed(2)}</td>
-      <td>₡ ${p.amount_virtual.toFixed(2)}</td>
+      <td>${p.amount_virtual.toFixed(2)}</td>
       <td>${p.payment_method || '—'}</td>
       <td>${p.recorded_by_profile?.full_name || '—'}</td>
     </tr>
@@ -2471,7 +2506,7 @@ async function recordPayment() {
     recorded_by: currentProfile.id
   });
 
-  toast(`₡ ${virtual.toFixed(2)} crédités avec succès`, 'success');
+  toast(`${virtual.toFixed(2)} crédités avec succès`, 'success');
   document.getElementById('payment-real').value = '';
   document.getElementById('payment-virtual').value = '';
   document.getElementById('payment-notes').value = '';
@@ -2541,8 +2576,18 @@ function escHtml(str) {
 }
 
 function toggleUserMenu() {
-  if (confirm('Se déconnecter ?')) logout();
+  const dd = document.getElementById('user-dropdown');
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
 }
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const avatar = document.getElementById('user-avatar');
+  const dd = document.getElementById('user-dropdown');
+  if (dd && avatar && !avatar.contains(e.target) && !dd.contains(e.target)) {
+    dd.style.display = 'none';
+  }
+});
 </script>
 </body>
 </html>
