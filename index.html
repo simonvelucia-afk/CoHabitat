@@ -1,0 +1,2546 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoHabitat — Gestion des ressources communes</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===== VARIABLES & RESET ===== */
+:root {
+  --bg: #0f0f0f;
+  --surface: #1a1a1a;
+  --surface2: #242424;
+  --surface3: #2e2e2e;
+  --border: #333;
+  --accent: #c8a96e;
+  --accent2: #7eb8a0;
+  --accent3: #e07060;
+  --text: #e8e4dc;
+  --text2: #9a9590;
+  --text3: #6a6560;
+  --radius: 12px;
+  --radius-sm: 6px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --transition: 0.2s ease;
+  --font-serif: 'DM Serif Display', serif;
+  --font-sans: 'DM Sans', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+a { color: var(--accent); text-decoration: none; }
+button { cursor: pointer; font-family: var(--font-sans); }
+input, select, textarea {
+  font-family: var(--font-sans);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  width: 100%;
+  outline: none;
+  transition: border-color var(--transition);
+  font-size: 0.95rem;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+select option { background: var(--surface2); }
+h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ===== LAYOUT ===== */
+#app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ===== LOGIN PAGE ===== */
+#login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: radial-gradient(ellipse at 30% 20%, rgba(200,169,110,0.08) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 80%, rgba(126,184,160,0.06) 0%, transparent 60%),
+              var(--bg);
+}
+.login-box {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 48px 40px;
+  box-shadow: var(--shadow);
+}
+.login-logo {
+  text-align: center;
+  margin-bottom: 36px;
+}
+.login-logo h1 {
+  font-size: 2.2rem;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+.login-logo p {
+  color: var(--text2);
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--text2);
+  margin-bottom: 6px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 22px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #0f0f0f;
+  width: 100%;
+  margin-top: 8px;
+}
+.btn-primary:hover { background: #d4b880; transform: translateY(-1px); }
+.btn-demo {
+  background: var(--surface2);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  width: 100%;
+  margin-top: 10px;
+}
+.btn-demo:hover { border-color: var(--accent2); color: var(--accent2); }
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+.btn-danger {
+  background: rgba(224,112,96,0.15);
+  color: var(--accent3);
+  border: 1px solid rgba(224,112,96,0.3);
+}
+.btn-danger:hover { background: rgba(224,112,96,0.25); }
+.btn-success {
+  background: rgba(126,184,160,0.15);
+  color: var(--accent2);
+  border: 1px solid rgba(126,184,160,0.3);
+}
+.btn-success:hover { background: rgba(126,184,160,0.25); }
+.btn-sm { padding: 7px 14px; font-size: 0.85rem; }
+.btn-icon { padding: 8px; width: 36px; height: 36px; border-radius: 8px; }
+.login-divider {
+  text-align: center;
+  color: var(--text3);
+  font-size: 0.8rem;
+  margin: 16px 0;
+  position: relative;
+}
+.login-divider::before, .login-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: var(--border);
+}
+.login-divider::before { left: 0; }
+.login-divider::after { right: 0; }
+.login-toggle {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 0.88rem;
+  color: var(--text2);
+}
+.login-toggle button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: inherit;
+  font-weight: 500;
+}
+
+/* ===== NAVBAR ===== */
+#navbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.nav-logo {
+  display: flex;
+  align-items: center;
+}
+.nav-tabs {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.nav-tab {
+  background: none;
+  border: none;
+  color: var(--text2);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  transition: all var(--transition);
+}
+.nav-tab:hover { background: var(--surface2); color: var(--text); }
+.nav-tab.active { background: rgba(200,169,110,0.15); color: var(--accent); }
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.balance-pill {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.88rem;
+  color: var(--accent2);
+  font-weight: 500;
+}
+.demo-badge {
+  background: rgba(224,112,96,0.15);
+  border: 1px solid rgba(224,112,96,0.3);
+  color: var(--accent3);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.user-avatar {
+  width: 36px; height: 36px;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  position: relative;
+}
+
+/* ===== MAIN CONTENT ===== */
+#main { flex: 1; padding: 28px 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
+.page { display: none; }
+.page.active { display: block; }
+
+/* ===== SECTION HEADERS ===== */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.section-title h2 {
+  font-size: 1.7rem;
+  color: var(--text);
+}
+.section-title p {
+  color: var(--text2);
+  font-size: 0.9rem;
+  margin-top: 2px;
+}
+
+/* ===== CARDS ===== */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  transition: all var(--transition);
+  position: relative;
+}
+.card:hover { border-color: var(--accent); box-shadow: 0 0 20px rgba(200,169,110,0.08); }
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.card-title {
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--text);
+}
+.card-subtitle {
+  font-size: 0.83rem;
+  color: var(--text2);
+  margin-top: 2px;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.badge-green { background: rgba(126,184,160,0.15); color: var(--accent2); border: 1px solid rgba(126,184,160,0.2); }
+.badge-red { background: rgba(224,112,96,0.15); color: var(--accent3); border: 1px solid rgba(224,112,96,0.2); }
+.badge-yellow { background: rgba(200,169,110,0.15); color: var(--accent); border: 1px solid rgba(200,169,110,0.2); }
+.badge-gray { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.meta-item {
+  font-size: 0.82rem;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.card-price {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 8px 0;
+}
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+/* ===== TABLE ===== */
+.table-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  overflow-x: auto;
+}
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th {
+  background: var(--surface2);
+  color: var(--text2);
+  font-weight: 500;
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+td {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+tr:hover td { background: rgba(255,255,255,0.02); }
+.td-actions { display: flex; gap: 6px; }
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  max-width: 540px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.modal-header h3 { font-size: 1.3rem; }
+.modal-close {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.modal-close:hover { color: var(--text); border-color: var(--accent); }
+.modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-section-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text3);
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ===== TOASTS ===== */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-size: 0.88rem;
+  min-width: 260px;
+  max-width: 360px;
+  box-shadow: var(--shadow);
+  animation: slideIn 0.3s ease;
+}
+.toast-success { border-left: 3px solid var(--accent2); }
+.toast-error { border-left: 3px solid var(--accent3); }
+.toast-info { border-left: 3px solid var(--accent); }
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ===== ADMIN TABS ===== */
+.admin-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.admin-tab {
+  background: none;
+  border: none;
+  color: var(--text2);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  transition: all var(--transition);
+}
+.admin-tab.active { background: var(--surface2); color: var(--accent); }
+.admin-tab:hover:not(.active) { color: var(--text); }
+
+/* ===== STATS ===== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.stat-label { font-size: 0.78rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 1.8rem; font-family: var(--font-serif); color: var(--text); margin-top: 4px; }
+.stat-value small { font-family: var(--font-sans); font-size: 0.9rem; color: var(--text2); }
+
+/* ===== CALENDAR / SLOTS ===== */
+.time-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.time-slot {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.time-slot.available:hover { border-color: var(--accent2); color: var(--accent2); }
+.time-slot.selected { background: rgba(126,184,160,0.2); border-color: var(--accent2); color: var(--accent2); }
+.time-slot.booked { background: var(--surface); color: var(--text3); cursor: not-allowed; opacity: 0.5; }
+
+/* ===== TRIP DETAILS ===== */
+.trip-route {
+  position: relative;
+  padding-left: 24px;
+  margin: 12px 0;
+}
+.route-line {
+  position: absolute;
+  left: 6px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--accent2), var(--accent));
+}
+.route-point {
+  position: relative;
+  padding: 4px 0;
+  font-size: 0.88rem;
+}
+.route-point::before {
+  content: '';
+  position: absolute;
+  left: -21px;
+  top: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent2);
+  border: 2px solid var(--bg);
+}
+.route-point:last-child::before { background: var(--accent); }
+.route-point .point-name { color: var(--text); font-weight: 500; }
+.route-point .point-time { color: var(--text3); font-size: 0.78rem; }
+
+/* ===== BALANCE DISPLAY ===== */
+.balance-display {
+  background: linear-gradient(135deg, rgba(200,169,110,0.12) 0%, rgba(126,184,160,0.08) 100%);
+  border: 1px solid rgba(200,169,110,0.2);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.balance-label { font-size: 0.82rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+.balance-amount {
+  font-family: var(--font-serif);
+  font-size: 2.5rem;
+  color: var(--accent);
+}
+.balance-unit { font-family: var(--font-sans); font-size: 1rem; color: var(--text2); margin-left: 6px; }
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text3);
+}
+.empty-state .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+.empty-state p { font-size: 0.95rem; }
+
+/* ===== PROGRESS BAR ===== */
+.progress-bar {
+  height: 6px;
+  background: var(--surface3);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 6px 0;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(to right, var(--accent2), var(--accent));
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* ===== FILTER BAR ===== */
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.filter-bar input, .filter-bar select { width: auto; flex: 1; min-width: 160px; }
+
+/* ===== CARGO SELECTOR ===== */
+.cargo-selector {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.cargo-block {
+  width: 40px; height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--text3);
+}
+.cargo-block.selected { background: rgba(200,169,110,0.2); border-color: var(--accent); color: var(--accent); }
+.cargo-block.used { background: var(--surface3); color: var(--text3); cursor: not-allowed; }
+
+/* ===== NOTIFICATION BADGE ===== */
+.notif-badge {
+  position: absolute;
+  top: -4px; right: -4px;
+  width: 16px; height: 16px;
+  background: var(--accent3);
+  border-radius: 50%;
+  font-size: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 640px) {
+  #main { padding: 16px 14px; }
+  .cards-grid { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .nav-tabs { display: none; }
+  .modal { padding: 20px; }
+  .balance-display { flex-direction: column; gap: 8px; text-align: center; }
+}
+
+/* ===== LOADING ===== */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  color: var(--text3);
+  gap: 10px;
+}
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== INLINE INFO BOX ===== */
+.info-box {
+  background: rgba(200,169,110,0.08);
+  border: 1px solid rgba(200,169,110,0.2);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: var(--text2);
+  margin: 8px 0;
+}
+.info-box.warning {
+  background: rgba(224,112,96,0.08);
+  border-color: rgba(224,112,96,0.2);
+  color: var(--accent3);
+}
+
+/* Passenger list in trip card */
+.passengers-list { margin-top: 10px; }
+.passenger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div id="toast-container"></div>
+
+<!-- LOGIN PAGE -->
+<div id="login-page">
+  <div class="login-box">
+    <div class="login-logo">
+      <a href="https://www.modulimo.com" target="_blank" rel="noopener noreferrer"><img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCABfAdUDASIAAhEBAxEB/8QAHQABAAMBAQEBAQEAAAAAAAAAAAYHCAUEAwIBCf/EAFMQAAECBQEEBAgICQoDCQAAAAECAwAEBQYRBwgSITETQXGBFCIyN1FhkbJCUnN0gqGxsxUWM3J1kqLB0RcjJDU2Q2KUo8JWZNIYKFVlk9Ph4/H/xAAYAQEAAwEAAAAAAAAAAAAAAAAAAQIEA//EAC0RAAICAQMCBAUEAwAAAAAAAAABAgMREiExBBMyM0FRI2GRsfAicaHRUoHB/9oADAMBAAIRAxEAPwDScIRB9dLgqtsaa1Cr0Z5LE40ppKHCgK3QpYB4HhygRKWlNsnEIplm2tcJiWaeTftMSHEBYHgwGMjPxI8y7e1nyR/KVRwRzG4kf7InBz7r/wAWXfCKSbtLW91O83qJTlp9KWwR7keO26lqPbms9Bta6LmaqkvUWXHFobbG7uhCyPgg5ygQwR3fdMvmEUJXbzv2ZvK7WpG7KTQ6PQplDJVNSgXgL4J4hJJOR9ce96d1KlpmelprU+3EPU+UE5NI/BwJbZPJRwnj2DjxHpEMDvL2LshFUSjOpz1FbrX8pFvfg5xkPJmFU0BG4RkKycYj92rUbqrsvNTdO1MoVSZkj/SOgpO8E8CceUOYB4wwWVny+39lqQjkWXVXa5aVJrDyEIdnJRt9aUDgCpIJx6o68QXTysiEIQJEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIARW20une0arXqLJ/1URZMV5tHI6TR6uJ/wtH/VRErkpb4GRjaC1HdtO3Je2qYhaalUJEETKHQDLoyAeHPJG9g8IgVHToGxT5YVOpVacnOiSZhwl4BTmPGPADrzHQrk7T2Nb7rVUJ6lSkymloakHqm2Fstu7jeOBB6t6LCoFe0tFFkkVqpWhMVJLKRNOtMtpQpzHjEDHLMTwZfHJ5a/2V7S9R7OsO5UqshU/VaLPy+49TytaeimAtO6sFwcMpKgR14ETC8FdJtOWS4UlO9TnTunmPEe4R5bqrdtqFyJk69aC6C9RHW5WTZQ2mY8J3Tg5A49fX6OEcS15h2c1Q0qmXnC44qgHeUTknCHR+6Azj9OfVfc49yU2Yqy9YUSwUtcvPMzBSnmUoWvP1ZPdEYuearcrK1G5lVO2phuuU5qnuNS070jvRpDY4N53gr+bTnPLjFyaKBLmrOpiVgKSqfAIIyCN9wRzLXti03NpSv0pNvyYl5CntzLDeCUJePRFSgnOP7zljAxwhkq63JJr1f9nMn6dP16W010xfU/IycxTxP1FO8QpSUgndPr8VXYVD0R7tEJZmkSGqcrKILbEnMvNtJzndSgPBIz2ARYupFp1WfrVGuy2HJZFco6lJQ0+SG5llYwpskcuBOD6zFf6ZpnEUTVt6flPA5pbswp5gLC+jUWnFEbw58+cDo4aZr89CztHFb+ldsn/wAtZHsTiJZEM0OVv6SW2f8Akkj2EiJnFWaYeFCOS/c1uMPLYfuClNOoUUrQucbCkkcwQTwMdY8owBfrxmL2rbxOd+feOfpmJSycr7u0lsb4kJ2Tn5cTMjNsTTBJAcZcC0kjnxHCPvGYdkW7zJ1mbtCbeAYnAX5QKPJ1I8YDtSM/RjT0GsF6rFZHIhCPxMPNy8u4+8sIabSVrUeQAGSYg6HjqNbo1NeDNQq0hJulO8EPzCG1EenBPKPpTapTKmlaqbUZSdDZwsy7yXN0+vdJxGGdU7pevG+ajW1khlbnRyyPiNJ4JHbjifWTFy7GDwxccv1gsL98RZrYyw6nXZpS2NGQhCKmoQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEQnXKXMzpfWGUjJUhsD/1ExNo4GoNVt+j2pOTd0JC6WQG3kFsr3944AwPXBFZ7xZXetWkMvelYlarT6jI0uZS2UTSnGyS9y3SSDzAGI61vaWac0+hyUnUqbSZ6cZYSh+ZUcF1YHFWM9ZiCTNwaAzit52QqOT8VMyPsVHw6XZ7dOfAamM+qZP74tuZcw1OW31PVfmhtIq1z+H0Gu0ikU5SUAyoTndIGFEceOecdqrS9NldoWxJKleDiVlqW82hLJG6kBLvDhyjgtSOgD/BuSqx7GpoxM9MLa0vauVFSteVnW6kw0pTYmkvo8U+KopDgAV5WOGcZgIxTe2PqcTRuoyEjqxqSZ2dl5bfqRCeldSjew45nGTEjoNOkZTW64LuNUp5k5+msstKE0jisboUMZzw6JJ+lFf6go0MTetXFYRWfwn4SozfgwXudKTlWO/McBQ2fepNy929DBGrTtts/c1AKtS1DhUpM9j6f4xXU5JtUqhalzrs1KblTQ+/L7jyVFSfBccgeHjZiof+7/6Ln/aj+KVoAAc/jRjr4mGC0rs+31L50EOdILcP/KkftqicRHNM1UFViUk2x0v4I6DEt0ud/d3jnOevOYkcVNMFiKR+XVBLalHkATGGbGpEpdWqbNJmySxPzTySpPMZCyFdxwY27W3ky1GnZhZwlqXcWewJJjGezogu6yUEcyHHVHuaWYsjL1O8oIjL7VVsm9lNrJZqNJnOaTjKkK4Eeo/YY3PZ1dlLltin1yRWFMzbKV4z5KvhJPrByO6M+7XloCXqMneEo3hEziWnMcgsDxFd4yPoiPRshXgEOTtmTjhwvM1JEnhn+8R9hHYYl7rJSl9q1wfDNIRUW1JdyqBYf4IlHtydq6izwPjJZHlnv4J7zFukgAknAEYy1Sqs3qZrJ4DTFqfZVMJkJLd4p3ArBX2E7ys+iKpHfqJ6YYXLOXLWglrRqcvKbbPSvVFqWkyTyQAvfV68nA+iYsbYyfSmv3BLda5VpY+isj/dE02haFKUXQZmkSDYRL09yXQgAc8ZBJ9ZJJPrMV3sdPBGoFUZJ4uUxRHc63/GLZyjNGHbuijVcIRUu0PqcuyqU3SaO4Pw3Op3krwCJdvlv49JPADtPVFDfOagssmV56gWlaKSK3WGWXsZEujLjp+iniO/EQB3aOslL5QmRrC0A43wygA+vBVmKX0k02rGp1VmKlPT7rMg27/SpxzK3HVniUpzzV6SeWevlF3q2drCMr0Qcqod3cdL4QM59ON3EWwjKrLrN4rCJXZmqVk3Y6mXplYQibVylphJacPYDwPcTE1jFWsOltW07nWppuYXO0l5e6xOJTuqQrmELA5K54PXg8uUXBszaoTVfQbTuCZ6WfYb3pN9Z8Z5A5pUetQHHPWM+iDRau96tE1hl6xXN16zWXbNwTdDqbs8mblVBLgblipOSkKGDnjwIixoxLtDjOs1w/Kt/dIiEsl+osdcco0CNoPTzP5epf5Q/wAY7NB1k07rDwZZr7cs4o4CZptTOT2qGPrirbM2fKLXrSplZduCfZdnJZLykJaQUpJHIRxL22dripEq5OUCos1ptsFRZ6PonseoZIV7QfVE4Ry7l6WcGqZZ9mZZS/LutvNLGUrQoKBHqIj6RiLS7Um4NP6wlsOPP03pMTVPcJxzwSnPkqH/AOxs+gVWSrlFlKvTnellZtoOtK9R6j6xyiGsHam5WL5nD1Dv637Fak3a8uZSmcUtLXQtb/FIBOfR5Qj+6e33Qb5lpuYoSphTcqtKHC81ucSCRj2RUe2j/Vts/LTHutx9tjL+oLg+dNe4qGNindl3tHoX/HGvS5aZaVvvVyrl0SjSkJUWkbysqUAOHaY7MVhtQeZ2pfLsfeJiEdrJOMW0dOxdWLSvKufgaiuTiprolPYdYKE7qcZ459YieRkPZJ865/Rz32ojXkSylFjshllY1rXKxaRWJylTjtQEzJvrYdCZUkbyFFJwc8RkRZMnMNzcozNNZ6N5tLiMjBwRkfbGENVPObc/6WmfvVRuS2f7OUz5o17gg1gpRbKcpJ+h0IQhEGk5d1V2QtqgzVaqZcEpKp3nC2jeVjIHAd8Qy2NabKuKvSlFprs+ZubXuNBcsUpzgnic8OUeraC80Nf+QHvpjLmgnngtz5yr3FRZLYy23ShYor1NwRH78u6j2VRUVetqeTLKeSwC03vneIJHD6JiQRR+2K8U2HS2M8HKiFY7G1fxiEdrZOEG0Sm1taLHuOvStFkJmcTNTSihrppcoSVYJxn14ix4/wA9ZX8I0eYp9XbQtglQflXepRQrGR2ERuzT645e7LOp1el8J8JZBcRnO44OC09xBiWsHHp7nZlS5O9FdXVrNZFt16ZotQmZxU1LEJd6GXK0hRGcZ9PGJZe9fl7XtSo16ZGUSbBWE5xvq5JT3nAjCNU/CdV8LuOcCnEvzZS68et1WVEDu/dBLJPUXOvCjybnsO8KNetHXVaIt5Uuh5TKulb3DvAAnh3iJBFI7Hj6FWBUpcHxm6kpR7FNo/gYu6IezOtUnOCbP4pQSkqUQAOJJ6or27dZrCt19Us9VTPTKfKakkdLg+gq8n64p/aP1WnajVZm0LfmVy9OllFucebVhUwsc05HwBy9Zz1R+tINBTXqSzXbsmpiUl5hIXLyjICXFoPJSlHyQRyGM9kTj3OMr5SlprRPJPaMsd58NvSlXl0H+8UwlQHclRMWTad227dUr4RQarLziQMqQlWFo/OSeI9kVhXtnK0JmQWikT1QkJrB6Nxaw6jP+JJAOOwiM91aRujTG9iwXnJGpSigtt1pR3XUHkR8ZJ9B9YMMJlXbbV41sbvhEL0cvhm/LPaqZShqeZPQzjSTwS4BzHqI4j2dUTSKmuMlJZQhCECRFVbVCt3SKbHpmmB+1FqxU21ccaSveudYH1mJXJzu8tnovK8qNQaHN0unyTi66xSEzSC1TS823lB3VLIBAHA8+ER+l21rBVqLI1Vi9KKwmbl0PhtUglJQFJCsHCPXHwXWZGm37eMzUpZc3JMWvK9Owg4LidxOU56s78V/VazaM2xKLVp9djTE1uolCmpu7ruR4oRvAg8OQETgzTmvV/8ACbWve102XqVUqBfVWVVpKWp3hC1SMlv7hO4oK8VIISASCTwiwUVlip6r22/JOFcpN0CYmGiRjKVLbIOOwRS9m/ivKN3fKyVtV6k1YW7MLJqEwF4bO6D4u6kgklPE55RNdN3yu9tO8nyrScHsUP4QZNc3x+cnY0tYkE6g6mzE+iX6FqptqUt5I3UJ3VknJ5CPDVtT2KjPOyen9gu3IllW45OCXCGN70A449pxHssugyFwXbqZSqohxyTeq0uXW0OFG+Agq3SR1HrHXHpuuXvqdnnLbshmWtSgU1IS5UHUBPSndBIaTjyRnir054wL/q07fP7kf/H666QfCLo0gW1JJ4uOyrIUUJ9OMEcPWREkuqq2ldWjNw1m3m5N1sU97OGEpcaXuE4UMZBjg0mm6qUhRqlDvenXmwwr+kSK1glY6wlWThXo4jviQXvblIl9PrmueRpj1JnKjQ3PCpYHcSVFG9laBw3xxGe2BC1Yef5Ols9+Zu3fkF/eriexA9n3zOW583X94uJ5FWd6/Av2I7qbM+CadXHM9bdMmCO3o1RlLZlRvayUg/FQ+f8ASUP3xprXWY8G0iuRz40mW/1yE/vjOuyg0lzVlpShno5J5Q9R8Ufviy4M1/nRRqK/rdlrqtCo0KaSCJlkhtR+A4OKVDsIEYeo09U7MvRmcQksz9Lm8LQrhxSrCkn1HiO+N/RlXa0tBVLupi6ZRnEpUxuPlI4JfSOv85PHuMIsdXDZTXoWrrHqHKU/R1FXpr/9IrjIakt08Rvjx1fRGR24ivtkK0lPVCdvCaZHRsAy0mT1rI8dQ7AQO8xSLMzWq6mlW6h52ZQy4WpJjqSpxWSB2mNz2BbrFqWhTqCwQrwVkJcWB5azxUrvOYNYRFTd1mp8Ih+04ne0gqR+K6yf2xFG7KEwGdWW2j/fyTyB3AK/2xfO0ijf0frP+ENq9jiYzns1zAl9Y6MT8MPNjvaVBcEXbXxNpRh3XeruVnVWuvrUShiYMs2D1Jb8X7QT3xuKMRa+0Vyiaq1ppSCG5l7wpo/GS5432kjuhEv1mdCNU6HUyXpWlVAl2EJT0kql9wgeUtfjEn247hE0iudnS45Wv6X01ltwGapyPBJhHWkp8k9hTj6/RFjRDNFbTgsET1ho7Nc00r0i6hKlCTceaJ+C4gFST7RGNdL596mah0CcZJC0T7SeB5hSgkj2ExsfWats0DTOuTrq0pWuUXLsA/CccBSkfXnsBjImjVGermptCkmW1LCZpL7hA8lCDvEn2fWImPBj6nzI45N1RiXaH881wfKt/dIjbUYl2h/PNcHyrf3SIR5OnWeBfuax0j82Vu/MGvsiUxFdIvNlbv6Pa+yJVFTTDwoyFtWUOUpOpIm5NpLQqMsl9xKRgdICUqPfgHtzFp7INTmJvT2ekH1laJGfUlnJ8lK0pVu/rbx74qbaiuKSr2pBYp7yH2acwJZTiDlJXklQB68E47QYu7Zdtx6g6ZNzU0kpfqr6pvdI4pbwEoHeE730ou+DFVve8EP20f6utn5aY91uPtsZf1BcHzpr3FQ2zZZxdBt6bSMttTTyFH0FSUke6Y8WxnUpZKK/SFLSmZUpqYQknipIyk47CR7Yj0LcdT+exoyKw2oPM7Uvl2PvExZ8VPtVzrMtpO/LuKAcmpplDYzzIVvH6kxC5NN3lspzZJ865/Rz32ojXcZT2Paa9MX9UaoEnoJSQU2pXVvuLTuj2JV7I1ZCXJy6RfDMGap+c25v0tM/eqjcds/2cpnzRr3BGHNVPObc36WmfvVRuO2f7OUz5o17giZHPpfHI6EIQiptIFtBeaGv/ID30xlzQTzwW585V7io1HtBeaGv/ID30xlzQTzwW585V7iosuDB1HnR/PU3BGf9s50ih26zngqZeWR2JSB9pjQEZw2z5g9Lbkr1Yfc9wRC5NHU+UyPLtJVe2ZafWJVvem6RMvunA4qZK8LHdwV3GOxshXcpioztnTbmWpgGZkwfgrA8dPeMH6J9MWDs0SzM5orKysw2HGXnJhtxJ5KSVEERnC5ZGo6ZaqOtyy1B2mTYell8ukazlOe1Jwe+Lc7GV/D0WItrbAuxW7T7OlXQEqIm5wJPE8w2k/WcdkRrVG1ha+g1qS62tyZfnDMzJI477jZIB7AAO6OJYzE1qprg1O1JsuNPTBm5lBOUoZbxhHZwSnvi3NsRA/EGmEDyagPcVDjYl/EjOz6Hg2MXAaFcLOeKZplWO1Ch+6LlvupuUazKxVWfysrJOuo/OCTj64ojYweHhNyS+eJQwvHesRfN7UtdatCrUls4XNybrSPzikgfXFXyaKM9lYMN2RJJrN9UiRmjvpm59pDpUc72VjOe3jG+m0JQ2lCAEpSMADqEf5+0GceoF1yU862tDshOIcWjrBQriPqMb6pM/K1SmS1RknkvS0y0lxpaTwUkjIiZHHomsM9UULtj0lhy26PW9xImGJoyxVjiULSVY9qfri+ooHbHrUsig0igBxKpl2YM0pGeKUJSUgntKj7DELk0dRjtvJFNjuovMXxU6YFHoJqR6RSereQoYPsUr2xqmMx7HFDfduCr3CtChLMS4lW1HkpayFEDsCRn84RpyEuSvS57aEIQiDQIqPayONJ1eufZ/wB0W5Fb7Rdu1i59Ol06hyhm5pM2070QUASkbwOM9oiVyc7k3B4Kouio0yUv295epTrMqJq2mWWOkVjpHOhaISPXwj93lcVuv25pdJU+4pFS6S/LCcCXfyOEIypXoA3SO+PXU5G/qs+mZqejlDnJkNIbLzyvHUEgAZO/6BHl/Fa8FctFLaHa4f8A3IsZHq3wv4Z69QLmtObvO66tJV+QfTN2qZNgocz0jxcHiD14SPbHu0vdze+mw9NsPp/aX/COUi0L0Vy0atQfnO//AGRKrDtm/XtS6JW69blLotNpMg7KNNSbySkJIOAEhRPNUQWipOWWvv7kv02ly1feoDhGN+qM/cJP+6PRrfSapWtO52RpReK1LbW+2yf5x1lKgXEp9JI6uvGI/E7J3lRq/WJy3aTR59ipPofJmJ1bS0lLSEYICCPg559ceGYrWsCfydl0BfZUz+8CIO+2lxZAtG6RKsazPTVlSNWk7ZakC3OGdQtIcdxwACuOc4PcYtzVsZ0vub9GP+4Yiq6/rSkeLYdE7qin/qjj3TUdaK3b9Qoz1i0ttqel1y61onUlSQpJBI8bnxiSkWoxaSf0JhoAMaPW582P3ionURfSijz1v6dUSj1JtLc5LSwS6hKgoJUSTjI7YlEVZ2rWIorfaVeLOjtYAP5QtI9rif4RSOyI2pWqD7gHBFNdz3rbEaprdJplbp66fVpJidlFkFTLyd5JIORwjn2/Z9r2/OLnKJQpGnzC0dGpxhoJUU5Bx2cBE52OU6XKxT9juxF9VLVReVkT9DyhL7iN+WWvkh1PFJPq6j6iYlEIg7tJrDM/aJaJVe2r0br1zGTWiTbKpVtlwry6eAUeA4AZ78eiNAwhEt5K11xrWEQLaDbLmkNfA+CwFexaYy1oQ4GtXbdWTgGa3falQ/fG2apISdUp71PqEs3Myr6dx1pxOUrHoIjg0/T2yafPMzsja9Ml5lhYW062wApChyIME9jjbS5zUl6EnitNd9M2r8oyJmR3Ga3JpPg7ijhLqeZbV+49R7YsuEQd5xU1hmGbcrt46VXS8G2XZGaT4kzKzCD0byQesdY9Ch3GLdY2m2fAv5+0l+FY5InPEJ705Ai965QaLXWOhrFKk59vGAH2gvHZnlEWGkGm4mOn/FaU3s5xvr3f1d7EWyjMqLIbQlsZkvO77z1cr0tItSbjiEqPg1PlEkoRn4SvScfCOAPVGh9BdMEWHSnJ2oqQ9W5xIDyk8Uso59Gk9fpJ6z2RPqJQqNRGOgpFLk5Fv4rDQRntxzjoxDZeujTLVJ5YjEu0P55bh+Vb+6RG2ojdWsKzatUXqjUraps3NvEFx51kFSyBgZPYBBPBa+p2RwjNdtbQFx0K35GjS1GpbjUmyllC17+8oDrODHhuXWvUG6GFU2VdbkW3xuFuntEOLB4YCslXsjTA0y0/Bz+KFI/y4jtUm3aDSSDTKNISZAxllhKT7QInKOXYtaw5bGb9HdC6nU55is3lLqk6ekhaZJzg7MH/ABD4KfTniY1E02hptLTaEoQgBKUpGAAOQEfqEQ3k711RrWERfVG0Ja97Nm6G+vonVDpJZ3H5N1Pkns6j6iYxyEXbpheiHlMu06pyijulScodSfR1KQRG7o59bolIrct4NV6bKTzXxX2gsDszygng53Udx5Twyg6dtNBMgkVC1SubAwVMzWEKPpwUkjs4xWt53Xd+sFzSsoxILWlBKZSRlgVJbzzUo9Z4DKjgDHVGm1aQabqmOnNqym9nO6Fr3f1d7ESmh0CiUJjoaPSpOQb6ww0EZ7cc4nKRR02z2nLYjGi1htWFaKZBxaXahMqD046kcCvHBI9SRw9fE9cTmEIqaoxUVhGC9VPOZc36WmfvVRY8htG3NJyMvKIodJUlhpLYJLmSEgD0+qNCTundjzs4/OTdrUt+YfcU464tgFS1KOSSfSSY+P8AJjp9/wAIUj/LiLZRjXT2RbcZclEf9pW6f/AaR7XP+qJxorrHW76vA0WoUuQlmRLLd32d/eynHDifXE//AJMdPv8AhCkf5cR0KDZdqUGe8Oo1AkJGZ3SjpWWglW6eYzEbHSNdqablscHaC80Nf+QHvpjLmgnngtz5yr3FRtarU6Rq1Pdp9SlWpuVeGHGnU5Soc+IjiUuwbLpdQZqFOtmmSs2wreadbZAUg4xkHvgngm2lzmpJ8EljMe2W6FXBQWRzRKuKPeofwjTkcS4bRtm4ZluZrdDkag82ncQt9oKKU5zgQTwXug7IaUQnZc80Eh8u/wC+Yiu1tZjlQp8hdVOlluzUsfBpkNoKipsnKDgeg5H0ou2h0imUOnpp9IkWJKUQSpLTKd1IJOScR7iARgjIhnfJDqzXoZR2yTajtKtyfuGelVszU+70LXSI3VBpB48+IyrP6oj0bX7e9pvJr+LUUfWhcXSAAMAYjn1+iUivyIka1TpeflgsOBp9G8kKGcHHp4mGd8jtYr0IzfsaOAXTXWyfKkkEDsX/APMagjh2/Z9r2/NLmqJQpGnvuI3FOMNBJKc5xHcgyaYOENLM5bQ+js5M1F+7bVllTBeyuek2x4291uIHXnrHPPHrivtMNXrlsBn8FLl01CmJWT4I+ShTR691WCU9hBEbOiO3DY9o3AsuVe3qfNOnm4poBf6wwYnPucp9O9WqDwyk6ttNKXJKTSrW6OaIwFzEzvISfTgJBPtEVnRLevbV27Xqg4lx9bqx4TOup3WWU9QHYOSRGpKfpNp3IvdKxasipYOR0u84B3KJETCTlZaTl0y8pLtMMoGEobQEpHYBDKXBDonN/EkcewrWp1nWzLUKmJPRMjK3FeU6s+Us+sx3oQipqSSWEIQhAkQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIA/9k=" alt="Modulimo" style="max-width:280px;height:auto;display:block;margin:0 auto"></a>
+      <p style="margin-top:12px;color:var(--text2);font-size:0.9rem">Gestion des ressources communes</p>
+    </div>
+    <div id="auth-form">
+      <div class="form-group">
+        <label>Adresse courriel</label>
+        <input type="email" id="auth-email" placeholder="votre@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>Mot de passe</label>
+        <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="form-group" id="auth-name-group" style="display:none">
+        <label>Nom complet</label>
+        <input type="text" id="auth-name" placeholder="Prénom Nom">
+      </div>
+      <button class="btn btn-primary" onclick="authSubmit()">
+        <span id="auth-btn-text">Se connecter</span>
+      </button>
+      <div class="login-divider">ou</div>
+      <button class="btn btn-demo" onclick="loginDemo()">
+        🎭 Entrer en mode démo
+      </button>
+      <div class="login-toggle">
+        <span id="auth-toggle-text">Pas encore de compte ?</span>
+        <button onclick="toggleAuthMode()"> S'inscrire</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+
+  <!-- NAVBAR -->
+  <nav id="navbar">
+    <div class="nav-logo"><a href="https://www.modulimo.com" target="_blank" rel="noopener noreferrer"><img src="data:image/png;base64,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" alt="Modulimo" style="height:36px;width:auto;display:block"></a></div>
+    <div class="nav-tabs" id="nav-tabs"></div>
+    <div class="nav-right">
+      <div class="demo-badge" id="demo-badge" style="display:none">MODE DÉMO</div>
+      <div class="balance-pill" id="nav-balance" style="display:none"></div>
+      <div class="user-avatar" id="user-avatar" onclick="toggleUserMenu()">
+        <span id="avatar-initials">?</span>
+        <div class="notif-badge" id="notif-badge" style="display:none">0</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- PAGES -->
+  <main id="main">
+
+    <!-- ==================== TENANT: DASHBOARD ==================== -->
+    <div id="page-dashboard" class="page">
+      <div class="balance-display">
+        <div>
+          <div class="balance-label">Solde disponible</div>
+          <div>
+            <span class="balance-amount" id="balance-amount">0</span>
+            <span class="balance-unit">crédits</span>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="balance-label">Unité résidentielle</div>
+          <div style="font-size:1.4rem;font-family:var(--font-serif)" id="user-unit">—</div>
+        </div>
+      </div>
+      <div class="stats-grid" id="dashboard-stats"></div>
+      <div class="section-header">
+        <div class="section-title">
+          <h2>Mes réservations récentes</h2>
+        </div>
+      </div>
+      <div id="my-reservations-list"></div>
+    </div>
+
+    <!-- ==================== TENANT: ESPACES ==================== -->
+    <div id="page-spaces" class="page">
+      <div class="section-header">
+        <div class="section-title">
+          <h2>Espaces communs</h2>
+          <p>Réservez par tranches de 15 minutes</p>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <input type="text" id="spaces-search" placeholder="Rechercher un espace…" oninput="filterSpaces()">
+        <input type="date" id="spaces-date" onchange="filterSpaces()">
+      </div>
+      <div class="cards-grid" id="spaces-grid">
+        <div class="loading"><div class="spinner"></div> Chargement…</div>
+      </div>
+    </div>
+
+    <!-- ==================== TENANT: VÉHICULES / TRAJETS ==================== -->
+    <div id="page-trips" class="page">
+      <div class="section-header">
+        <div class="section-title">
+          <h2>Covoiturage & Véhicules</h2>
+          <p>Trajets disponibles et réservation de véhicules</p>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-create-trip" style="display:none" onclick="openCreateTrip()">
+          + Publier un trajet
+        </button>
+      </div>
+      <div class="admin-tabs">
+        <button class="admin-tab active" onclick="switchTripsTab('available')">Trajets disponibles</button>
+        <button class="admin-tab" onclick="switchTripsTab('mine')">Mes trajets</button>
+        <button class="admin-tab" id="driver-tab" style="display:none" onclick="switchTripsTab('driving')">En tant que chauffeur</button>
+      </div>
+      <div id="trips-grid">
+        <div class="loading"><div class="spinner"></div> Chargement…</div>
+      </div>
+    </div>
+
+    <!-- ==================== TENANT: MES TRANSACTIONS ==================== -->
+    <div id="page-transactions" class="page">
+      <div class="section-header">
+        <div class="section-title">
+          <h2>Historique des transactions</h2>
+        </div>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Montant</th>
+              <th>Solde après</th>
+            </tr>
+          </thead>
+          <tbody id="transactions-tbody">
+            <tr><td colspan="4"><div class="loading"><div class="spinner"></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ==================== ADMIN ==================== -->
+    <div id="page-admin" class="page">
+      <div class="section-header">
+        <div class="section-title">
+          <h2>Administration</h2>
+        </div>
+      </div>
+      <div class="admin-tabs">
+        <button class="admin-tab active" onclick="adminTab('tenants')">Locataires</button>
+        <button class="admin-tab" onclick="adminTab('spaces-admin')">Espaces</button>
+        <button class="admin-tab" onclick="adminTab('vehicles-admin')">Véhicules</button>
+        <button class="admin-tab" onclick="adminTab('payments')">Paiements</button>
+        <button class="admin-tab" onclick="adminTab('settings')" id="settings-tab" style="display:none">Paramètres</button>
+        <button class="admin-tab" onclick="adminTab('logs')">Logs</button>
+      </div>
+
+      <!-- Locataires -->
+      <div id="admin-tenants" class="admin-section">
+        <div class="section-header">
+          <div></div>
+          <button class="btn btn-primary btn-sm" onclick="openAddTenant()">+ Ajouter un locataire</button>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead><tr>
+              <th>Nom</th><th>Unité</th><th>Rôle</th><th>Chauffeur</th><th>Solde</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="tenants-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Espaces admin -->
+      <div id="admin-spaces-admin" class="admin-section" style="display:none">
+        <div class="section-header">
+          <div></div>
+          <button class="btn btn-primary btn-sm" onclick="openAddSpace()">+ Ajouter un espace</button>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead><tr>
+              <th>Espace</th><th>Capacité</th><th>Lieu</th><th>Prix/15min</th><th>Disponible</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="admin-spaces-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Véhicules admin -->
+      <div id="admin-vehicles-admin" class="admin-section" style="display:none">
+        <div class="section-header">
+          <div></div>
+          <button class="btn btn-primary btn-sm" onclick="openAddVehicle()">+ Ajouter un véhicule</button>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead><tr>
+              <th>Modèle</th><th>Plaque</th><th>Places</th><th>Cargo (m³)</th><th>Prix/min</th><th>Prix/km</th><th>Dispo</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="admin-vehicles-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Paiements -->
+      <div id="admin-payments" class="admin-section" style="display:none">
+        <div class="section-header">
+          <div class="section-title"><h3 style="font-size:1.1rem">Enregistrer un paiement réel</h3></div>
+        </div>
+        <div class="card" style="max-width:480px;margin-bottom:24px">
+          <div class="form-group">
+            <label>Locataire</label>
+            <select id="payment-tenant"></select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Montant réel ($)</label>
+              <input type="number" id="payment-real" placeholder="0.00" min="0" step="0.01">
+            </div>
+            <div class="form-group">
+              <label>Crédits alloués</label>
+              <input type="number" id="payment-virtual" placeholder="0.00" min="0" step="0.01">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Mode de paiement</label>
+            <select id="payment-method">
+              <option>Argent comptant</option>
+              <option>Virement bancaire</option>
+              <option>Chèque</option>
+              <option>Autre</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <input type="text" id="payment-notes" placeholder="Note optionnelle…">
+          </div>
+          <button class="btn btn-primary" onclick="recordPayment()">Enregistrer le paiement</button>
+        </div>
+        <div class="section-header">
+          <div class="section-title"><h3 style="font-size:1.1rem">Historique des paiements</h3></div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead><tr>
+              <th>Date</th><th>Locataire</th><th>Montant réel</th><th>Crédits</th><th>Mode</th><th>Admin</th>
+            </tr></thead>
+            <tbody id="payments-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Paramètres -->
+      <div id="admin-settings" class="admin-section" style="display:none">
+        <div class="card" style="max-width:540px">
+          <h3 style="margin-bottom:16px;font-size:1.2rem">Paramètres système</h3>
+          <div id="settings-form"></div>
+          <button class="btn btn-primary" style="margin-top:16px" onclick="saveSettings()">Sauvegarder</button>
+        </div>
+      </div>
+
+      <!-- Logs -->
+      <div id="admin-logs" class="admin-section" style="display:none">
+        <div class="table-container">
+          <table>
+            <thead><tr>
+              <th>Date</th><th>Utilisateur</th><th>Ressource</th><th>Action</th><th>Démo</th>
+            </tr></thead>
+            <tbody id="logs-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ==================== MODALS ==================== -->
+
+<!-- Space Booking Modal -->
+<div class="modal-overlay" id="modal-book-space">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="book-space-title">Réserver l'espace</h3>
+      <button class="modal-close" onclick="closeModal('modal-book-space')">×</button>
+    </div>
+    <div class="form-group">
+      <label>Date</label>
+      <input type="date" id="book-date">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Heure de début</label>
+        <input type="time" id="book-start" step="900">
+      </div>
+      <div class="form-group">
+        <label>Heure de fin</label>
+        <input type="time" id="book-end" step="900">
+      </div>
+    </div>
+    <div class="info-box" id="book-cost-preview"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-book-space')">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmBookSpace()">Confirmer la réservation</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Trip Modal -->
+<div class="modal-overlay" id="modal-create-trip">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <h3>Publier un trajet</h3>
+      <button class="modal-close" onclick="closeModal('modal-create-trip')">×</button>
+    </div>
+    <div class="form-group">
+      <label>Titre du trajet</label>
+      <input type="text" id="trip-title" placeholder="Ex: Aller au centre commercial">
+    </div>
+    <div class="form-group">
+      <label>Véhicule</label>
+      <select id="trip-vehicle"></select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Point de départ</label>
+        <input type="text" id="trip-from" placeholder="Adresse de départ">
+      </div>
+      <div class="form-group">
+        <label>Destination</label>
+        <input type="text" id="trip-to" placeholder="Adresse de destination">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Date et heure de départ</label>
+        <input type="datetime-local" id="trip-departure">
+      </div>
+      <div class="form-group">
+        <label>Distance estimée (km)</label>
+        <input type="number" id="trip-distance" placeholder="0" min="0" step="0.1">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Places disponibles (passagers)</label>
+        <input type="number" id="trip-seats" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label>Cargo disponible (%)</label>
+        <input type="number" id="trip-cargo" placeholder="100" min="0" max="100" value="100">
+      </div>
+    </div>
+    <p class="form-section-title">Personnes à charge</p>
+    <div id="dependents-list"></div>
+    <button class="btn btn-secondary btn-sm" onclick="addDependent()" style="margin-top:8px">+ Ajouter une personne à charge</button>
+    <p class="form-section-title">Arrêts intermédiaires</p>
+    <div id="stops-list"></div>
+    <button class="btn btn-secondary btn-sm" onclick="addStop()" style="margin-top:8px">+ Ajouter un arrêt</button>
+    <div class="form-group" style="margin-top:12px">
+      <label>Description (optionnel)</label>
+      <textarea id="trip-desc" rows="2" placeholder="Informations supplémentaires…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-create-trip')">Annuler</button>
+      <button class="btn btn-primary" onclick="submitCreateTrip()">Publier le trajet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Book Trip Modal (Passenger) -->
+<div class="modal-overlay" id="modal-book-trip">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-header">
+      <h3>Demande de covoiturage</h3>
+      <button class="modal-close" onclick="closeModal('modal-book-trip')">×</button>
+    </div>
+    <div id="book-trip-content"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-book-trip')">Annuler</button>
+      <button class="btn btn-primary" onclick="submitTripBooking()">Envoyer la demande</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Tenant Modal -->
+<div class="modal-overlay" id="modal-add-tenant">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Ajouter / Modifier un locataire</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-tenant')">×</button>
+    </div>
+    <div class="form-group">
+      <label>Nom complet</label>
+      <input type="text" id="tenant-name" placeholder="Prénom Nom">
+    </div>
+    <div class="form-group">
+      <label>Courriel</label>
+      <input type="email" id="tenant-email" placeholder="email@example.com">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Unité résidentielle</label>
+        <input type="text" id="tenant-unit" placeholder="Ex: 4B">
+      </div>
+      <div class="form-group">
+        <label>Rôle</label>
+        <select id="tenant-role">
+          <option value="tenant">Locataire</option>
+          <option value="admin">Administrateur</option>
+          <option value="principal_admin">Admin Principal</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>
+        <input type="checkbox" id="tenant-driver" style="width:auto;margin-right:6px">
+        Chauffeur approuvé
+      </label>
+    </div>
+    <div class="form-group">
+      <label>Crédit initial (crédits)</label>
+      <input type="number" id="tenant-balance" placeholder="0" min="0" value="0">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-tenant')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveTenant()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Space Modal -->
+<div class="modal-overlay" id="modal-add-space">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="space-modal-title">Ajouter un espace commun</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-space')">×</button>
+    </div>
+    <div class="form-group">
+      <label>Nom de l'espace</label>
+      <input type="text" id="space-name" placeholder="Salle communautaire, Terrasse…">
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="space-desc" rows="2" placeholder="Équipements, règles d'utilisation…"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Capacité (personnes)</label>
+        <input type="number" id="space-capacity" placeholder="1" min="1" value="1">
+      </div>
+      <div class="form-group">
+        <label>Localisation</label>
+        <input type="text" id="space-location" placeholder="Ex: Rez-de-chaussée">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Tarif par tranche de 15 min (crédits)</label>
+      <input type="number" id="space-price" placeholder="0.00" min="0" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>
+        <input type="checkbox" id="space-available" style="width:auto;margin-right:6px" checked>
+        Disponible à la réservation
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-space')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveSpace()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Vehicle Modal -->
+<div class="modal-overlay" id="modal-add-vehicle">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="vehicle-modal-title">Ajouter un véhicule</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-vehicle')">×</button>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Modèle</label>
+        <input type="text" id="veh-model" placeholder="Ex: Toyota Sienna 2022">
+      </div>
+      <div class="form-group">
+        <label>Plaque d'immatriculation</label>
+        <input type="text" id="veh-plate" placeholder="ABC-1234">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nombre de places</label>
+        <input type="number" id="veh-seats" placeholder="5" min="1" value="5">
+      </div>
+      <div class="form-group">
+        <label>Espace cargo (m³)</label>
+        <input type="number" id="veh-cargo" placeholder="0" min="0" step="0.1" value="0">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Couleur</label>
+        <input type="text" id="veh-color" placeholder="Blanc, Noir…">
+      </div>
+      <div class="form-group">
+        <label>Année</label>
+        <input type="number" id="veh-year" placeholder="2024" min="1990" max="2030">
+      </div>
+    </div>
+    <p class="form-section-title">Tarification</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Prix par minute (crédits)</label>
+        <input type="number" id="veh-price-min" placeholder="0.25" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>Prix par km (crédits)</label>
+        <input type="number" id="veh-price-km" placeholder="0.18" min="0" step="0.01">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Prix cargo par tranche 10% (crédits)</label>
+      <input type="number" id="veh-price-cargo" placeholder="0.50" min="0" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>
+        <input type="checkbox" id="veh-available" style="width:auto;margin-right:6px" checked>
+        Disponible
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-vehicle')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveVehicle()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Trip Driver View Modal -->
+<div class="modal-overlay" id="modal-trip-detail">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h3 id="trip-detail-title">Détails du trajet</h3>
+      <button class="modal-close" onclick="closeModal('modal-trip-detail')">×</button>
+    </div>
+    <div id="trip-detail-content"></div>
+    <div class="modal-footer" id="trip-detail-footer"></div>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// CONFIGURATION SUPABASE
+// ==========================================
+// ⚠️  REMPLACEZ CES VALEURS PAR VOS CLÉS SUPABASE
+const SUPABASE_URL = 'https://VOTRE_PROJECT_ID.supabase.co';
+const SUPABASE_ANON_KEY = 'VOTRE_ANON_KEY';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ==========================================
+// STATE GLOBAL
+// ==========================================
+let currentUser = null;
+let currentProfile = null;
+let isDemo = false;
+let authMode = 'login'; // 'login' | 'register'
+let editingId = null; // for modals in edit mode
+
+// Cache
+let spacesCache = [];
+let vehiclesCache = [];
+let tripsCache = [];
+let tenantsCache = [];
+let settingsCache = {};
+let currentBookingSpaceId = null;
+let currentBookingTripId = null;
+
+// ==========================================
+// INIT
+// ==========================================
+document.addEventListener('DOMContentLoaded', async () => {
+  // Set today's date as default
+  const today = new Date().toISOString().split('T')[0];
+  const spacesDate = document.getElementById('spaces-date');
+  if (spacesDate) spacesDate.value = today;
+
+  // Auth state change
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (session) {
+      currentUser = session.user;
+      await loadProfile();
+      showApp();
+    } else if (!isDemo) {
+      currentUser = null;
+      currentProfile = null;
+      showLogin();
+    }
+  });
+});
+
+// ==========================================
+// AUTH
+// ==========================================
+function toggleAuthMode() {
+  authMode = authMode === 'login' ? 'register' : 'login';
+  document.getElementById('auth-btn-text').textContent = authMode === 'login' ? 'Se connecter' : "S'inscrire";
+  document.getElementById('auth-toggle-text').textContent = authMode === 'login' ? 'Pas encore de compte ?' : 'Déjà un compte ?';
+  document.querySelector('.login-toggle button').textContent = authMode === 'login' ? " S'inscrire" : ' Se connecter';
+  document.getElementById('auth-name-group').style.display = authMode === 'register' ? 'block' : 'none';
+}
+
+async function authSubmit() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const name = document.getElementById('auth-name').value.trim();
+
+  if (!email || !password) { toast('Veuillez remplir tous les champs', 'error'); return; }
+
+  if (authMode === 'register') {
+    const { error } = await sb.auth.signUp({ email, password, options: { data: { full_name: name || email } } });
+    if (error) { toast(error.message, 'error'); return; }
+    toast('Compte créé ! Vérifiez votre courriel.', 'success');
+  } else {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) { toast('Identifiants incorrects', 'error'); return; }
+  }
+}
+
+async function loginDemo() {
+  isDemo = true;
+  currentProfile = {
+    id: '00000000-0000-0000-0000-000000000001',
+    email: 'demo@demo.local',
+    full_name: 'Utilisateur Démo',
+    unit: 'DEMO',
+    role: 'demo',
+    is_approved_driver: false,
+    virtual_balance: 0
+  };
+  showApp();
+  toast('Mode démo activé — consultation uniquement', 'info');
+}
+
+async function logout() {
+  if (isDemo) {
+    isDemo = false;
+    currentProfile = null;
+    currentUser = null;
+    showLogin();
+    return;
+  }
+  await sb.auth.signOut();
+}
+
+// ==========================================
+// PROFILE
+// ==========================================
+async function loadProfile() {
+  if (!currentUser) return;
+  const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  if (error) { toast('Erreur chargement profil', 'error'); return; }
+  currentProfile = data;
+}
+
+// ==========================================
+// NAVIGATION
+// ==========================================
+function showLogin() {
+  document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  buildNav();
+  navigateTo('dashboard');
+}
+
+function buildNav() {
+  const tabs = document.getElementById('nav-tabs');
+  const isAdmin = currentProfile?.role === 'admin' || currentProfile?.role === 'principal_admin';
+  const role = currentProfile?.role;
+
+  let html = '';
+  if (role !== 'demo') {
+    html += `<button class="nav-tab" onclick="navigateTo('dashboard')">Tableau de bord</button>`;
+  }
+  html += `<button class="nav-tab" onclick="navigateTo('spaces')">Espaces</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('trips')">Covoiturage</button>`;
+  if (role !== 'demo') {
+    html += `<button class="nav-tab" onclick="navigateTo('transactions')">Transactions</button>`;
+  }
+  if (isAdmin) {
+    html += `<button class="nav-tab" onclick="navigateTo('admin')">Admin</button>`;
+  }
+  tabs.innerHTML = html;
+
+  // Avatar
+  const initials = (currentProfile?.full_name || 'D').split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+  document.getElementById('avatar-initials').textContent = initials;
+
+  // Demo badge
+  document.getElementById('demo-badge').style.display = isDemo ? 'flex' : 'none';
+
+  // Balance
+  const balancePill = document.getElementById('nav-balance');
+  if (!isDemo && currentProfile) {
+    balancePill.style.display = 'flex';
+    balancePill.textContent = `₡ ${(currentProfile.virtual_balance || 0).toFixed(2)}`;
+  }
+
+  // Admin settings tab
+  if (currentProfile?.role === 'principal_admin') {
+    document.getElementById('settings-tab').style.display = '';
+  }
+}
+
+function navigateTo(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+
+  const pageEl = document.getElementById(`page-${page}`);
+  if (pageEl) pageEl.classList.add('active');
+
+  // Highlight nav tab
+  document.querySelectorAll('.nav-tab').forEach(t => {
+    if (t.textContent.toLowerCase().includes(pageName(page))) t.classList.add('active');
+  });
+
+  // Load page data
+  switch(page) {
+    case 'dashboard': loadDashboard(); break;
+    case 'spaces': loadSpaces(); break;
+    case 'trips': loadTrips(); break;
+    case 'transactions': loadTransactions(); break;
+    case 'admin': loadAdmin(); break;
+  }
+}
+
+function pageName(page) {
+  const map = { dashboard: 'tableau', spaces: 'espace', trips: 'covoiturage', transactions: 'transaction', admin: 'admin' };
+  return map[page] || page;
+}
+
+// ==========================================
+// TOAST
+// ==========================================
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ==========================================
+// MODAL HELPERS
+// ==========================================
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Click outside to close
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+});
+
+// ==========================================
+// DASHBOARD
+// ==========================================
+async function loadDashboard() {
+  if (!currentProfile) return;
+  document.getElementById('balance-amount').textContent = (currentProfile.virtual_balance || 0).toFixed(2);
+  document.getElementById('user-unit').textContent = currentProfile.unit || '—';
+
+  // Stats
+  let stats = [];
+  if (!isDemo) {
+    const { data: sRes } = await sb.from('space_reservations')
+      .select('id, status')
+      .eq('tenant_id', currentProfile.id);
+    const { data: tBook } = await sb.from('trip_bookings')
+      .select('id, status')
+      .eq('passenger_id', currentProfile.id);
+    stats = [
+      { label: 'Réservations d\'espaces', value: sRes?.length || 0 },
+      { label: 'Covoiturages', value: tBook?.length || 0 },
+      { label: 'Solde', value: `₡ ${(currentProfile.virtual_balance || 0).toFixed(2)}` },
+    ];
+    if (currentProfile.is_approved_driver) {
+      const { data: myTrips } = await sb.from('trips').select('id').eq('driver_id', currentProfile.id);
+      stats.push({ label: 'Trajets publiés', value: myTrips?.length || 0 });
+    }
+  }
+
+  document.getElementById('dashboard-stats').innerHTML = stats.map(s => `
+    <div class="stat-card">
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-value">${s.value}</div>
+    </div>
+  `).join('');
+
+  // Recent reservations
+  if (!isDemo) {
+    const { data: sRes } = await sb.from('space_reservations')
+      .select('*, common_spaces(name)')
+      .eq('tenant_id', currentProfile.id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    const { data: tBook } = await sb.from('trip_bookings')
+      .select('*, trips(title, departure_time)')
+      .eq('passenger_id', currentProfile.id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    const combined = [
+      ...(sRes || []).map(r => ({
+        type: 'Espace', name: r.common_spaces?.name, date: r.start_time, cost: r.total_cost, status: r.status
+      })),
+      ...(tBook || []).map(r => ({
+        type: 'Trajet', name: r.trips?.title, date: r.trips?.departure_time, cost: r.total_cost, status: r.status
+      }))
+    ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
+
+    const list = document.getElementById('my-reservations-list');
+    if (!combined.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Aucune réservation pour le moment</p></div>';
+    } else {
+      list.innerHTML = `<div class="table-container"><table>
+        <thead><tr><th>Type</th><th>Ressource</th><th>Date</th><th>Coût</th><th>Statut</th></tr></thead>
+        <tbody>${combined.map(r => `
+          <tr>
+            <td><span class="badge badge-gray">${r.type}</span></td>
+            <td>${r.name || '—'}</td>
+            <td>${r.date ? new Date(r.date).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
+            <td>₡ ${(r.cost || 0).toFixed(2)}</td>
+            <td><span class="badge ${statusBadge(r.status)}">${statusLabel(r.status)}</span></td>
+          </tr>
+        `).join('')}</tbody>
+      </table></div>`;
+    }
+  } else {
+    document.getElementById('my-reservations-list').innerHTML = `<div class="info-box">En mode démo, les réservations ne sont pas enregistrées à votre compte.</div>`;
+  }
+}
+
+function statusBadge(s) {
+  return { confirmed: 'badge-green', pending: 'badge-yellow', cancelled: 'badge-red', completed: 'badge-gray', accepted: 'badge-green', rejected: 'badge-red' }[s] || 'badge-gray';
+}
+function statusLabel(s) {
+  return { confirmed: 'Confirmée', pending: 'En attente', cancelled: 'Annulée', completed: 'Terminée', accepted: 'Acceptée', rejected: 'Refusée' }[s] || s;
+}
+
+// ==========================================
+// SPACES
+// ==========================================
+async function loadSpaces() {
+  const grid = document.getElementById('spaces-grid');
+  grid.innerHTML = '<div class="loading"><div class="spinner"></div> Chargement…</div>';
+  const { data, error } = await sb.from('common_spaces')
+    .select('*, space_pricing(price_per_slot)')
+    .eq('is_available', true)
+    .order('name');
+  if (error) { grid.innerHTML = '<div class="empty-state"><p>Erreur de chargement</p></div>'; return; }
+  spacesCache = data || [];
+  renderSpaces(spacesCache);
+}
+
+function renderSpaces(spaces) {
+  const grid = document.getElementById('spaces-grid');
+  if (!spaces.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🏠</div><p>Aucun espace disponible</p></div>';
+    return;
+  }
+  grid.innerHTML = spaces.map(s => {
+    const price = s.space_pricing?.[0]?.price_per_slot || 0;
+    return `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${s.name}</div>
+          <div class="card-subtitle">${s.location || ''}</div>
+        </div>
+        <span class="badge badge-green">Disponible</span>
+      </div>
+      <div class="card-meta">
+        <span class="meta-item">👥 ${s.capacity} personnes</span>
+        ${s.description ? `<span class="meta-item">📝 ${s.description.slice(0,40)}${s.description.length > 40 ? '…' : ''}</span>` : ''}
+      </div>
+      <div class="card-price">₡ ${price.toFixed(2)} <small style="font-size:.75rem;color:var(--text2)">/ 15 min</small></div>
+      <div class="card-actions">
+        ${!isDemo 
+          ? `<button class="btn btn-primary btn-sm" onclick="openBookSpace('${s.id}', '${escHtml(s.name)}')">Réserver</button>`
+          : `<button class="btn btn-secondary btn-sm" disabled>Démo — lecture seule</button>`
+        }
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterSpaces() {
+  const q = document.getElementById('spaces-search').value.toLowerCase();
+  renderSpaces(spacesCache.filter(s => !q || s.name.toLowerCase().includes(q) || (s.location || '').toLowerCase().includes(q)));
+}
+
+function openBookSpace(spaceId, spaceName) {
+  currentBookingSpaceId = spaceId;
+  document.getElementById('book-space-title').textContent = `Réserver — ${spaceName}`;
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('book-date').value = today;
+  document.getElementById('book-start').value = '09:00';
+  document.getElementById('book-end').value = '10:00';
+  updateBookCostPreview();
+  openModal('modal-book-space');
+}
+
+function updateBookCostPreview() {
+  const space = spacesCache.find(s => s.id === currentBookingSpaceId);
+  if (!space) return;
+  const price = space.space_pricing?.[0]?.price_per_slot || 0;
+  const start = document.getElementById('book-start').value;
+  const end = document.getElementById('book-end').value;
+  if (start && end && end > start) {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    const minutes = (eh * 60 + em) - (sh * 60 + sm);
+    const slots = Math.ceil(minutes / 15);
+    const cost = slots * price;
+    document.getElementById('book-cost-preview').innerHTML = 
+      `<strong>${slots} tranche(s) de 15 min</strong> — Coût total: <strong>₡ ${cost.toFixed(2)}</strong>`;
+  }
+}
+
+document.getElementById('book-start').addEventListener('change', updateBookCostPreview);
+document.getElementById('book-end').addEventListener('change', updateBookCostPreview);
+
+async function confirmBookSpace() {
+  if (isDemo) {
+    await logRequest(currentBookingSpaceId, 'space', 'request', { demo: true });
+    toast('Mode démo: demande enregistrée sans réservation réelle', 'info');
+    closeModal('modal-book-space');
+    return;
+  }
+  const date = document.getElementById('book-date').value;
+  const start = document.getElementById('book-start').value;
+  const end = document.getElementById('book-end').value;
+  if (!date || !start || !end) { toast('Veuillez remplir tous les champs', 'error'); return; }
+  if (end <= start) { toast('L\'heure de fin doit être après le début', 'error'); return; }
+
+  const startDT = `${date}T${start}:00`;
+  const endDT = `${date}T${end}:00`;
+  const space = spacesCache.find(s => s.id === currentBookingSpaceId);
+  const price = space?.space_pricing?.[0]?.price_per_slot || 0;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const minutes = (eh * 60 + em) - (sh * 60 + sm);
+  const slots = Math.ceil(minutes / 15);
+  const cost = slots * price;
+
+  if (currentProfile.virtual_balance < cost) {
+    toast('Solde insuffisant pour cette réservation', 'error'); return;
+  }
+
+  // Check availability
+  const { data: avail } = await sb.rpc('check_space_availability', {
+    p_space_id: currentBookingSpaceId, p_start: startDT, p_end: endDT
+  });
+  if (!avail) { toast('Cet espace n\'est pas disponible sur ce créneau', 'error'); return; }
+
+  // Create reservation
+  const { data: res, error } = await sb.from('space_reservations').insert({
+    space_id: currentBookingSpaceId,
+    tenant_id: currentProfile.id,
+    start_time: startDT,
+    end_time: endDT,
+    total_slots: slots,
+    total_cost: cost,
+    status: 'confirmed'
+  }).select().single();
+
+  if (error) { toast('Erreur lors de la réservation: ' + error.message, 'error'); return; }
+
+  // Debit balance
+  await sb.rpc('adjust_balance', {
+    p_user_id: currentProfile.id,
+    p_amount: -cost,
+    p_type: 'space_reservation',
+    p_reference_id: res.id,
+    p_reference_type: 'space_reservation',
+    p_description: `Réservation ${space?.name}`
+  });
+
+  currentProfile.virtual_balance -= cost;
+  document.getElementById('nav-balance').textContent = `₡ ${currentProfile.virtual_balance.toFixed(2)}`;
+
+  toast('Réservation confirmée !', 'success');
+  closeModal('modal-book-space');
+  await logRequest(currentBookingSpaceId, 'space', 'book', { reservation_id: res.id });
+}
+
+// ==========================================
+// TRIPS
+// ==========================================
+let currentTripsTab = 'available';
+
+async function loadTrips() {
+  const isDriver = currentProfile?.is_approved_driver;
+  document.getElementById('btn-create-trip').style.display = isDriver && !isDemo ? '' : 'none';
+  document.getElementById('driver-tab').style.display = isDriver ? '' : 'none';
+  await renderTripsTab();
+}
+
+function switchTripsTab(tab) {
+  currentTripsTab = tab;
+  document.querySelectorAll('#page-trips .admin-tab').forEach((t, i) => {
+    t.classList.toggle('active', ['available', 'mine', 'driving'][i] === tab);
+  });
+  renderTripsTab();
+}
+
+async function renderTripsTab() {
+  const grid = document.getElementById('trips-grid');
+  grid.innerHTML = '<div class="loading"><div class="spinner"></div> Chargement…</div>';
+
+  let query = sb.from('trips_with_details').select('*');
+
+  if (currentTripsTab === 'available') {
+    query = query.eq('status', 'published').gt('departure_time', new Date().toISOString());
+  } else if (currentTripsTab === 'mine') {
+    query = query.eq('passenger_join', currentProfile?.id);
+    // Fallback: get bookings
+    const { data: bookings } = await sb.from('trip_bookings')
+      .select('*, trips(*), trips_with_details(*)')
+      .eq('passenger_id', currentProfile?.id)
+      .order('created_at', { ascending: false });
+    renderTripBookings(bookings || []);
+    return;
+  } else if (currentTripsTab === 'driving') {
+    query = query.eq('driver_id', currentProfile?.id);
+  }
+
+  const { data, error } = await query.order('departure_time').limit(50);
+  tripsCache = data || [];
+
+  if (!tripsCache.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🚗</div><p>Aucun trajet trouvé</p></div>';
+    return;
+  }
+
+  if (currentTripsTab === 'driving') {
+    renderDriverTrips(tripsCache);
+  } else {
+    renderAvailableTrips(tripsCache);
+  }
+}
+
+function renderAvailableTrips(trips) {
+  const grid = document.getElementById('trips-grid');
+  grid.innerHTML = `<div class="cards-grid">${trips.map(t => {
+    const seatsLeft = t.available_seats - (t.booked_seats || 0);
+    const cargoLeft = t.cargo_available_pct - (t.booked_cargo_pct || 0);
+    const depTime = new Date(t.departure_time);
+    return `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${escHtml(t.title)}</div>
+          <div class="card-subtitle">Chauffeur: ${escHtml(t.driver_name)} · Unité ${t.driver_unit || '?'}</div>
+        </div>
+        <span class="badge ${seatsLeft > 0 ? 'badge-green' : 'badge-red'}">${seatsLeft > 0 ? seatsLeft + ' place(s)' : 'Complet'}</span>
+      </div>
+      <div class="trip-route">
+        <div class="route-line"></div>
+        <div class="route-point">
+          <div class="point-name">📍 ${escHtml(t.departure_point)}</div>
+          <div class="point-time">${depTime.toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+        </div>
+        <div class="route-point">
+          <div class="point-name">🏁 ${escHtml(t.destination)}</div>
+          <div class="point-time">${t.estimated_distance_km ? t.estimated_distance_km + ' km' : ''}</div>
+        </div>
+      </div>
+      <div class="card-meta">
+        <span class="meta-item">🚗 ${escHtml(t.vehicle_model)}</span>
+        <span class="meta-item">📦 Cargo: ${cargoLeft}% dispo</span>
+        ${t.price_per_minute ? `<span class="meta-item">₡ ${t.price_per_minute}/min + ${t.price_per_km}/km</span>` : ''}
+      </div>
+      <div class="card-actions">
+        ${!isDemo && currentProfile?.id !== t.driver_id && seatsLeft > 0
+          ? `<button class="btn btn-primary btn-sm" onclick="openBookTrip('${t.id}')">Demander une place</button>`
+          : isDemo ? `<button class="btn btn-secondary btn-sm" disabled>Démo</button>`
+          : ''
+        }
+        <button class="btn btn-secondary btn-sm" onclick="openTripDetail('${t.id}')">Détails</button>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderDriverTrips(trips) {
+  const grid = document.getElementById('trips-grid');
+  grid.innerHTML = `<div class="cards-grid">${trips.map(t => {
+    const depTime = new Date(t.departure_time);
+    return `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${escHtml(t.title)}</div>
+          <div class="card-subtitle">${depTime.toLocaleString('fr-CA', { dateStyle: 'full', timeStyle: 'short' })}</div>
+        </div>
+        <span class="badge ${statusBadge(t.status)}">${statusLabel(t.status)}</span>
+      </div>
+      <div class="trip-route">
+        <div class="route-line"></div>
+        <div class="route-point"><div class="point-name">📍 ${escHtml(t.departure_point)}</div></div>
+        <div class="route-point"><div class="point-name">🏁 ${escHtml(t.destination)}</div></div>
+      </div>
+      <div class="card-meta">
+        <span class="meta-item">🚗 ${escHtml(t.vehicle_model)}</span>
+        <span class="meta-item">👥 ${t.booked_seats || 0}/${t.available_seats} places</span>
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-secondary btn-sm" onclick="openTripDetail('${t.id}')">Gérer</button>
+        ${t.status === 'published' ? `<button class="btn btn-danger btn-sm" onclick="cancelTrip('${t.id}')">Annuler</button>` : ''}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderTripBookings(bookings) {
+  const grid = document.getElementById('trips-grid');
+  if (!bookings.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🎫</div><p>Aucun covoiturage réservé</p></div>';
+    return;
+  }
+  grid.innerHTML = `<div class="table-container"><table>
+    <thead><tr><th>Trajet</th><th>Départ</th><th>Embarquement</th><th>Coût</th><th>Statut</th><th>Actions</th></tr></thead>
+    <tbody>${bookings.map(b => `
+      <tr>
+        <td>${b.trips?.title || '—'}</td>
+        <td>${b.trips?.departure_time ? new Date(b.trips.departure_time).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
+        <td>${b.pickup_location || '—'}</td>
+        <td>₡ ${(b.total_cost || 0).toFixed(2)}</td>
+        <td><span class="badge ${statusBadge(b.status)}">${statusLabel(b.status)}</span></td>
+        <td>${b.status === 'pending' || b.status === 'accepted' ? `<button class="btn btn-danger btn-sm" onclick="cancelBooking('${b.id}')">Annuler</button>` : ''}</td>
+      </tr>
+    `).join('')}</tbody>
+  </table></div>`;
+}
+
+function openBookTrip(tripId) {
+  currentBookingTripId = tripId;
+  const trip = tripsCache.find(t => t.id === tripId);
+  if (!trip) return;
+
+  const cargoLeft = trip.cargo_available_pct - (trip.booked_cargo_pct || 0);
+  const seatsLeft = trip.available_seats - (trip.booked_seats || 0);
+
+  document.getElementById('book-trip-content').innerHTML = `
+    <div class="info-box" style="margin-bottom:14px">
+      <strong>${escHtml(trip.title)}</strong><br>
+      ${escHtml(trip.departure_point)} → ${escHtml(trip.destination)}<br>
+      Chauffeur: ${escHtml(trip.driver_name)} · ${new Date(trip.departure_time).toLocaleString('fr-CA', { dateStyle: 'full', timeStyle: 'short' })}
+    </div>
+    <div class="form-group">
+      <label>Point d'embarquement souhaité</label>
+      <input type="text" id="booking-pickup" placeholder="Votre adresse de départ" value="${escHtml(trip.departure_point)}">
+    </div>
+    <div class="form-group">
+      <label>Point de dépôt souhaité</label>
+      <input type="text" id="booking-dropoff" placeholder="Votre adresse de destination" value="${escHtml(trip.destination)}">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nombre de places (max ${seatsLeft})</label>
+        <input type="number" id="booking-seats" value="1" min="1" max="${seatsLeft}">
+      </div>
+      <div class="form-group">
+        <label>Cargo souhaité (%)</label>
+        <select id="booking-cargo">
+          ${Array.from({length: Math.floor(cargoLeft/10)+1}, (_, i) => i*10).map(v => `<option value="${v}">${v}%</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="info-box">
+      <strong>Tarification:</strong> ₡ ${trip.price_per_minute}/min + ₡ ${trip.price_per_km}/km<br>
+      Les détours par rapport à la route principale seront facturés séparément.
+      Le chauffeur devra accepter votre demande.
+    </div>
+  `;
+  openModal('modal-book-trip');
+}
+
+async function submitTripBooking() {
+  if (isDemo) {
+    await logRequest(currentBookingTripId, 'trip', 'request', { demo: true });
+    toast('Mode démo: demande enregistrée sans réservation réelle', 'info');
+    closeModal('modal-book-trip');
+    return;
+  }
+
+  const pickup = document.getElementById('booking-pickup').value;
+  const dropoff = document.getElementById('booking-dropoff').value;
+  const seats = parseInt(document.getElementById('booking-seats').value) || 1;
+  const cargo = parseInt(document.getElementById('booking-cargo').value) || 0;
+
+  if (!pickup || !dropoff) { toast('Veuillez remplir les points d\'embarquement et de dépôt', 'error'); return; }
+
+  const { data, error } = await sb.from('trip_bookings').insert({
+    trip_id: currentBookingTripId,
+    passenger_id: currentProfile.id,
+    pickup_location: pickup,
+    dropoff_location: dropoff,
+    seats_requested: seats,
+    cargo_pct_requested: cargo,
+    status: 'pending'
+  }).select().single();
+
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  await logRequest(currentBookingTripId, 'trip', 'request', { booking_id: data.id });
+  toast('Demande envoyée ! Le chauffeur doit l\'accepter.', 'success');
+  closeModal('modal-book-trip');
+}
+
+async function cancelBooking(bookingId) {
+  if (!confirm('Confirmer l\'annulation ?')) return;
+  const { error } = await sb.from('trip_bookings')
+    .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+    .eq('id', bookingId);
+  if (error) { toast('Erreur annulation', 'error'); return; }
+  toast('Réservation annulée', 'success');
+  loadTrips();
+}
+
+async function cancelTrip(tripId) {
+  if (!confirm('Annuler ce trajet ? Les passagers seront notifiés.')) return;
+  const { error } = await sb.from('trips')
+    .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+    .eq('id', tripId);
+  if (error) { toast('Erreur annulation', 'error'); return; }
+  toast('Trajet annulé', 'success');
+  loadTrips();
+}
+
+async function openTripDetail(tripId) {
+  const { data: trip } = await sb.from('trips_with_details').select('*').eq('id', tripId).single();
+  const { data: bookings } = await sb.from('trip_bookings')
+    .select('*, profiles(full_name, unit)')
+    .eq('trip_id', tripId)
+    .neq('status', 'cancelled');
+
+  if (!trip) return;
+  document.getElementById('trip-detail-title').textContent = trip.title;
+
+  const isDriver = trip.driver_id === currentProfile?.id;
+  const depTime = new Date(trip.departure_time);
+
+  let passengersHtml = '';
+  if (bookings?.length) {
+    passengersHtml = `<div class="passengers-list">${bookings.map(b => `
+      <div class="passenger-row">
+        <span>${b.profiles?.full_name} (Unité ${b.profiles?.unit}) — ${b.pickup_location} → ${b.dropoff_location} — ${b.seats_requested} place(s)</span>
+        <span>
+          <span class="badge ${statusBadge(b.status)}">${statusLabel(b.status)}</span>
+          ${isDriver && b.status === 'pending' ? `
+            <button class="btn btn-success btn-sm" style="margin-left:6px" onclick="acceptBooking('${b.id}')">✓</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectBooking('${b.id}')">✗</button>
+          ` : ''}
+        </span>
+      </div>
+    `).join('')}</div>`;
+  } else {
+    passengersHtml = '<p style="color:var(--text3);font-size:.9rem">Aucun passager pour l\'instant</p>';
+  }
+
+  document.getElementById('trip-detail-content').innerHTML = `
+    <div class="trip-route" style="margin-bottom:16px">
+      <div class="route-line"></div>
+      <div class="route-point">
+        <div class="point-name">📍 ${escHtml(trip.departure_point)}</div>
+        <div class="point-time">${depTime.toLocaleString('fr-CA', { dateStyle: 'full', timeStyle: 'short' })}</div>
+      </div>
+      <div class="route-point">
+        <div class="point-name">🏁 ${escHtml(trip.destination)}</div>
+        <div class="point-time">${trip.estimated_distance_km ? trip.estimated_distance_km + ' km estimés' : ''}</div>
+      </div>
+    </div>
+    <div class="card-meta" style="margin-bottom:12px">
+      <span class="meta-item">🚗 ${escHtml(trip.vehicle_model)} — ${trip.license_plate}</span>
+      <span class="meta-item">👥 ${trip.booked_seats || 0}/${trip.available_seats} places</span>
+      <span class="meta-item">📦 Cargo: ${trip.cargo_available_pct - (trip.booked_cargo_pct || 0)}% restant</span>
+    </div>
+    <p class="form-section-title">Passagers</p>
+    ${passengersHtml}
+    ${trip.description ? `<p style="color:var(--text2);font-size:.88rem;margin-top:12px">${escHtml(trip.description)}</p>` : ''}
+  `;
+
+  document.getElementById('trip-detail-footer').innerHTML = isDriver && trip.status === 'published' ? `
+    <button class="btn btn-danger" onclick="cancelTrip('${trip.id}');closeModal('modal-trip-detail')">Annuler le trajet</button>
+  ` : '<button class="btn btn-secondary" onclick="closeModal(\'modal-trip-detail\')">Fermer</button>';
+
+  openModal('modal-trip-detail');
+}
+
+async function acceptBooking(id) {
+  await sb.from('trip_bookings').update({ status: 'accepted' }).eq('id', id);
+  toast('Passager accepté', 'success');
+  document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+}
+
+async function rejectBooking(id) {
+  await sb.from('trip_bookings').update({ status: 'rejected' }).eq('id', id);
+  toast('Passager refusé', 'info');
+  document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+}
+
+// Create Trip
+let dependentsCount = 0;
+let stopsCount = 0;
+
+async function openCreateTrip() {
+  dependentsCount = 0; stopsCount = 0;
+  document.getElementById('dependents-list').innerHTML = '';
+  document.getElementById('stops-list').innerHTML = '';
+
+  const { data: vehicles } = await sb.from('vehicles').select('*').eq('is_available', true);
+  vehiclesCache = vehicles || [];
+  document.getElementById('trip-vehicle').innerHTML = vehiclesCache.map(v =>
+    `<option value="${v.id}">${v.model} (${v.license_plate})</option>`
+  ).join('');
+
+  const now = new Date();
+  now.setHours(now.getHours() + 1, 0, 0, 0);
+  document.getElementById('trip-departure').value = now.toISOString().slice(0, 16);
+  openModal('modal-create-trip');
+}
+
+function addDependent() {
+  dependentsCount++;
+  const div = document.createElement('div');
+  div.className = 'form-row';
+  div.style.marginBottom = '8px';
+  div.id = `dep-${dependentsCount}`;
+  div.innerHTML = `
+    <input type="text" placeholder="Nom de la personne" id="dep-name-${dependentsCount}">
+    <input type="number" placeholder="Siège #" min="1" id="dep-seat-${dependentsCount}" style="max-width:100px">
+  `;
+  document.getElementById('dependents-list').appendChild(div);
+}
+
+function addStop() {
+  stopsCount++;
+  const div = document.createElement('div');
+  div.style.marginBottom = '8px';
+  div.id = `stop-${stopsCount}`;
+  div.innerHTML = `
+    <div class="form-row">
+      <input type="text" placeholder="Lieu de l'arrêt" id="stop-loc-${stopsCount}">
+      <input type="datetime-local" id="stop-time-${stopsCount}">
+    </div>
+  `;
+  document.getElementById('stops-list').appendChild(div);
+}
+
+async function submitCreateTrip() {
+  const title = document.getElementById('trip-title').value.trim();
+  const vehicleId = document.getElementById('trip-vehicle').value;
+  const from = document.getElementById('trip-from').value.trim();
+  const to = document.getElementById('trip-to').value.trim();
+  const departure = document.getElementById('trip-departure').value;
+  const distance = parseFloat(document.getElementById('trip-distance').value) || null;
+  const seats = parseInt(document.getElementById('trip-seats').value) || 0;
+  const cargo = parseInt(document.getElementById('trip-cargo').value) || 100;
+  const desc = document.getElementById('trip-desc').value.trim();
+
+  if (!title || !vehicleId || !from || !to || !departure) {
+    toast('Veuillez remplir les champs obligatoires', 'error'); return;
+  }
+
+  const { data: trip, error } = await sb.from('trips').insert({
+    vehicle_id: vehicleId,
+    driver_id: currentProfile.id,
+    title,
+    departure_point: from,
+    destination: to,
+    departure_time: departure,
+    estimated_distance_km: distance,
+    available_seats: seats,
+    cargo_available_pct: cargo,
+    description: desc || null,
+    status: 'published'
+  }).select().single();
+
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+
+  // Save stops
+  for (let i = 1; i <= stopsCount; i++) {
+    const loc = document.getElementById(`stop-loc-${i}`)?.value;
+    const time = document.getElementById(`stop-time-${i}`)?.value;
+    if (loc) {
+      await sb.from('trip_stops').insert({ trip_id: trip.id, stop_order: i, location: loc, estimated_arrival: time || null });
+    }
+  }
+
+  // Save dependents
+  for (let i = 1; i <= dependentsCount; i++) {
+    const name = document.getElementById(`dep-name-${i}`)?.value;
+    const seat = document.getElementById(`dep-seat-${i}`)?.value;
+    if (name) {
+      await sb.from('driver_dependent_seats').insert({ trip_id: trip.id, driver_id: currentProfile.id, dependent_name: name, seat_number: seat || null });
+    }
+  }
+
+  toast('Trajet publié !', 'success');
+  closeModal('modal-create-trip');
+  loadTrips();
+}
+
+// ==========================================
+// TRANSACTIONS
+// ==========================================
+async function loadTransactions() {
+  if (isDemo) {
+    document.getElementById('transactions-tbody').innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text3)">Non disponible en mode démo</td></tr>`;
+    return;
+  }
+  const { data } = await sb.from('transactions')
+    .select('*')
+    .eq('user_id', currentProfile.id)
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  document.getElementById('transactions-tbody').innerHTML = (data || []).map(t => `
+    <tr>
+      <td style="white-space:nowrap">${new Date(t.created_at).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+      <td>${escHtml(t.description || txLabel(t.type))}</td>
+      <td style="color:${t.amount >= 0 ? 'var(--accent2)' : 'var(--accent3)'};font-weight:600">
+        ${t.amount >= 0 ? '+' : ''}₡ ${t.amount.toFixed(2)}
+      </td>
+      <td>₡ ${t.balance_after.toFixed(2)}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--text3)">Aucune transaction</td></tr>`;
+}
+
+function txLabel(type) {
+  const labels = {
+    admin_credit: 'Crédit par administrateur', space_reservation: 'Réservation espace',
+    space_cancel_refund: 'Remboursement espace', trip_booking: 'Réservation covoiturage',
+    trip_cancel_refund: 'Remboursement trajet', trip_cancel_charge: 'Frais annulation',
+    trip_driver_earning: 'Gain chauffeur', trip_driver_charge: 'Frais chauffeur annulation', demo: 'Transaction démo'
+  };
+  return labels[type] || type;
+}
+
+// ==========================================
+// ADMIN
+// ==========================================
+let currentAdminTab = 'tenants';
+
+async function loadAdmin() {
+  await adminTab('tenants');
+}
+
+async function adminTab(tab) {
+  currentAdminTab = tab;
+  document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none');
+  document.querySelectorAll('#page-admin .admin-tab').forEach(t => t.classList.remove('active'));
+  const el = document.getElementById(`admin-${tab}`);
+  if (el) el.style.display = '';
+  event?.target?.classList?.add('active');
+
+  switch(tab) {
+    case 'tenants': await loadTenants(); break;
+    case 'spaces-admin': await loadAdminSpaces(); break;
+    case 'vehicles-admin': await loadAdminVehicles(); break;
+    case 'payments': await loadAdminPayments(); break;
+    case 'settings': await loadSettings(); break;
+    case 'logs': await loadLogs(); break;
+  }
+}
+
+// --- Tenants ---
+async function loadTenants() {
+  const { data } = await sb.from('profiles').select('*').neq('role', 'demo').order('full_name');
+  tenantsCache = data || [];
+  document.getElementById('tenants-tbody').innerHTML = tenantsCache.map(t => `
+    <tr>
+      <td>${escHtml(t.full_name)}</td>
+      <td>${t.unit || '—'}</td>
+      <td><span class="badge badge-gray">${t.role}</span></td>
+      <td>${t.is_approved_driver ? '<span class="badge badge-green">✓ Chauffeur</span>' : '—'}</td>
+      <td>₡ ${(t.virtual_balance || 0).toFixed(2)}</td>
+      <td class="td-actions">
+        <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Modifier</button>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text3)">Aucun locataire</td></tr>';
+}
+
+function openAddTenant() {
+  editingId = null;
+  document.getElementById('tenant-name').value = '';
+  document.getElementById('tenant-email').value = '';
+  document.getElementById('tenant-unit').value = '';
+  document.getElementById('tenant-role').value = 'tenant';
+  document.getElementById('tenant-driver').checked = false;
+  document.getElementById('tenant-balance').value = '0';
+  openModal('modal-add-tenant');
+}
+
+function editTenant(id) {
+  editingId = id;
+  const t = tenantsCache.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('tenant-name').value = t.full_name;
+  document.getElementById('tenant-email').value = t.email;
+  document.getElementById('tenant-unit').value = t.unit || '';
+  document.getElementById('tenant-role').value = t.role;
+  document.getElementById('tenant-driver').checked = t.is_approved_driver;
+  document.getElementById('tenant-balance').value = t.virtual_balance || 0;
+  openModal('modal-add-tenant');
+}
+
+async function saveTenant() {
+  const name = document.getElementById('tenant-name').value.trim();
+  const email = document.getElementById('tenant-email').value.trim();
+  const unit = document.getElementById('tenant-unit').value.trim();
+  const role = document.getElementById('tenant-role').value;
+  const driver = document.getElementById('tenant-driver').checked;
+  const balance = parseFloat(document.getElementById('tenant-balance').value) || 0;
+
+  if (editingId) {
+    const { error } = await sb.from('profiles').update({ full_name: name, unit, role, is_approved_driver: driver, virtual_balance: balance }).eq('id', editingId);
+    if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+    toast('Locataire mis à jour', 'success');
+  } else {
+    toast('Pour ajouter un locataire, il doit s\'inscrire via la page de connexion. Vous pouvez ensuite modifier son profil.', 'info');
+  }
+  closeModal('modal-add-tenant');
+  loadTenants();
+}
+
+// --- Admin Spaces ---
+async function loadAdminSpaces() {
+  const { data } = await sb.from('common_spaces').select('*, space_pricing(price_per_slot)').order('name');
+  document.getElementById('admin-spaces-tbody').innerHTML = (data || []).map(s => `
+    <tr>
+      <td>${escHtml(s.name)}</td>
+      <td>${s.capacity}</td>
+      <td>${s.location || '—'}</td>
+      <td>₡ ${(s.space_pricing?.[0]?.price_per_slot || 0).toFixed(2)}</td>
+      <td><span class="badge ${s.is_available ? 'badge-green' : 'badge-red'}">${s.is_available ? 'Oui' : 'Non'}</span></td>
+      <td class="td-actions">
+        <button class="btn btn-secondary btn-sm" onclick="editSpace('${s.id}')">Modifier</button>
+        <button class="btn btn-danger btn-sm" onclick="toggleSpace('${s.id}', ${!s.is_available})">${s.is_available ? 'Désactiver' : 'Activer'}</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openAddSpace() {
+  editingId = null;
+  document.getElementById('space-modal-title').textContent = 'Ajouter un espace commun';
+  ['space-name', 'space-desc', 'space-location'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('space-capacity').value = '1';
+  document.getElementById('space-price').value = '';
+  document.getElementById('space-available').checked = true;
+  openModal('modal-add-space');
+}
+
+async function editSpace(id) {
+  editingId = id;
+  const { data: s } = await sb.from('common_spaces').select('*, space_pricing(price_per_slot)').eq('id', id).single();
+  if (!s) return;
+  document.getElementById('space-modal-title').textContent = 'Modifier l\'espace';
+  document.getElementById('space-name').value = s.name;
+  document.getElementById('space-desc').value = s.description || '';
+  document.getElementById('space-capacity').value = s.capacity;
+  document.getElementById('space-location').value = s.location || '';
+  document.getElementById('space-price').value = s.space_pricing?.[0]?.price_per_slot || '';
+  document.getElementById('space-available').checked = s.is_available;
+  openModal('modal-add-space');
+}
+
+async function saveSpace() {
+  const name = document.getElementById('space-name').value.trim();
+  const desc = document.getElementById('space-desc').value.trim();
+  const capacity = parseInt(document.getElementById('space-capacity').value) || 1;
+  const location = document.getElementById('space-location').value.trim();
+  const price = parseFloat(document.getElementById('space-price').value) || 0;
+  const available = document.getElementById('space-available').checked;
+
+  if (!name) { toast('Nom requis', 'error'); return; }
+
+  let spaceId = editingId;
+  if (editingId) {
+    await sb.from('common_spaces').update({ name, description: desc, capacity, location, is_available: available }).eq('id', editingId);
+  } else {
+    const { data } = await sb.from('common_spaces').insert({ name, description: desc, capacity, location, is_available: available, created_by: currentProfile.id }).select().single();
+    spaceId = data?.id;
+  }
+  // Update pricing
+  if (spaceId && price >= 0) {
+    await sb.from('space_pricing').upsert({ space_id: spaceId, price_per_slot: price, created_by: currentProfile.id });
+  }
+  toast('Espace enregistré', 'success');
+  closeModal('modal-add-space');
+  loadAdminSpaces();
+}
+
+async function toggleSpace(id, val) {
+  await sb.from('common_spaces').update({ is_available: val }).eq('id', id);
+  loadAdminSpaces();
+}
+
+// --- Admin Vehicles ---
+async function loadAdminVehicles() {
+  const { data } = await sb.from('vehicles').select('*, vehicle_pricing(price_per_minute, price_per_km, price_per_cargo_slot)').order('model');
+  document.getElementById('admin-vehicles-tbody').innerHTML = (data || []).map(v => `
+    <tr>
+      <td>${escHtml(v.model)}</td>
+      <td>${v.license_plate}</td>
+      <td>${v.seat_count}</td>
+      <td>${v.cargo_capacity_m3 || 0}</td>
+      <td>₡ ${(v.vehicle_pricing?.[0]?.price_per_minute || 0).toFixed(2)}</td>
+      <td>₡ ${(v.vehicle_pricing?.[0]?.price_per_km || 0).toFixed(2)}</td>
+      <td><span class="badge ${v.is_available ? 'badge-green' : 'badge-red'}">${v.is_available ? 'Oui' : 'Non'}</span></td>
+      <td class="td-actions">
+        <button class="btn btn-secondary btn-sm" onclick="editVehicle('${v.id}')">Modifier</button>
+        <button class="btn btn-danger btn-sm" onclick="toggleVehicle('${v.id}', ${!v.is_available})">${v.is_available ? 'Désactiver' : 'Activer'}</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openAddVehicle() {
+  editingId = null;
+  document.getElementById('vehicle-modal-title').textContent = 'Ajouter un véhicule';
+  ['veh-model','veh-plate','veh-color'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('veh-seats').value = '5';
+  document.getElementById('veh-cargo').value = '0';
+  document.getElementById('veh-year').value = new Date().getFullYear();
+  ['veh-price-min','veh-price-km','veh-price-cargo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('veh-available').checked = true;
+  openModal('modal-add-vehicle');
+}
+
+async function editVehicle(id) {
+  editingId = id;
+  const { data: v } = await sb.from('vehicles').select('*, vehicle_pricing(*)').eq('id', id).single();
+  if (!v) return;
+  document.getElementById('vehicle-modal-title').textContent = 'Modifier le véhicule';
+  document.getElementById('veh-model').value = v.model;
+  document.getElementById('veh-plate').value = v.license_plate;
+  document.getElementById('veh-seats').value = v.seat_count;
+  document.getElementById('veh-cargo').value = v.cargo_capacity_m3 || 0;
+  document.getElementById('veh-color').value = v.color || '';
+  document.getElementById('veh-year').value = v.year || '';
+  document.getElementById('veh-price-min').value = v.vehicle_pricing?.[0]?.price_per_minute || '';
+  document.getElementById('veh-price-km').value = v.vehicle_pricing?.[0]?.price_per_km || '';
+  document.getElementById('veh-price-cargo').value = v.vehicle_pricing?.[0]?.price_per_cargo_slot || '';
+  document.getElementById('veh-available').checked = v.is_available;
+  openModal('modal-add-vehicle');
+}
+
+async function saveVehicle() {
+  const model = document.getElementById('veh-model').value.trim();
+  const plate = document.getElementById('veh-plate').value.trim();
+  const seats = parseInt(document.getElementById('veh-seats').value) || 5;
+  const cargo = parseFloat(document.getElementById('veh-cargo').value) || 0;
+  const color = document.getElementById('veh-color').value.trim();
+  const year = parseInt(document.getElementById('veh-year').value) || null;
+  const priceMin = parseFloat(document.getElementById('veh-price-min').value) || 0;
+  const priceKm = parseFloat(document.getElementById('veh-price-km').value) || 0;
+  const priceCargo = parseFloat(document.getElementById('veh-price-cargo').value) || 0;
+  const available = document.getElementById('veh-available').checked;
+
+  if (!model || !plate) { toast('Modèle et plaque requis', 'error'); return; }
+
+  let vehicleId = editingId;
+  if (editingId) {
+    await sb.from('vehicles').update({ model, license_plate: plate, seat_count: seats, cargo_capacity_m3: cargo, color, year, is_available: available }).eq('id', editingId);
+  } else {
+    const { data } = await sb.from('vehicles').insert({ model, license_plate: plate, seat_count: seats, cargo_capacity_m3: cargo, color, year, is_available: available, created_by: currentProfile.id }).select().single();
+    vehicleId = data?.id;
+  }
+  if (vehicleId) {
+    await sb.from('vehicle_pricing').upsert({ vehicle_id: vehicleId, price_per_minute: priceMin, price_per_km: priceKm, price_per_cargo_slot: priceCargo, created_by: currentProfile.id });
+  }
+  toast('Véhicule enregistré', 'success');
+  closeModal('modal-add-vehicle');
+  loadAdminVehicles();
+}
+
+async function toggleVehicle(id, val) {
+  await sb.from('vehicles').update({ is_available: val }).eq('id', id);
+  loadAdminVehicles();
+}
+
+// --- Payments ---
+async function loadAdminPayments() {
+  const { data: tenants } = await sb.from('profiles').select('id, full_name, unit').neq('role', 'demo').order('full_name');
+  document.getElementById('payment-tenant').innerHTML = (tenants || []).map(t =>
+    `<option value="${t.id}">${t.full_name} (${t.unit || 'sans unité'})</option>`
+  ).join('');
+
+  const { data: payments } = await sb.from('real_payments')
+    .select('*, profiles!real_payments_tenant_id_fkey(full_name), recorded_by_profile:profiles!real_payments_recorded_by_fkey(full_name)')
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  document.getElementById('payments-tbody').innerHTML = (payments || []).map(p => `
+    <tr>
+      <td>${new Date(p.created_at).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+      <td>${p.profiles?.full_name || '—'}</td>
+      <td>$ ${p.amount_real.toFixed(2)}</td>
+      <td>₡ ${p.amount_virtual.toFixed(2)}</td>
+      <td>${p.payment_method || '—'}</td>
+      <td>${p.recorded_by_profile?.full_name || '—'}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text3)">Aucun paiement enregistré</td></tr>';
+}
+
+async function recordPayment() {
+  const tenantId = document.getElementById('payment-tenant').value;
+  const real = parseFloat(document.getElementById('payment-real').value) || 0;
+  const virtual = parseFloat(document.getElementById('payment-virtual').value) || 0;
+  const method = document.getElementById('payment-method').value;
+  const notes = document.getElementById('payment-notes').value;
+
+  if (!tenantId || virtual <= 0) { toast('Veuillez remplir tous les champs', 'error'); return; }
+
+  // Credit tenant
+  const { data: tx } = await sb.rpc('adjust_balance', {
+    p_user_id: tenantId,
+    p_amount: virtual,
+    p_type: 'admin_credit',
+    p_description: `Paiement enregistré par admin — ${method}${notes ? ': ' + notes : ''}`,
+    p_created_by: currentProfile.id
+  });
+
+  // Record payment
+  await sb.from('real_payments').insert({
+    tenant_id: tenantId,
+    amount_real: real,
+    amount_virtual: virtual,
+    payment_method: method,
+    notes,
+    recorded_by: currentProfile.id
+  });
+
+  toast(`₡ ${virtual.toFixed(2)} crédités avec succès`, 'success');
+  document.getElementById('payment-real').value = '';
+  document.getElementById('payment-virtual').value = '';
+  document.getElementById('payment-notes').value = '';
+  loadAdminPayments();
+}
+
+// --- Settings ---
+async function loadSettings() {
+  const { data } = await sb.from('system_settings').select('*').order('key');
+  const form = document.getElementById('settings-form');
+  form.innerHTML = (data || []).map(s => `
+    <div class="form-group">
+      <label>${s.description || s.key}</label>
+      <input type="text" id="setting-${s.key}" value="${escHtml(s.value)}">
+    </div>
+  `).join('');
+  settingsCache = Object.fromEntries((data || []).map(s => [s.key, s]));
+}
+
+async function saveSettings() {
+  for (const [key, setting] of Object.entries(settingsCache)) {
+    const el = document.getElementById(`setting-${key}`);
+    if (el) {
+      await sb.from('system_settings').update({ value: el.value, updated_by: currentProfile.id, updated_at: new Date().toISOString() }).eq('key', key);
+    }
+  }
+  toast('Paramètres sauvegardés', 'success');
+}
+
+// --- Logs ---
+async function loadLogs() {
+  const { data } = await sb.from('reservation_requests')
+    .select('*, profiles(full_name)')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  document.getElementById('logs-tbody').innerHTML = (data || []).map(l => `
+    <tr>
+      <td style="white-space:nowrap">${new Date(l.created_at).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+      <td>${l.profiles?.full_name || '—'}</td>
+      <td><span class="badge badge-gray">${l.resource_type}</span></td>
+      <td>${l.action}</td>
+      <td>${l.is_demo ? '<span class="badge badge-yellow">Démo</span>' : '—'}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text3)">Aucun log</td></tr>';
+}
+
+// ==========================================
+// HELPERS
+// ==========================================
+async function logRequest(resourceId, resourceType, action, details = {}) {
+  try {
+    await sb.from('reservation_requests').insert({
+      user_id: currentProfile.id,
+      resource_type: resourceType,
+      resource_id: resourceId,
+      action,
+      details,
+      is_demo: isDemo
+    });
+  } catch(e) { /* silent */ }
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleUserMenu() {
+  if (confirm('Se déconnecter ?')) logout();
+}
+</script>
+</body>
+</html>
