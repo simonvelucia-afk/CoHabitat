@@ -725,13 +725,22 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       <p style="margin-top:12px;color:var(--text2);font-size:0.9rem">Gestion des ressources communes</p>
     </div>
     <div id="auth-form">
+      <div id="auth-error" style="
+        display:none;
+        padding:10px 14px;
+        border-radius:6px;
+        font-size:0.85rem;
+        margin-bottom:14px;
+        border:1px solid;
+        line-height:1.5;
+      "></div>
       <div class="form-group">
         <label>Adresse courriel</label>
-        <input type="email" id="auth-email" placeholder="votre@email.com" autocomplete="email">
+        <input type="email" id="auth-email" placeholder="votre@email.com" autocomplete="email" oninput="document.getElementById('auth-error').style.display='none'">
       </div>
       <div class="form-group">
         <label>Mot de passe</label>
-        <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password">
+        <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password" oninput="document.getElementById('auth-error').style.display='none'" onkeydown="if(event.key==='Enter')authSubmit()">
       </div>
       <div class="form-group" id="auth-name-group" style="display:none">
         <label>Nom complet</label>
@@ -1365,16 +1374,59 @@ async function authSubmit() {
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
   const name = document.getElementById('auth-name').value.trim();
+  const btn = document.getElementById('auth-btn-text');
+  const errorBox = document.getElementById('auth-error');
 
-  if (!email || !password) { toast('Veuillez remplir tous les champs', 'error'); return; }
+  errorBox.style.display = 'none';
+  errorBox.textContent = '';
 
-  if (authMode === 'register') {
-    const { error } = await sb.auth.signUp({ email, password, options: { data: { full_name: name || email } } });
-    if (error) { toast(error.message, 'error'); return; }
-    toast('Compte créé ! Vérifiez votre courriel.', 'success');
-  } else {
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) { toast('Identifiants incorrects', 'error'); return; }
+  if (!email || !password) {
+    errorBox.textContent = 'Veuillez remplir tous les champs.';
+    errorBox.style.display = 'block';
+    return;
+  }
+
+  // Check if Supabase keys are still placeholder
+  if (SUPABASE_URL.includes('VOTRE_PROJECT_ID') || SUPABASE_ANON_KEY.includes('VOTRE_ANON_KEY')) {
+    errorBox.textContent = '⚠️ Les clés Supabase ne sont pas configurées dans index.html. Remplacez VOTRE_PROJECT_ID et VOTRE_ANON_KEY.';
+    errorBox.style.display = 'block';
+    return;
+  }
+
+  btn.textContent = '⏳ Connexion…';
+
+  try {
+    if (authMode === 'register') {
+      const { error } = await sb.auth.signUp({
+        email, password,
+        options: { data: { full_name: name || email } }
+      });
+      if (error) throw error;
+      errorBox.style.background = 'rgba(126,184,160,0.12)';
+      errorBox.style.borderColor = 'rgba(126,184,160,0.3)';
+      errorBox.style.color = 'var(--accent2)';
+      errorBox.textContent = '✓ Compte créé ! Vérifiez votre courriel pour confirmer votre inscription.';
+      errorBox.style.display = 'block';
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    }
+  } catch(err) {
+    let msg = 'Une erreur est survenue.';
+    if (err.message) {
+      if (err.message.includes('Invalid login')) msg = 'Courriel ou mot de passe incorrect.';
+      else if (err.message.includes('Email not confirmed')) msg = 'Veuillez confirmer votre courriel avant de vous connecter.';
+      else if (err.message.includes('fetch') || err.message.includes('Failed')) msg = '⚠️ Impossible de contacter le serveur. Vérifiez vos clés Supabase dans index.html.';
+      else if (err.message.includes('already registered')) msg = 'Ce courriel est déjà utilisé.';
+      else msg = err.message;
+    }
+    errorBox.style.background = 'rgba(224,112,96,0.08)';
+    errorBox.style.borderColor = 'rgba(224,112,96,0.3)';
+    errorBox.style.color = 'var(--accent3)';
+    errorBox.textContent = msg;
+    errorBox.style.display = 'block';
+  } finally {
+    btn.textContent = authMode === 'login' ? 'Se connecter' : "S'inscrire";
   }
 }
 
