@@ -1352,7 +1352,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       currentUser = session.user;
       try {
         await loadProfile();
+        console.log('Calling showApp()...');
         showApp();
+        console.log('showApp() done');
       } catch(e) {
         console.error('loadProfile error:', e);
         // Profile might not exist yet — create it then retry
@@ -1490,13 +1492,15 @@ async function logout() {
 // ==========================================
 async function loadProfile() {
   if (!currentUser) return;
+  console.log('loadProfile: fetching for uid =', currentUser.id);
   const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  console.log('loadProfile result — data:', data, '| error:', error);
   if (error) {
-    console.error('loadProfile error:', error);
+    console.error('loadProfile FAILED:', error.code, error.message, error.details);
     throw error;
   }
   currentProfile = data;
-  console.log('Profile loaded:', currentProfile?.email, currentProfile?.role);
+  console.log('Profile OK:', currentProfile?.email, currentProfile?.role);
 }
 
 // ==========================================
