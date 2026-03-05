@@ -1539,7 +1539,7 @@ function showApp() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   buildNav();
-  navigateTo('dashboard');
+  navigateTo(isDemo ? 'spaces' : 'dashboard');
 }
 
 function buildNav() {
