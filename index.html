@@ -865,6 +865,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       </div>
       <div class="admin-tabs">
         <button class="admin-tab active" onclick="switchTripsTab('available')">Trajets disponibles</button>
+        <button class="admin-tab" onclick="switchTripsTab('requests')">Demandes passagers</button>
         <button class="admin-tab" onclick="switchTripsTab('mine')">Mes trajets</button>
         <button class="admin-tab" id="driver-tab" style="display:none" onclick="switchTripsTab('driving')">En tant que chauffeur</button>
       </div>
@@ -1123,6 +1124,94 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-create-trip')">Annuler</button>
       <button class="btn btn-primary" onclick="submitCreateTrip()">Publier le trajet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Passenger Request Modal -->
+<div class="modal-overlay" id="modal-passenger-request">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h3 id="passenger-request-modal-title">Demander un trajet</h3>
+      <button class="modal-close" onclick="closeModal('modal-passenger-request')">×</button>
+    </div>
+    <div id="passenger-request-form-content">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Point de départ</label>
+          <input type="text" id="pr-from" placeholder="Votre adresse de départ">
+        </div>
+        <div class="form-group">
+          <label>Destination</label>
+          <input type="text" id="pr-to" placeholder="Adresse de destination">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date souhaitée</label>
+          <input type="date" id="pr-date">
+        </div>
+        <div class="form-group">
+          <label>Heure souhaitée</label>
+          <select id="pr-time"></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre de passagers</label>
+          <input type="number" id="pr-seats" value="1" min="1" max="8">
+        </div>
+        <div class="form-group">
+          <label>Bagages souhaités (pi³)</label>
+          <input type="number" id="pr-luggage" value="0" min="0" step="0.5" placeholder="0">
+        </div>
+      </div>
+      <div id="pr-demo-notice" style="display:none">
+        <div class="info-box warning" style="margin-top:8px">
+          🎭 Vous êtes en mode démo — votre demande sera visible de tous mais <strong>vous devrez créer un compte</strong> pour être contacté par un chauffeur.
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label>Votre nom</label>
+            <input type="text" id="pr-demo-name" placeholder="Prénom Nom">
+          </div>
+          <div class="form-group">
+            <label>Votre courriel</label>
+            <input type="email" id="pr-demo-email" placeholder="pour être contacté">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-passenger-request')">Annuler</button>
+      <button class="btn btn-primary" id="pr-submit-btn" onclick="submitPassengerRequest()">Envoyer la demande</button>
+    </div>
+  </div>
+</div>
+
+<!-- Driver Offer Modal -->
+<div class="modal-overlay" id="modal-driver-offer">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h3>Proposer de prendre ce passager</h3>
+      <button class="modal-close" onclick="closeModal('modal-driver-offer')">×</button>
+    </div>
+    <div id="driver-offer-content"></div>
+    <div class="form-group" style="margin-top:12px">
+      <label>Votre véhicule</label>
+      <select id="offer-vehicle"></select>
+    </div>
+    <div class="form-group">
+      <label>Bagages acceptés (pi³)</label>
+      <input type="number" id="offer-luggage" value="0" min="0" step="0.5">
+    </div>
+    <div class="form-group">
+      <label>Message au passager (optionnel)</label>
+      <textarea id="offer-message" rows="2" placeholder="Heure exacte, lieu de rendez-vous…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-driver-offer')">Annuler</button>
+      <button class="btn btn-primary" onclick="submitDriverOffer()">Envoyer ma proposition</button>
     </div>
   </div>
 </div>
@@ -1880,7 +1969,7 @@ async function loadTrips() {
 function switchTripsTab(tab) {
   currentTripsTab = tab;
   document.querySelectorAll('#page-trips .admin-tab').forEach((t, i) => {
-    t.classList.toggle('active', ['available', 'mine', 'driving'][i] === tab);
+    t.classList.toggle('active', ['available', 'requests', 'mine', 'driving'][i] === tab);
   });
   renderTripsTab();
 }
@@ -1893,6 +1982,9 @@ async function renderTripsTab() {
 
   if (currentTripsTab === 'available') {
     query = query.eq('status', 'published').gt('departure_time', new Date().toISOString());
+  } else if (currentTripsTab === 'requests') {
+    await renderPassengerRequests();
+    return;
   } else if (currentTripsTab === 'mine') {
     if (isDemo) {
       grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🎫</div><p>Connectez-vous pour voir vos réservations</p></div>';
@@ -2088,6 +2180,260 @@ async function submitTripBooking() {
   await logRequest(currentBookingTripId, 'trip', 'request', { booking_id: data.id });
   toast('Demande envoyée ! Le chauffeur doit l\'accepter.', 'success');
   closeModal('modal-book-trip');
+}
+
+// ==========================================
+// PASSENGER REQUESTS (sans véhicule)
+// ==========================================
+let passengerRequestsCache = [];
+let currentOfferRequestId = null;
+
+async function renderPassengerRequests() {
+  const grid = document.getElementById('trips-grid');
+  grid.innerHTML = '<div class="loading"><div class="spinner"></div> Chargement…</div>';
+
+  const { data, error } = await sb.from('passenger_requests')
+    .select('*')
+    .eq('status', 'open')
+    .order('desired_datetime');
+
+  passengerRequestsCache = data || [];
+
+  const isDriver = currentProfile?.is_approved_driver;
+
+  // Bouton "Demander un trajet" visible pour tous
+  let headerBtn = `<div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+    <button class="btn btn-primary btn-sm" onclick="openPassengerRequestModal()">+ Demander un trajet</button>
+  </div>`;
+
+  if (!passengerRequestsCache.length) {
+    grid.innerHTML = headerBtn + '<div class="empty-state"><div class="empty-icon">🙋</div><p>Aucune demande de trajet pour le moment</p></div>';
+    return;
+  }
+
+  const cards = passengerRequestsCache.map(r => {
+    const isOwn = !isDemo && currentProfile?.id && r.requester_id === currentProfile.id;
+    const dt = r.desired_datetime ? new Date(r.desired_datetime).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+    const demoTag = r.is_demo ? `<span class="badge badge-yellow" style="margin-left:6px">Démo</span>` : '';
+    return `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${escHtml(r.departure_point)} → ${escHtml(r.destination)}</div>
+          <div class="card-subtitle">${escHtml(r.requester_name || '—')} · ${dt}${demoTag}</div>
+        </div>
+        <span class="badge badge-yellow">${r.seats_requested} passager(s)</span>
+      </div>
+      <div class="card-meta">
+        ${r.luggage_ft3 > 0 ? `<span class="meta-item">📦 ${r.luggage_ft3} pi³ de bagages</span>` : '<span class="meta-item">📦 Pas de bagages</span>'}
+        ${r.notes ? `<span class="meta-item">📝 ${escHtml(r.notes.slice(0,50))}${r.notes.length>50?'…':''}</span>` : ''}
+      </div>
+      <div class="card-actions">
+        ${isDriver && !isOwn ? `<button class="btn btn-primary btn-sm" onclick="openDriverOffer('${r.id}')">Proposer de prendre</button>` : ''}
+        ${isOwn ? `<button class="btn btn-danger btn-sm" onclick="cancelPassengerRequest('${r.id}')">Annuler ma demande</button>` : ''}
+        <button class="btn btn-secondary btn-sm" onclick="openRequestOffers('${r.id}')">Voir les offres</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  grid.innerHTML = headerBtn + `<div class="cards-grid">${cards}</div>`;
+}
+
+function openPassengerRequestModal() {
+  const now = new Date();
+  now.setMinutes(Math.ceil(now.getMinutes()/15)*15, 0, 0);
+  // Remplir le select des heures par blocs de 15 min
+  const timeSelect = document.getElementById('pr-time');
+  timeSelect.innerHTML = '';
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hh = String(h).padStart(2,'0');
+      const mm = String(m).padStart(2,'0');
+      const opt = document.createElement('option');
+      opt.value = `${hh}:${mm}`;
+      opt.textContent = `${hh}:${mm}`;
+      timeSelect.appendChild(opt);
+    }
+  }
+  // Pré-sélectionner l'heure courante arrondie
+  const defaultH = String(now.getHours()).padStart(2,'0');
+  const defaultM = String(now.getMinutes()).padStart(2,'0');
+  timeSelect.value = `${defaultH}:${defaultM}`;
+  document.getElementById('pr-date').value = now.toISOString().split('T')[0];
+  document.getElementById('pr-from').value = '';
+  document.getElementById('pr-to').value = '';
+  document.getElementById('pr-seats').value = '1';
+  document.getElementById('pr-luggage').value = '0';
+  // Afficher ou non le bloc démo
+  const demoNotice = document.getElementById('pr-demo-notice');
+  demoNotice.style.display = isDemo ? 'block' : 'none';
+  document.getElementById('passenger-request-modal-title').textContent = isDemo
+    ? 'Demander un trajet (mode démo)'
+    : 'Demander un trajet';
+  openModal('modal-passenger-request');
+}
+
+async function submitPassengerRequest() {
+  const from = document.getElementById('pr-from').value.trim();
+  const to = document.getElementById('pr-to').value.trim();
+  const date = document.getElementById('pr-date').value;
+  const time = document.getElementById('pr-time').value;
+  const dt = date && time ? `${date}T${time}:00` : null;
+  const seats = parseInt(document.getElementById('pr-seats').value) || 1;
+  const luggage = parseFloat(document.getElementById('pr-luggage').value) || 0;
+  const notes = document.getElementById('pr-notes').value.trim();
+
+  if (!from || !to || !date || !time) { toast('Veuillez remplir départ, destination, date et heure', 'error'); return; }
+
+  let requesterName = currentProfile?.full_name || 'Anonyme';
+  let requesterEmail = currentProfile?.email || null;
+  let requesterId = isDemo ? null : currentProfile?.id;
+
+  if (isDemo) {
+    const demoName = document.getElementById('pr-demo-name').value.trim();
+    const demoEmail = document.getElementById('pr-demo-email').value.trim();
+    requesterName = demoName || 'Démo';
+    requesterEmail = demoEmail || null;
+  }
+
+  const { data, error } = await sb.from('passenger_requests').insert({
+    requester_id: requesterId,
+    requester_name: requesterName,
+    requester_email: requesterEmail,
+    departure_point: from,
+    destination: to,
+    desired_datetime: dt,
+    seats_requested: seats,
+    luggage_ft3: luggage,
+    notes: notes || null,
+    status: 'open',
+    is_demo: isDemo
+  }).select().single();
+
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+
+  if (isDemo) {
+    toast('Demande enregistrée ! Créez un compte pour être contacté par un chauffeur.', 'info');
+  } else {
+    toast('Demande publiée ! Les chauffeurs peuvent maintenant vous proposer un trajet.', 'success');
+  }
+  closeModal('modal-passenger-request');
+  renderPassengerRequests();
+}
+
+async function openDriverOffer(requestId) {
+  currentOfferRequestId = requestId;
+  const req = passengerRequestsCache.find(r => r.id === requestId);
+  if (!req) return;
+
+  document.getElementById('driver-offer-content').innerHTML = `
+    <div class="info-box" style="margin-bottom:14px">
+      <strong>${escHtml(req.departure_point)} → ${escHtml(req.destination)}</strong><br>
+      Passager: ${escHtml(req.requester_name)} · ${req.seats_requested} place(s)<br>
+      Bagages demandés: ${req.luggage_ft3} pi³
+      ${req.notes ? `<br>Note: ${escHtml(req.notes)}` : ''}
+    </div>`;
+
+  // Charger les véhicules du chauffeur
+  const { data: vehicles } = await sb.from('vehicles').select('*').eq('is_available', true);
+  vehiclesCache = vehicles || [];
+  document.getElementById('offer-vehicle').innerHTML = vehiclesCache.length
+    ? vehiclesCache.map(v => `<option value="${v.id}">${escHtml(v.model)} (${v.license_plate})</option>`).join('')
+    : '<option value="">Aucun véhicule disponible</option>';
+  document.getElementById('offer-luggage').value = req.luggage_ft3;
+  document.getElementById('offer-message').value = '';
+  openModal('modal-driver-offer');
+}
+
+async function submitDriverOffer() {
+  const vehicleId = document.getElementById('offer-vehicle').value;
+  const luggage = parseFloat(document.getElementById('offer-luggage').value) || 0;
+  const message = document.getElementById('offer-message').value.trim();
+
+  if (!vehicleId) { toast('Veuillez sélectionner un véhicule', 'error'); return; }
+
+  const { error } = await sb.from('driver_offers').insert({
+    request_id: currentOfferRequestId,
+    driver_id: currentProfile.id,
+    driver_name: currentProfile.full_name,
+    vehicle_id: vehicleId,
+    luggage_accepted_ft3: luggage,
+    message: message || null,
+    status: 'pending'
+  });
+
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Proposition envoyée au passager !', 'success');
+  closeModal('modal-driver-offer');
+  renderPassengerRequests();
+}
+
+async function openRequestOffers(requestId) {
+  const req = passengerRequestsCache.find(r => r.id === requestId);
+  if (!req) return;
+
+  const { data: offers } = await sb.from('driver_offers')
+    .select('*, vehicles(model, license_plate)')
+    .eq('request_id', requestId)
+    .neq('status', 'cancelled');
+
+  const isOwn = !isDemo && currentProfile?.id === req.requester_id;
+
+  let offersHtml = '';
+  if (!offers || !offers.length) {
+    offersHtml = '<p style="color:var(--text3);font-size:.9rem;margin-top:8px">Aucune proposition de chauffeur pour l'instant.</p>';
+  } else {
+    offersHtml = offers.map(o => `
+      <div class="passenger-row">
+        <div>
+          <strong>${escHtml(o.driver_name)}</strong> — ${escHtml(o.vehicles?.model || '?')} (${o.vehicles?.license_plate || '?'})<br>
+          <span style="font-size:.82rem;color:var(--text2)">Bagages acceptés: ${o.luggage_accepted_ft3} pi³${o.message ? ` · "${escHtml(o.message)}"` : ''}</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge ${statusBadge(o.status)}">${statusLabel(o.status)}</span>
+          ${isOwn && o.status === 'pending' ? `
+            <button class="btn btn-success btn-sm" onclick="acceptDriverOffer('${o.id}','${requestId}')">✓ Accepter</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectDriverOffer('${o.id}')">✗</button>
+          ` : ''}
+        </div>
+      </div>`).join('');
+  }
+
+  // Réutiliser modal-trip-detail pour afficher
+  document.getElementById('trip-detail-title').textContent = `${req.departure_point} → ${req.destination}`;
+  document.getElementById('trip-detail-content').innerHTML = `
+    <div class="info-box" style="margin-bottom:14px">
+      Passager: <strong>${escHtml(req.requester_name)}</strong> · ${req.seats_requested} place(s) · ${req.luggage_ft3} pi³ bagages<br>
+      ${new Date(req.desired_datetime).toLocaleString('fr-CA', { dateStyle: 'full', timeStyle: 'short' })}
+      ${req.notes ? `<br>Note: ${escHtml(req.notes)}` : ''}
+    </div>
+    <p class="form-section-title">Propositions des chauffeurs</p>
+    <div class="passengers-list">${offersHtml}</div>`;
+  document.getElementById('trip-detail-footer').innerHTML =
+    '<button class="btn btn-secondary" onclick="closeModal('modal-trip-detail')">Fermer</button>';
+  openModal('modal-trip-detail');
+}
+
+async function acceptDriverOffer(offerId, requestId) {
+  await sb.from('driver_offers').update({ status: 'accepted' }).eq('id', offerId);
+  await sb.from('driver_offers').update({ status: 'rejected' }).eq('request_id', requestId).neq('id', offerId);
+  await sb.from('passenger_requests').update({ status: 'matched' }).eq('id', requestId);
+  toast('Offre acceptée !', 'success');
+  closeModal('modal-trip-detail');
+  renderPassengerRequests();
+}
+
+async function rejectDriverOffer(offerId) {
+  await sb.from('driver_offers').update({ status: 'rejected' }).eq('id', offerId);
+  toast('Offre refusée', 'info');
+  closeModal('modal-trip-detail');
+}
+
+async function cancelPassengerRequest(requestId) {
+  if (!confirm('Annuler cette demande ?')) return;
+  await sb.from('passenger_requests').update({ status: 'cancelled' }).eq('id', requestId);
+  toast('Demande annulée', 'success');
+  renderPassengerRequests();
 }
 
 async function cancelBooking(bookingId) {
