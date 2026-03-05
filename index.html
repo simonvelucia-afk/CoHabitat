@@ -865,6 +865,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       </div>
       <div class="admin-tabs">
         <button class="admin-tab active" onclick="switchTripsTab('available')">Trajets disponibles</button>
+        <button class="admin-tab" onclick="switchTripsTab('requests')">Demandes passagers</button>
         <button class="admin-tab" onclick="switchTripsTab('mine')">Mes trajets</button>
         <button class="admin-tab" id="driver-tab" style="display:none" onclick="switchTripsTab('driving')">En tant que chauffeur</button>
       </div>
@@ -1123,6 +1124,94 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-create-trip')">Annuler</button>
       <button class="btn btn-primary" onclick="submitCreateTrip()">Publier le trajet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Passenger Request Modal -->
+<div class="modal-overlay" id="modal-passenger-request">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h3 id="passenger-request-modal-title">Demander un trajet</h3>
+      <button class="modal-close" onclick="closeModal('modal-passenger-request')">×</button>
+    </div>
+    <div id="passenger-request-form-content">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Point de départ</label>
+          <input type="text" id="pr-from" placeholder="Votre adresse de départ">
+        </div>
+        <div class="form-group">
+          <label>Destination</label>
+          <input type="text" id="pr-to" placeholder="Adresse de destination">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date souhaitée</label>
+          <input type="date" id="pr-date">
+        </div>
+        <div class="form-group">
+          <label>Heure souhaitée</label>
+          <select id="pr-time"></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre de passagers</label>
+          <input type="number" id="pr-seats" value="1" min="1" max="8">
+        </div>
+        <div class="form-group">
+          <label>Bagages souhaités (pi³)</label>
+          <input type="number" id="pr-luggage" value="0" min="0" step="0.5" placeholder="0">
+        </div>
+      </div>
+      <div id="pr-demo-notice" style="display:none">
+        <div class="info-box warning" style="margin-top:8px">
+          🎭 Vous êtes en mode démo — votre demande sera visible de tous mais <strong>vous devrez créer un compte</strong> pour être contacté par un chauffeur.
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <div class="form-group">
+            <label>Votre nom</label>
+            <input type="text" id="pr-demo-name" placeholder="Prénom Nom">
+          </div>
+          <div class="form-group">
+            <label>Votre courriel</label>
+            <input type="email" id="pr-demo-email" placeholder="pour être contacté">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-passenger-request')">Annuler</button>
+      <button class="btn btn-primary" onclick="submitPassengerRequest()">Envoyer la demande</button>
+    </div>
+  </div>
+</div>
+
+<!-- Driver Offer Modal -->
+<div class="modal-overlay" id="modal-driver-offer">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h3>Proposer de prendre ce passager</h3>
+      <button class="modal-close" onclick="closeModal('modal-driver-offer')">×</button>
+    </div>
+    <div id="driver-offer-content"></div>
+    <div class="form-group" style="margin-top:12px">
+      <label>Votre véhicule</label>
+      <select id="offer-vehicle"></select>
+    </div>
+    <div class="form-group">
+      <label>Bagages acceptés (pi³)</label>
+      <input type="number" id="offer-luggage" value="0" min="0" step="0.5">
+    </div>
+    <div class="form-group">
+      <label>Message au passager (optionnel)</label>
+      <textarea id="offer-message" rows="2" placeholder="Heure exacte, lieu de rendez-vous…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-driver-offer')">Annuler</button>
+      <button class="btn btn-primary" onclick="submitDriverOffer()">Envoyer ma proposition</button>
     </div>
   </div>
 </div>
@@ -1880,7 +1969,7 @@ async function loadTrips() {
 function switchTripsTab(tab) {
   currentTripsTab = tab;
   document.querySelectorAll('#page-trips .admin-tab').forEach((t, i) => {
-    t.classList.toggle('active', ['available', 'mine', 'driving'][i] === tab);
+    t.classList.toggle('active', ['available', 'requests', 'mine', 'driving'][i] === tab);
   });
   renderTripsTab();
 }
@@ -1893,7 +1982,14 @@ async function renderTripsTab() {
 
   if (currentTripsTab === 'available') {
     query = query.eq('status', 'published').gt('departure_time', new Date().toISOString());
+  } else if (currentTripsTab === 'requests') {
+    await renderPassengerRequests();
+    return;
   } else if (currentTripsTab === 'mine') {
+    if (isDemo) {
+      grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🎫</div><p>Connectez-vous pour voir vos réservations</p></div>';
+      return;
+    }
     query = query.eq('passenger_join', currentProfile?.id);
     // Fallback: get bookings
     const { data: bookings } = await sb.from('trip_bookings')
@@ -1953,9 +2049,8 @@ function renderAvailableTrips(trips) {
         ${t.price_per_minute ? `<span class="meta-item">${t.price_per_minute}/min + ${t.price_per_km}/km</span>` : ''}
       </div>
       <div class="card-actions">
-        ${!isDemo && currentProfile?.id !== t.driver_id && seatsLeft > 0
+        ${currentProfile?.id !== t.driver_id && seatsLeft > 0
           ? `<button class="btn btn-primary btn-sm" onclick="openBookTrip('${t.id}')">Demander une place</button>`
-          : isDemo ? `<button class="btn btn-secondary btn-sm" disabled>Démo</button>`
           : ''
         }
         <button class="btn btn-secondary btn-sm" onclick="openTripDetail('${t.id}')">Détails</button>
@@ -2060,8 +2155,7 @@ function openBookTrip(tripId) {
 
 async function submitTripBooking() {
   if (isDemo) {
-    await logRequest(currentBookingTripId, 'trip', 'request', { demo: true });
-    toast('Mode démo: demande enregistrée sans réservation réelle', 'info');
+    toast('Mode démo — demande simulée avec succès !', 'success');
     closeModal('modal-book-trip');
     return;
   }
