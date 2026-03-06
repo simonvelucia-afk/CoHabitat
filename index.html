@@ -2419,11 +2419,11 @@ async function renderPassengerRequests() {
       <div class="card-meta">
         <span class="meta-item">📅 ${r.desired_datetime ? new Date(r.desired_datetime).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</span>
         <span class="meta-item">👥 ${r.seats_requested || 1} passager(s)</span>
-        ${r.luggage_ft3 ? `<span class="meta-item">🧳 ${r.luggage_ft3} pi³</span>` : ''}
+        ${r.luggage_ft3 != null ? `<span class="meta-item">🧳 ${r.luggage_ft3} pi³</span>` : ''}
       </div>
       ${r.notes ? `<div style="font-size:.85rem;color:var(--text2);margin-top:6px">${escHtml(r.notes)}</div>` : ''}
       <div class="card-actions">
-        ${isDriver ? `<button class="btn btn-primary btn-sm" onclick="openDriverOffer('${r.id}', '${escHtml(r.departure_point)}', '${escHtml(r.destination)}')">Proposer un trajet</button>` : ''}
+        ${isDriver ? `<button class="btn btn-primary btn-sm" onclick="openDriverOffer('${r.id}', '${escHtml(r.departure_point)}', '${escHtml(r.destination)}', ${r.luggage_ft3 ?? 0}, ${r.seats_requested || 1})">Proposer un trajet</button>` : ''}
       </div>
     </div>
   `).join('')}</div>`;
@@ -2468,7 +2468,7 @@ async function submitPassengerRequest() {
 
   if (!from || !to || !date) { toast('Veuillez remplir départ, destination et date', 'error'); return; }
 
-  const desired_date = `${date}T${time}:00`;
+  const desired_datetime = `${date}T${time}:00`;
   let requester_name = currentProfile?.full_name || null;
   let requester_email = currentProfile?.email || null;
   let requester_id = isDemo ? null : currentProfile?.id;
@@ -2498,10 +2498,11 @@ async function submitPassengerRequest() {
   renderPassengerRequests();
 }
 
-async function openDriverOffer(requestId, from, to) {
+async function openDriverOffer(requestId, from, to, luggage, seats) {
   document.getElementById('driver-offer-content').innerHTML = `
     <div class="info-box" style="margin-bottom:14px">
-      <strong>${escHtml(from)} → ${escHtml(to)}</strong>
+      <strong>${escHtml(from)} → ${escHtml(to)}</strong><br>
+      <span style="font-size:.85rem;color:var(--text2)">👥 ${seats} passager(s) &nbsp;·&nbsp; 🧳 ${luggage} pi³ de bagages demandés</span>
     </div>`;
 
   const { data: vehicles } = await sb.from('vehicles').select('*').eq('is_available', true);
