@@ -2529,6 +2529,7 @@ async function submitDriverOffer() {
   const { error } = await sb.from('driver_offers').insert({
     request_id: requestId,
     driver_id: currentProfile.id,
+    driver_name: currentProfile.full_name || '',
     vehicle_id: vehicleId,
     luggage_accepted_ft3: luggage,
     message: message || null
