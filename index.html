@@ -2539,7 +2539,7 @@ async function submitReset() {
 
   try {
     btn.textContent = '⏳ Envoi…';
-    const { error } = await sb.auth.resetPasswordForEmail(email);
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://simonvelucia-afk.github.io/Pointe_Est/' });
     if (error) throw error;
 
     msg.style.background = 'rgba(126,184,160,0.08)';
