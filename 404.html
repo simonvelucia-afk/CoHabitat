@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script>
+    // GitHub Pages SPA redirect — préserve le hash Supabase (access_token etc.)
+    var hash = window.location.hash;
+    var search = window.location.search;
+    var base = 'https://simonvelucia-afk.github.io/Pointe_Est/';
+    window.location.replace(base + (search ? search : '') + (hash ? hash : ''));
+  </script>
+</head>
+<body></body>
+</html>
