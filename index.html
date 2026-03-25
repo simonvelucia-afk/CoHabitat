@@ -5714,15 +5714,15 @@ async function lmLoadTenants() {
 }
 
 async function lmDebitTenant(tenantId, amount, slotId, slotDesc) {
-  if (amount <= 0) return true;
+  if (!amount || amount <= 0) return { ok: true };
   const { error } = await sb.rpc('adjust_balance', {
     p_user_id: tenantId,
     p_amount: -amount,
     p_type: 'lunch_machine',
-    p_description: `Machine lunch — Case #${slotId}: ${slotDesc}`,
-    p_created_by: tenantId
+    p_description: `Machine lunch — Case #${slotId}: ${slotDesc}`
   });
-  return !error;
+  if (error) console.error('[lmDebitTenant]', JSON.stringify(error));
+  return { ok: !error, msg: error?.message || error?.details || '' };
 }
 
 async function lmSaveStateToDB(st) {
@@ -5860,10 +5860,10 @@ async function lmConfirmPurchase() {
   const xFrac = zoneId === LM_ZONE_IDS[0] ? 0.551 : 0.849;
   const btn = document.getElementById('lm-confirm-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
-  const ok = await lmDebitTenant(lmSelectedTenantId, price, slotId, slotDesc);
-  if (!ok) {
+  const result = await lmDebitTenant(lmSelectedTenantId, price, slotId, slotDesc);
+  if (!result.ok) {
     if (btn) { btn.disabled = false; btn.textContent = 'Confirmer ✓'; btn.style.opacity = '1'; }
-    toast('Erreur lors du débit. Veuillez réessayer.', 'error');
+    toast('Erreur lors du débit' + (result.msg ? ' : ' + result.msg : '.'), 'error');
     return;
   }
   if (tenant) tenant.virtual_balance = Math.max(0, (tenant.virtual_balance || 0) - price);
