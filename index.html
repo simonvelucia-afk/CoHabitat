@@ -2457,22 +2457,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const spacesDate = document.getElementById('spaces-date');
   if (spacesDate) spacesDate.value = today;
 
-  // sessionStorage est vide si la fenêtre a été fermée (contrairement à localStorage)
-  // On l'utilise pour détecter une réouverture après fermeture
-  const wasSessionActive = sessionStorage.getItem('sb_session_active');
+  // Check existing session on load
   const { data: { session } } = await sb.auth.getSession();
-
-  if (session && !wasSessionActive) {
-    // Session trouvée mais sessionStorage vide = fenêtre fermée sans logout → forcer logout
-    await sb.auth.signOut();
-    showLogin();
-    return;
-  }
   console.log('Initial session:', session?.user?.email || 'none');
 
-  if (session && wasSessionActive) {
+  if (session) {
     currentUser = session.user;
-    sessionStorage.setItem('sb_session_active', '1');
     await initApp();
     _resetAutoLogout();
   } else {
@@ -2497,7 +2487,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       if (document.getElementById('reset-password-modal').style.display === 'flex') return;
       currentUser = session.user;
-      sessionStorage.setItem('sb_session_active', '1');
       await initApp();
       _resetAutoLogout();
     } else if (event === 'SIGNED_OUT') {
@@ -2506,7 +2495,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       isDemo = false;
       clearTimeout(_autoLogoutTimer);
       _autoLogoutTimer = null;
-      sessionStorage.removeItem('sb_session_active');
       showLogin();
     }
   });
@@ -5964,15 +5952,15 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// À la fermeture : supprimer tous les tokens Supabase + sessionStorage (synchrone)
-window.addEventListener('beforeunload', () => {
-  if (currentUser && !isDemo) {
+// À la fermeture : supprimer tous les tokens Supabase du localStorage (synchrone)
+// On utilise pagehide avec persisted=false pour détecter une vraie fermeture
+window.addEventListener('pagehide', (e) => {
+  if (!e.persisted && currentUser && !isDemo) {
     Object.keys(localStorage).forEach(k => {
       if (k.startsWith('sb-') || k.includes('supabase') || k.includes('gotrue')) {
         localStorage.removeItem(k);
       }
     });
-    sessionStorage.removeItem('sb_session_active');
   }
 });
 
