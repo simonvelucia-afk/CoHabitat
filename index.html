@@ -5964,52 +5964,18 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Logout immédiat à la fermeture de la fenêtre/onglet
-// ═══════════════════════════════════════════════
-//  AUTO-LOGOUT
-// ═══════════════════════════════════════════════
-const AUTO_LOGOUT_MS = 5 * 60 * 1000; // 5 minutes d'inactivité
-const SB_TOKEN_KEY = 'sb-uwyhrdjlwetcbtskijrs-auth-token';
-let _autoLogoutTimer = null;
-
-function _resetAutoLogout() {
-  if (!currentUser || isDemo) return;
-  clearTimeout(_autoLogoutTimer);
-  _autoLogoutTimer = setTimeout(_doAutoLogout, AUTO_LOGOUT_MS);
-}
-
-async function _doAutoLogout() {
-  if (!currentUser || isDemo) return;
-  await sb.auth.signOut();
-}
-
-// Réinitialiser le timer à chaque interaction utilisateur
-['mousemove','mousedown','keydown','touchstart','scroll','click','wheel'].forEach(evt => {
-  document.addEventListener(evt, _resetAutoLogout, { passive: true });
-});
-
-// Auto-logout quand l'onglet est masqué
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && currentUser && !isDemo) {
-    _autoLogoutTimer = setTimeout(_doAutoLogout, 10 * 1000);
-  } else if (document.visibilityState === 'visible') {
-    _resetAutoLogout();
-  }
-});
-
-// À la fermeture : supprimer tous les tokens Supabase (synchrone, garanti)
+// À la fermeture : supprimer tous les tokens Supabase + sessionStorage (synchrone)
 window.addEventListener('beforeunload', () => {
   if (currentUser && !isDemo) {
-    // Supprimer toutes les clés Supabase du localStorage
     Object.keys(localStorage).forEach(k => {
       if (k.startsWith('sb-') || k.includes('supabase') || k.includes('gotrue')) {
         localStorage.removeItem(k);
       }
     });
-    // Marquer aussi dans sessionStorage (survit au rechargement mais pas à la fermeture)
     sessionStorage.removeItem('sb_session_active');
   }
 });
+
 </script>
 
 <!-- Modal réinitialisation mot de passe -->
