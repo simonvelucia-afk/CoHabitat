@@ -1514,44 +1514,74 @@ tr:hover td { background: rgba(255,255,255,0.02); }
         <!-- sous-onglets LM -->
         <div style="display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px;margin-bottom:20px;flex-wrap:wrap;">
           <button class="btn btn-secondary btn-sm lm-admin-tab active" id="lm-tab-cases" onclick="lmAdminNav('cases')">Cases</button>
+          <button class="btn btn-secondary btn-sm lm-admin-tab" id="lm-tab-creneaux" onclick="lmAdminNav('creneaux')">⏰ Créneaux</button>
           <button class="btn btn-secondary btn-sm lm-admin-tab" id="lm-tab-temperatures" onclick="lmAdminNav('temperatures')">Températures</button>
           <button class="btn btn-secondary btn-sm lm-admin-tab" id="lm-tab-config" onclick="lmAdminNav('config')">Configuration</button>
           <button class="btn btn-secondary btn-sm lm-admin-tab" id="lm-tab-status" onclick="lmAdminNav('status')">Statuts</button>
         </div>
         <!-- Panel cases -->
         <div id="lm-panel-cases" class="lm-admin-panel">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-            <h3 style="font-family:var(--font-serif);font-size:1.1rem">Gestion des cases</h3>
+
+          <!-- Menus préparés -->
+          <div style="margin-bottom:20px;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <h4 style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin:0;">📋 Menus préparés</h4>
+              <button class="btn btn-secondary btn-sm" onclick="lmAddMenu()">+ Ajouter un menu</button>
+            </div>
+            <div id="lm-menus-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
+            <div id="lm-menu-form" style="display:none;background:var(--surface);border:1px solid var(--border-active);border-radius:6px;padding:12px;margin-top:8px;">
+              <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">
+                <div style="flex:1;">
+                  <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px;">Nom du menu</label>
+                  <input id="lm-menu-name" type="text" placeholder="Ex: Poulet rôti, légumes grillés…" style="width:100%;">
+                </div>
+                <div style="width:90px;flex-shrink:0;">
+                  <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px;">Prix ($)</label>
+                  <input id="lm-menu-price" type="number" min="0" step="0.25" placeholder="0.00" style="width:100%;">
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-success btn-sm" onclick="lmSaveMenu()">✓ Sauvegarder</button>
+                <button class="btn btn-secondary btn-sm" onclick="lmCancelMenu()">✕ Annuler</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grille des cases -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h4 style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin:0;">🗄 Cases</h4>
             <div id="lm-clear-all-ui" style="display:flex;align-items:center;gap:8px;">
-              <button class="btn btn-danger btn-sm" id="lm-clear-all-btn" onclick="lmClearAllConfirm()">⚠ Vider toutes les cases</button>
+              <button class="btn btn-danger btn-sm" id="lm-clear-all-btn" onclick="lmClearAllConfirm()">⚠ Vider toutes</button>
               <div id="lm-clear-all-confirm" style="display:none;align-items:center;gap:8px;">
                 <span style="font-size:0.82rem;color:var(--accent3)">Confirmer ?</span>
-                <button class="btn btn-danger btn-sm" onclick="lmClearAllSlots()">✓ Oui, vider</button>
+                <button class="btn btn-danger btn-sm" onclick="lmClearAllSlots()">✓ Oui</button>
                 <button class="btn btn-secondary btn-sm" onclick="lmClearAllCancel()">✕ Non</button>
               </div>
             </div>
           </div>
-          <div id="lm-admin-slots-grid" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;"></div>
-          <div id="lm-admin-slot-edit" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-              <span style="font-size:0.82rem;color:var(--text2)">Case sélectionnée</span>
-              <span id="lm-edit-slot-label" style="font-weight:600;color:var(--accent)"></span>
+          <div id="lm-admin-slots-grid" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;"></div>
+
+          <!-- Édition case sélectionnée -->
+          <div id="lm-admin-slot-edit" style="display:none;background:var(--surface2);border:1px solid var(--border-active);border-radius:8px;padding:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <span id="lm-edit-slot-label" style="font-weight:700;color:var(--accent);font-family:'Barlow Condensed',sans-serif;font-size:15px;letter-spacing:.05em;"></span>
+              <button onclick="lmCloseSlotEdit()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;">✕</button>
             </div>
-            <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px;">
+            <!-- Choix rapide depuis les menus préparés -->
+            <div id="lm-quick-menus" style="margin-bottom:12px;"></div>
+            <!-- Champs manuels -->
+            <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">
               <div style="flex:1;">
-                <label style="font-size:0.82rem;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Description du contenu</label>
-                <textarea id="lm-slot-desc" rows="3" placeholder="Ex: Poulet rôti, légumes grillés…" style="width:100%;resize:vertical;"></textarea>
+                <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px;">Contenu</label>
+                <textarea id="lm-slot-desc" rows="2" placeholder="Description du repas…" style="width:100%;resize:vertical;"></textarea>
               </div>
-              <div style="width:120px;flex-shrink:0;">
-                <label style="font-size:0.82rem;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Prix</label>
-                <div style="display:flex;align-items:center;gap:6px;">
-                  <input type="number" id="lm-slot-price" min="0" step="0.25" placeholder="0.00" style="width:80px;">
-                  <span style="color:var(--text2)">$</span>
-                </div>
+              <div style="width:90px;flex-shrink:0;">
+                <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px;">Prix ($)</label>
+                <input type="number" id="lm-slot-price" min="0" step="0.25" placeholder="0.00" style="width:100%;">
               </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn btn-success btn-sm" onclick="lmSaveSlotDesc()">Sauvegarder</button>
+              <button class="btn btn-success btn-sm" onclick="lmSaveSlotDesc()">✓ Sauvegarder</button>
               <button class="btn btn-secondary btn-sm" onclick="lmClearSlotDesc()">Vider la case</button>
               <button class="btn btn-danger btn-sm" onclick="lmCancelReservation()">Annuler réservation</button>
             </div>
@@ -4426,7 +4456,7 @@ function lmDefaultState() {
     orange: { min:26,  max:55  },
     red:    { min:56,  max:100 },
   };
-  return { zones, slots, pin:'1234', colorRanges, boxMax:30, boxCount:30 };
+  return { zones, slots, pin:'1234', colorRanges, boxMax:30, boxCount:30, timeSlots:[], menus:[] };
 }
 
 // Simulate slow drift of actual temperature toward setpoint
@@ -4465,6 +4495,8 @@ function lmLoadState() {
       // Migrate boxCount/boxMax
       if(parsed.boxMax === undefined) parsed.boxMax = def.boxMax;
       if(parsed.boxCount === undefined) parsed.boxCount = def.boxMax;
+      if(!parsed.timeSlots) parsed.timeSlots = [];
+      if(!parsed.menus) parsed.menus = [];
       // Migrate slots: add price if missing
       if(parsed.slots) parsed.slots.forEach(s => { if(s.price === undefined) s.price = 0; });
       return parsed;
@@ -4938,13 +4970,13 @@ function lmAdminNav(panel) {
   const pan = document.getElementById('lm-panel-'+panel);
   if(tab) tab.classList.add('active');
   if(pan) pan.style.display='';
-  if(panel==='cases') lmRenderAdminCases();
+  if(panel==='cases') { lmRenderAdminCases(); lmRenderMenusList(); }
   if(panel==='temperatures') lmRenderAdminTemps();
   if(panel==='config') lmRenderAdminConfig();
   if(panel==='status') lmRenderAdminStatus();
 }
 
-function lmRenderAdmin() { lmAdminNav('cases'); }
+function lmRenderAdmin() { lmAdminNav('cases'); lmRenderMenusList(); }
 
 function lmRenderAdminCases() {
   const grid = document.getElementById('lm-admin-slots-grid');
@@ -4993,7 +5025,7 @@ function lmRenderAdminCases() {
       div.appendChild(numEl);
       div.appendChild(stEl);
       div.appendChild(bar);
-      div.onclick = function() { selectAdminSlot(slot.id); };
+      div.onclick = function() { lmSelectAdminSlot(slot.id); };
       row.appendChild(div);
     });
     grid.appendChild(row);
@@ -5003,15 +5035,116 @@ function lmRenderAdminCases() {
 function lmSelectAdminSlot(id) {
   lmAdminSelectedSlot = id;
   const slot = lmState.slots.find(s=>s.id===id);
-  document.getElementById('lm-admin-slot-edit').classList.add('active');
-  document.getElementById('lm-edit-slot-label').textContent = `Case #${id} — Zone ${slot.zone} (${lmState.zones[slot.zone]?.name})`;
+  const zone = lmState.zones[slot.zone];
+  const el = document.getElementById('lm-admin-slot-edit');
+  el.style.display = 'block';
+  document.getElementById('lm-edit-slot-label').textContent = `Case #${id} — ${zone?.name || 'Zone '+slot.zone}`;
   document.getElementById('lm-slot-desc').value = slot.desc || '';
-  document.getElementById('lm-slot-desc').textContent = slot.desc || '—';
   document.getElementById('lm-slot-price').value = slot.price ?? 0;
-  document.getElementById('lm-slot-desc').oninput = () => {
-    document.getElementById('lm-slot-desc').textContent = document.getElementById('lm-slot-desc').value || '—';
-  };
+  // Render quick menu buttons
+  lmRenderQuickMenus();
   lmRenderAdminCases();
+}
+
+function lmCloseSlotEdit() {
+  document.getElementById('lm-admin-slot-edit').style.display = 'none';
+  lmAdminSelectedSlot = null;
+  lmRenderAdminCases();
+}
+
+function lmRenderQuickMenus() {
+  const container = document.getElementById('lm-quick-menus');
+  if(!container) return;
+  const menus = lmState.menus || [];
+  if(!menus.length) { container.innerHTML = ''; return; }
+  let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">';
+  html += '<span style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;width:100%;margin-bottom:2px;">Menus préparés :</span>';
+  menus.forEach((m,i) => {
+    html += `<button onclick="lmApplyMenuToSlot(${i})" style="background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12px;padding:5px 10px;border-radius:4px;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text)'">`;
+    html += `${m.name} <span style="color:var(--text2);font-size:11px;">${m.price>0?'— '+m.price+' $':''}</span></button>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function lmApplyMenuToSlot(idx) {
+  const m = (lmState.menus || [])[idx];
+  if(!m) return;
+  document.getElementById('lm-slot-desc').value = m.name;
+  document.getElementById('lm-slot-price').value = m.price ?? 0;
+}
+
+// ─── Gestion des menus préparés ───
+let lmEditingMenuIdx = null;
+
+function lmRenderMenusList() {
+  const container = document.getElementById('lm-menus-list');
+  if(!container) return;
+  const menus = lmState.menus || [];
+  if(!menus.length) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--text-faint);font-style:italic;">Aucun menu enregistré.</div>';
+    return;
+  }
+  container.innerHTML = menus.map((m,i) => `
+    <div style="display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:8px 10px;">
+      <div style="flex:1;">
+        <span style="font-size:13px;font-weight:600;color:var(--text);">${m.name}</span>
+        ${m.price>0?`<span style="font-size:11px;color:var(--text2);margin-left:8px;">${m.price} $</span>`:''}
+      </div>
+      <button onclick="lmEditMenu(${i})" style="background:none;border:1px solid var(--border);color:var(--text2);font-size:11px;padding:3px 8px;border-radius:3px;cursor:pointer;">✎ Modifier</button>
+      <button onclick="lmDeleteMenu(${i})" style="background:none;border:1px solid var(--accent3);color:var(--accent3);font-size:11px;padding:3px 8px;border-radius:3px;cursor:pointer;">✕</button>
+    </div>
+  `).join('');
+}
+
+function lmAddMenu() {
+  lmEditingMenuIdx = null;
+  document.getElementById('lm-menu-name').value = '';
+  document.getElementById('lm-menu-price').value = '';
+  document.getElementById('lm-menu-form').style.display = 'block';
+  document.getElementById('lm-menu-name').focus();
+}
+
+function lmEditMenu(i) {
+  const m = (lmState.menus || [])[i];
+  if(!m) return;
+  lmEditingMenuIdx = i;
+  document.getElementById('lm-menu-name').value = m.name;
+  document.getElementById('lm-menu-price').value = m.price ?? 0;
+  document.getElementById('lm-menu-form').style.display = 'block';
+  document.getElementById('lm-menu-name').focus();
+}
+
+function lmSaveMenu() {
+  const name = document.getElementById('lm-menu-name').value.trim();
+  if(!name) return;
+  const price = parseFloat(document.getElementById('lm-menu-price').value) || 0;
+  if(!lmState.menus) lmState.menus = [];
+  if(lmEditingMenuIdx !== null) {
+    lmState.menus[lmEditingMenuIdx] = { name, price };
+  } else {
+    lmState.menus.push({ name, price });
+  }
+  lmEditingMenuIdx = null;
+  document.getElementById('lm-menu-form').style.display = 'none';
+  lmSaveState();
+  lmRenderMenusList();
+  lmRenderQuickMenus();
+  lmFlashSave();
+}
+
+function lmCancelMenu() {
+  lmEditingMenuIdx = null;
+  document.getElementById('lm-menu-form').style.display = 'none';
+}
+
+function lmDeleteMenu(i) {
+  if(!lmState.menus) return;
+  lmState.menus.splice(i, 1);
+  lmSaveState();
+  lmRenderMenusList();
+  lmRenderQuickMenus();
+  lmFlashSave();
 }
 
 function lmSaveSlotDesc() {
