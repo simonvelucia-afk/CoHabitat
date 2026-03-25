@@ -2457,6 +2457,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   const spacesDate = document.getElementById('spaces-date');
   if (spacesDate) spacesDate.value = today;
 
+  // Si l'app a été fermée (beforeunload déclenché), forcer le logout
+  const closedAt = localStorage.getItem('_appClosedAt');
+  const heartbeat = localStorage.getItem('_appHeartbeat');
+  const wasProperlyActive = heartbeat && (!closedAt || parseInt(heartbeat) > parseInt(closedAt) - 6000);
+  if (closedAt && !wasProperlyActive) {
+    localStorage.removeItem('_appClosedAt');
+    localStorage.removeItem('_appHeartbeat');
+    await sb.auth.signOut();
+    showLogin();
+    return;
+  }
+  localStorage.removeItem('_appClosedAt');
+
   // Check existing session on load
   const { data: { session } } = await sb.auth.getSession();
   console.log('Initial session:', session?.user?.email || 'none');
@@ -2464,6 +2477,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (session) {
     currentUser = session.user;
     await initApp();
+    _resetAutoLogout();
+    _startHeartbeat();
   } else {
     showLogin();
   }
@@ -2488,12 +2503,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       currentUser = session.user;
       await initApp();
       _resetAutoLogout(); // Démarrer le timer d'inactivité
+      _startHeartbeat();  // Démarrer le heartbeat
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
       currentProfile = null;
       isDemo = false;
       clearTimeout(_autoLogoutTimer); // Arrêter le timer
       _autoLogoutTimer = null;
+      _stopHeartbeat();
+      localStorage.removeItem('_appClosedAt');
+      localStorage.removeItem('_appHeartbeat');
       showLogin();
     }
   });
@@ -5952,12 +5971,28 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Logout immédiat à la fermeture de la fenêtre/onglet
+// Au fermeture : marquer l'heure de fermeture dans localStorage
 window.addEventListener('beforeunload', () => {
   if (currentUser && !isDemo) {
-    // beforeunload ne supporte pas async — on utilise sendBeacon ou signOut sync
-    sb.auth.signOut();
+    localStorage.setItem('_appClosedAt', Date.now().toString());
   }
 });
+
+// Maintenir un heartbeat pendant que l'app est ouverte
+let _heartbeatInterval = null;
+function _startHeartbeat() {
+  localStorage.removeItem('_appClosedAt');
+  clearInterval(_heartbeatInterval);
+  _heartbeatInterval = setInterval(() => {
+    if (currentUser && !isDemo) {
+      localStorage.setItem('_appHeartbeat', Date.now().toString());
+    }
+  }, 5000);
+}
+function _stopHeartbeat() {
+  clearInterval(_heartbeatInterval);
+  _heartbeatInterval = null;
+}
 </script>
 
 <!-- Modal réinitialisation mot de passe -->
