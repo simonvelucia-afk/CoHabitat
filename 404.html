@@ -4,19 +4,26 @@
   <meta charset="UTF-8">
   <title>Redirection…</title>
   <script>
-    // Récupérer le hash complet (access_token, type=recovery, etc.)
-    var hash = window.location.hash;      // ex: #access_token=xxx&type=recovery
-    var search = window.location.search;  // ex: ?foo=bar
-    
-    // Toujours rediriger vers Pointe_Est avec le hash intact
-    var dest = 'https://simonvelucia-afk.github.io/Pointe_Est/'
-      + (search ? search : '')
-      + (hash ? hash : '');
-    
-    window.location.replace(dest);
+    (function() {
+      var hash = window.location.hash;
+      var search = window.location.search;
+      var path = window.location.pathname; // ex: /Pointe_Est/
+
+      // Si on est déjà sur /Pointe_Est/, ne pas rediriger
+      if (path.indexOf('/Pointe_Est') === 0) return;
+
+      // Sauvegarder le hash dans sessionStorage avant de rediriger
+      if (hash) {
+        sessionStorage.setItem('supabase_hash', hash);
+      }
+
+      var dest = 'https://simonvelucia-afk.github.io/Pointe_Est/'
+        + (search || '')
+        + (hash || '');
+
+      window.location.replace(dest);
+    })();
   </script>
 </head>
-<body>
-  <p>Redirection en cours…</p>
-</body>
+<body><p>Redirection…</p></body>
 </html>
