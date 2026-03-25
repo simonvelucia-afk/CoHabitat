@@ -4,6 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CoHabitat — Gestion des ressources communes</title>
+<script>
+// Intercepter le hash Supabase AVANT l'init du SDK
+(function() {
+  var hash = window.location.hash;
+  var saved = sessionStorage.getItem('supabase_redirect_hash');
+  
+  // Hash venant du 404.html via sessionStorage
+  if (saved && saved.includes('type=recovery')) {
+    sessionStorage.removeItem('supabase_redirect_hash');
+    sessionStorage.setItem('pw_recovery', '1');
+    // Injecter dans l'URL pour que Supabase le traite
+    history.replaceState(null, '', window.location.pathname + saved);
+  }
+  // Hash direct dans l'URL
+  else if (hash && hash.includes('type=recovery')) {
+    sessionStorage.setItem('pw_recovery', '1');
+  }
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -2349,22 +2368,6 @@ let currentBookingTripId = null;
 // INIT
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
-  // Récupérer le hash Supabase depuis sessionStorage (mis par 404.html)
-  var savedHash = sessionStorage.getItem('supabase_redirect_hash');
-  if (savedHash && savedHash.length > 1) {
-    sessionStorage.removeItem('supabase_redirect_hash');
-    if (savedHash.includes('type=recovery')) {
-      sessionStorage.setItem('pw_recovery', '1');
-    }
-    // Injecter le hash dans l'URL pour que Supabase le traite
-    window.location.replace(window.location.href.split('#')[0] + savedHash);
-    return;
-  }
-  // Détecter recovery directement dans le hash courant
-  var currentHash = window.location.hash;
-  if (currentHash.includes('type=recovery')) {
-    sessionStorage.setItem('pw_recovery', '1');
-  }
   // Set today's date as default
   const today = new Date().toISOString().split('T')[0];
   const spacesDate = document.getElementById('spaces-date');
