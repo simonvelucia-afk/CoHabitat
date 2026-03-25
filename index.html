@@ -2732,16 +2732,16 @@ function buildNav() {
 
   let html = '';
   if (role !== 'demo') {
-    html += `<button class="nav-tab" onclick="navigateTo('dashboard')">Tableau de bord</button>`;
+    html += `<button class="nav-tab" onclick="navigateTo('dashboard')">${lmT('navDashboard')}</button>`;
   }
-  html += `<button class="nav-tab" onclick="navigateTo('spaces')">Espaces</button>`;
-  html += `<button class="nav-tab" onclick="navigateTo('trips')">Auto-partage</button>`;
-  html += `<button class="nav-tab" onclick="navigateTo('lunch')">🍱 Lunch</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('spaces')">${lmT('navSpaces')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('trips')">${lmT('navTrips')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('lunch')">${lmT('navLunch')}</button>`;
   if (role !== 'demo') {
-    html += `<button class="nav-tab" onclick="navigateTo('transactions')">Transactions</button>`;
+    html += `<button class="nav-tab" onclick="navigateTo('transactions')">${lmT('navTransactions')}</button>`;
   }
   if (isAdmin) {
-    html += `<button class="nav-tab" onclick="navigateTo('admin')">Admin</button>`;
+    html += `<button class="nav-tab" onclick="navigateTo('admin')">${lmT('navAdmin')}</button>`;
   }
   tabs.innerHTML = html;
 
@@ -4117,6 +4117,13 @@ function lmZoneColorVar(z) { return lmZoneColor(z); }
 const LANGS = {
   fr: {
     code:'fr', flag:'🇫🇷', label:'FR',
+    // Nav tabs
+    navDashboard: 'Tableau de bord',
+    navSpaces: 'Espaces',
+    navTrips: 'Auto-partage',
+    navLunch: '🍱 Lunch',
+    navTransactions: 'Transactions',
+    navAdmin: 'Admin',
     // Topbar
     admin: 'ADMIN',
     appTitle: 'Machine',
@@ -4200,6 +4207,13 @@ const LANGS = {
   },
   en: {
     code: "en', flag: '🇬🇧', label: 'EN",
+    // Nav tabs
+    navDashboard: 'Dashboard',
+    navSpaces: 'Spaces',
+    navTrips: 'Carpooling',
+    navLunch: '🍱 Lunch',
+    navTransactions: 'Transactions',
+    navAdmin: 'Admin',
     admin: 'ADMIN',
     appTitle: 'Lunch',
     appTitleSub: 'MACHINE',
@@ -4270,6 +4284,13 @@ const LANGS = {
   },
   es: {
     code: "es', flag: '🇪🇸', label: 'ES",
+    // Nav tabs
+    navDashboard: 'Tablero',
+    navSpaces: 'Espacios',
+    navTrips: 'Coche compartido',
+    navLunch: '🍱 Comida',
+    navTransactions: 'Transacciones',
+    navAdmin: 'Admin',
     admin: 'ADMIN',
     appTitle: 'Máquina',
     appTitleSub: 'COMIDA',
@@ -4359,6 +4380,8 @@ function lmApplyLang() {
   lmRenderMachineZoneOverlays();
   lmRenderHomeStats();
   lmRenderLangBtns();
+  // Rebuild nav tabs with current language
+  if (typeof buildNav === 'function' && document.getElementById('nav-tabs')?.children.length > 0) buildNav();
   // Update static HTML elements
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
