@@ -2457,19 +2457,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const spacesDate = document.getElementById('spaces-date');
   if (spacesDate) spacesDate.value = today;
 
-  // Si l'app a été fermée (beforeunload déclenché), forcer le logout
-  const closedAt = localStorage.getItem('_appClosedAt');
-  const heartbeat = localStorage.getItem('_appHeartbeat');
-  const wasProperlyActive = heartbeat && (!closedAt || parseInt(heartbeat) > parseInt(closedAt) - 6000);
-  if (closedAt && !wasProperlyActive) {
-    localStorage.removeItem('_appClosedAt');
-    localStorage.removeItem('_appHeartbeat');
-    await sb.auth.signOut();
-    showLogin();
-    return;
-  }
-  localStorage.removeItem('_appClosedAt');
-
   // Check existing session on load
   const { data: { session } } = await sb.auth.getSession();
   console.log('Initial session:', session?.user?.email || 'none');
@@ -2478,7 +2465,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentUser = session.user;
     await initApp();
     _resetAutoLogout();
-    _startHeartbeat();
   } else {
     showLogin();
   }
@@ -2503,16 +2489,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       currentUser = session.user;
       await initApp();
       _resetAutoLogout(); // Démarrer le timer d'inactivité
-      _startHeartbeat();  // Démarrer le heartbeat
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
       currentProfile = null;
       isDemo = false;
-      clearTimeout(_autoLogoutTimer); // Arrêter le timer
+      clearTimeout(_autoLogoutTimer);
       _autoLogoutTimer = null;
-      _stopHeartbeat();
-      localStorage.removeItem('_appClosedAt');
-      localStorage.removeItem('_appHeartbeat');
       showLogin();
     }
   });
@@ -5971,28 +5953,44 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Logout immédiat à la fermeture de la fenêtre/onglet
-// Au fermeture : marquer l'heure de fermeture dans localStorage
-window.addEventListener('beforeunload', () => {
-  if (currentUser && !isDemo) {
-    localStorage.setItem('_appClosedAt', Date.now().toString());
+// ═══════════════════════════════════════════════
+//  AUTO-LOGOUT
+// ═══════════════════════════════════════════════
+const AUTO_LOGOUT_MS = 5 * 60 * 1000; // 5 minutes d'inactivité
+const SB_TOKEN_KEY = 'sb-uwyhrdjlwetcbtskijrs-auth-token';
+let _autoLogoutTimer = null;
+
+function _resetAutoLogout() {
+  if (!currentUser || isDemo) return;
+  clearTimeout(_autoLogoutTimer);
+  _autoLogoutTimer = setTimeout(_doAutoLogout, AUTO_LOGOUT_MS);
+}
+
+async function _doAutoLogout() {
+  if (!currentUser || isDemo) return;
+  await sb.auth.signOut();
+}
+
+// Réinitialiser le timer à chaque interaction utilisateur
+['mousemove','mousedown','keydown','touchstart','scroll','click','wheel'].forEach(evt => {
+  document.addEventListener(evt, _resetAutoLogout, { passive: true });
+});
+
+// Auto-logout quand l'onglet est masqué
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && currentUser && !isDemo) {
+    _autoLogoutTimer = setTimeout(_doAutoLogout, 10 * 1000);
+  } else if (document.visibilityState === 'visible') {
+    _resetAutoLogout();
   }
 });
 
-// Maintenir un heartbeat pendant que l'app est ouverte
-let _heartbeatInterval = null;
-function _startHeartbeat() {
-  localStorage.removeItem('_appClosedAt');
-  clearInterval(_heartbeatInterval);
-  _heartbeatInterval = setInterval(() => {
-    if (currentUser && !isDemo) {
-      localStorage.setItem('_appHeartbeat', Date.now().toString());
-    }
-  }, 5000);
-}
-function _stopHeartbeat() {
-  clearInterval(_heartbeatInterval);
-  _heartbeatInterval = null;
-}
+// À la fermeture : supprimer le token Supabase du localStorage (synchrone, garanti)
+window.addEventListener('beforeunload', () => {
+  if (currentUser && !isDemo) {
+    localStorage.removeItem(SB_TOKEN_KEY);
+  }
+});
 </script>
 
 <!-- Modal réinitialisation mot de passe -->
