@@ -1286,21 +1286,21 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     <div id="page-dashboard" class="page">
       <div class="balance-display">
         <div>
-          <div class="balance-label">Solde disponible</div>
+          <div class="balance-label" data-pt="Solde disponible">Solde disponible</div>
           <div>
             <span class="balance-amount" id="balance-amount">0</span>
             <span class="balance-unit">CAD</span>
           </div>
         </div>
         <div style="text-align:right">
-          <div class="balance-label">Unité résidentielle</div>
+          <div class="balance-label" data-pt="Unité résidentielle">Unité résidentielle</div>
           <div style="font-size:1.4rem;font-family:var(--font-serif)" id="user-unit">—</div>
         </div>
       </div>
       <div class="stats-grid" id="dashboard-stats"></div>
       <div class="section-header">
         <div class="section-title">
-          <h2>Mes réservations récentes</h2>
+          <h2 data-pt="Mes réservations récentes">Mes réservations récentes</h2>
         </div>
       </div>
       <div id="my-reservations-list"></div>
@@ -1310,8 +1310,8 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     <div id="page-spaces" class="page">
       <div class="section-header">
         <div class="section-title">
-          <h2>Espaces communs</h2>
-          <p>Réservez par tranches de 15 minutes</p>
+          <h2 data-pt="Espaces communs">Espaces communs</h2>
+          <p data-pt="Réservez par tranches de 15 minutes">Réservez par tranches de 15 minutes</p>
         </div>
       </div>
       <div class="filter-bar">
@@ -1327,18 +1327,18 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     <div id="page-trips" class="page">
       <div class="section-header">
         <div class="section-title">
-          <h2>Auto-partage & Véhicules</h2>
-          <p>Véhicules disponibles et réservation de trajets</p>
+          <h2 data-pt="Auto-partage & Véhicules">Auto-partage & Véhicules</h2>
+          <p data-pt="Véhicules disponibles et réservation de trajets">Véhicules disponibles et réservation de trajets</p>
         </div>
-        <button class="btn btn-primary btn-sm" id="btn-create-trip" style="display:none" onclick="openCreateTrip()">
+        <button class="btn btn-primary btn-sm" id="btn-create-trip" style="display:none" onclick="openCreateTrip()" data-pt="+ Publier un trajet">
           + Publier un trajet
         </button>
       </div>
       <div class="admin-tabs">
-        <button class="admin-tab active" onclick="switchTripsTab('available')">Trajets disponibles</button>
-        <button class="admin-tab" id="requests-tab" onclick="switchTripsTab('requests')">Demandes passagers</button>
-        <button class="admin-tab" onclick="switchTripsTab('mine')">Mes trajets</button>
-        <button class="admin-tab" id="driver-tab" style="display:none" onclick="switchTripsTab('driving')">En tant que chauffeur</button>
+        <button class="admin-tab active" onclick="switchTripsTab('available')" data-pt="Trajets disponibles">Trajets disponibles</button>
+        <button class="admin-tab" id="requests-tab" onclick="switchTripsTab('requests')" data-pt="Demandes passagers">Demandes passagers</button>
+        <button class="admin-tab" onclick="switchTripsTab('mine')" data-pt="Mes trajets">Mes trajets</button>
+        <button class="admin-tab" id="driver-tab" style="display:none" onclick="switchTripsTab('driving')" data-pt="En tant que chauffeur">En tant que chauffeur</button>
       </div>
       <div id="trips-grid">
         <div class="loading"><div class="spinner"></div> Chargement…</div>
@@ -1349,17 +1349,17 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     <div id="page-transactions" class="page">
       <div class="section-header">
         <div class="section-title">
-          <h2>Historique des transactions</h2>
+          <h2 data-pt="Historique des transactions">Historique des transactions</h2>
         </div>
       </div>
       <div class="table-container">
         <table>
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Description</th>
-              <th>Montant</th>
-              <th>Solde après</th>
+              <th data-pt="Date">Date</th>
+              <th data-pt="Description">Description</th>
+              <th data-pt="Montant">Montant</th>
+              <th data-pt="Solde après">Solde après</th>
             </tr>
           </thead>
           <tbody id="transactions-tbody">
@@ -1373,16 +1373,16 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     <div id="page-admin" class="page">
       <div class="section-header">
         <div class="section-title">
-          <h2>Administration</h2>
+          <h2 data-pt="Administration">Administration</h2>
         </div>
       </div>
       <div class="admin-tabs">
-        <button class="admin-tab active" onclick="adminTab('tenants')">Locataires</button>
-        <button class="admin-tab" onclick="adminTab('spaces-admin')">Espaces</button>
-        <button class="admin-tab" onclick="adminTab('vehicles-admin')">Véhicules</button>
-        <button class="admin-tab" onclick="adminTab('payments')">Paiements</button>
-        <button class="admin-tab" onclick="adminTab('settings')" id="settings-tab" style="display:none">Paramètres</button>
-        <button class="admin-tab" onclick="adminTab('logs')">Logs</button>
+        <button class="admin-tab active" onclick="adminTab('tenants')" data-pt="Locataires">Locataires</button>
+        <button class="admin-tab" onclick="adminTab('spaces-admin')" data-pt="Espaces">Espaces</button>
+        <button class="admin-tab" onclick="adminTab('vehicles-admin')" data-pt="Véhicules">Véhicules</button>
+        <button class="admin-tab" onclick="adminTab('payments')" data-pt="Paiements">Paiements</button>
+        <button class="admin-tab" onclick="adminTab('settings')" id="settings-tab" style="display:none" data-pt="Paramètres">Paramètres</button>
+        <button class="admin-tab" onclick="adminTab('logs')" data-pt="Logs">Logs</button>
         <button class="admin-tab" id="lunch-admin-tab" onclick="adminTab('lunch')" style="display:none">🍱 Machine Lunch</button>
       </div>
 
@@ -2853,6 +2853,7 @@ function showApp() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   buildNav();
+  ptApply();
   navigateTo(isDemo ? 'spaces' : 'dashboard');
 }
 
@@ -2979,13 +2980,13 @@ async function loadDashboard() {
       .select('id, status')
       .eq('passenger_id', currentProfile.id);
     stats = [
-      { label: 'Réservations d\'espaces', value: sRes?.length || 0 },
-      { label: 'Covoiturages', value: tBook?.length || 0 },
-      { label: 'Solde', value: `${(currentProfile.virtual_balance || 0).toFixed(2)} $` },
+      { label: pt('Réservations d\'espaces'), value: sRes?.length || 0 },
+      { label: pt('Covoiturages'), value: tBook?.length || 0 },
+      { label: pt('Solde'), value: `${(currentProfile.virtual_balance || 0).toFixed(2)} $` },
     ];
     if (currentProfile.is_approved_driver) {
       const { data: myTrips } = await sb.from('trips').select('id').eq('driver_id', currentProfile.id);
-      stats.push({ label: 'Trajets publiés', value: myTrips?.length || 0 });
+      stats.push({ label: pt('Trajets publiés'), value: myTrips?.length || 0 });
     }
   }
 
@@ -3011,24 +3012,24 @@ async function loadDashboard() {
 
     const combined = [
       ...(sRes || []).map(r => ({
-        type: 'Espace', name: r.common_spaces?.name, date: r.start_time, cost: r.total_cost, status: r.status
+        type: pt('Espace'), name: r.common_spaces?.name, date: r.start_time, cost: r.total_cost, status: r.status
       })),
       ...(tBook || []).map(r => ({
-        type: 'Trajet', name: r.trips?.title, date: r.trips?.departure_time, cost: r.total_cost, status: r.status
+        type: pt('Trajet'), name: r.trips?.title, date: r.trips?.departure_time, cost: r.total_cost, status: r.status
       }))
     ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
 
     const list = document.getElementById('my-reservations-list');
     if (!combined.length) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Aucune réservation pour le moment</p></div>';
+      list.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>${pt('Aucune réservation pour le moment')}</p></div>`;
     } else {
       list.innerHTML = `<div class="table-container"><table>
-        <thead><tr><th>Type</th><th>Ressource</th><th>Date</th><th>Coût</th><th>Statut</th></tr></thead>
+        <thead><tr><th>${pt('Type')}</th><th>${pt('Ressource')}</th><th>${pt('Date')}</th><th>${pt('Coût')}</th><th>${pt('Statut')}</th></tr></thead>
         <tbody>${combined.map(r => `
           <tr>
             <td><span class="badge badge-gray">${r.type}</span></td>
             <td>${r.name || '—'}</td>
-            <td>${r.date ? new Date(r.date).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
+            <td>${r.date ? new Date(r.date).toLocaleString(lmLang === 'fr' ? 'fr-CA' : lmLang === 'es' ? 'es-ES' : 'en-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
             <td>${(r.cost || 0).toFixed(2)} $</td>
             <td><span class="badge ${statusBadge(r.status)}">${statusLabel(r.status)}</span></td>
           </tr>
@@ -3036,7 +3037,7 @@ async function loadDashboard() {
       </table></div>`;
     }
   } else {
-    document.getElementById('my-reservations-list').innerHTML = `<div class="info-box">En mode démo, les réservations ne sont pas enregistrées à votre compte.</div>`;
+    document.getElementById('my-reservations-list').innerHTML = `<div class="info-box">${pt('En mode démo, les réservations ne sont pas enregistrées à votre compte.')}</div>`;
   }
 }
 
@@ -3044,7 +3045,10 @@ function statusBadge(s) {
   return { confirmed: 'badge-green', pending: 'badge-yellow', cancelled: 'badge-red', completed: 'badge-gray', accepted: 'badge-green', rejected: 'badge-red' }[s] || 'badge-gray';
 }
 function statusLabel(s) {
-  return { confirmed: 'Confirmée', pending: 'En attente', cancelled: 'Annulée', completed: 'Terminée', accepted: 'Acceptée', rejected: 'Refusée' }[s] || s;
+  return {
+    confirmed: pt('Confirmée'), pending: pt('En attente'), cancelled: pt('Annulée'),
+    completed: pt('Terminée'), accepted: pt('Acceptée'), rejected: pt('Refusée')
+  }[s] || s;
 }
 
 // ==========================================
@@ -3052,7 +3056,7 @@ function statusLabel(s) {
 // ==========================================
 async function loadSpaces() {
   const grid = document.getElementById('spaces-grid');
-  grid.innerHTML = '<div class="loading"><div class="spinner"></div> Chargement\u2026</div>';
+  grid.innerHTML = `<div class="loading"><div class="spinner"></div> ${pt('Chargement…')}</div>`;
   const { data, error } = await sb.from('common_spaces')
     .select('*, space_pricing(price_per_slot)')
     .eq('is_available', true)
@@ -3068,7 +3072,7 @@ async function loadSpaces() {
 function renderSpaces(spaces) {
   const grid = document.getElementById('spaces-grid');
   if (!spaces.length) {
-    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🏠</div><p>Aucun espace disponible</p></div>';
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">🏠</div><p>${pt('Aucun espace disponible')}</p></div>`;
     return;
   }
   grid.innerHTML = spaces.map(s => {
@@ -3080,15 +3084,15 @@ function renderSpaces(spaces) {
           <div class="card-title">${s.name}</div>
           <div class="card-subtitle">${s.location || ''}</div>
         </div>
-        <span class="badge badge-green">Disponible</span>
+        <span class="badge badge-green">${pt('Disponible')}</span>
       </div>
       <div class="card-meta">
-        <span class="meta-item">👥 ${s.capacity} personnes</span>
+        <span class="meta-item">👥 ${s.capacity} ${pt('personnes')}</span>
         ${s.description ? `<span class="meta-item">📝 ${s.description.slice(0,40)}${s.description.length > 40 ? '…' : ''}</span>` : ''}
       </div>
-      <div class="card-price">${price.toFixed(2)} $ <small style="font-size:.75rem;color:var(--text2)">/ 15 min</small></div>
+      <div class="card-price">${price.toFixed(2)} $ <small style="font-size:.75rem;color:var(--text2)">${pt('/ 15 min')}</small></div>
       <div class="card-actions">
-        ${!isDemo ? `<button class="btn btn-primary btn-sm" onclick="openBookSpace('${s.id}', '${escHtml(s.name)}')">Réserver</button>` : ''}
+        ${!isDemo ? `<button class="btn btn-primary btn-sm" onclick="openBookSpace('${s.id}', '${escHtml(s.name)}')">${pt('Réserver')}</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -3217,7 +3221,7 @@ function switchTripsTab(tab) {
 
 async function renderTripsTab() {
   const grid = document.getElementById('trips-grid');
-  grid.innerHTML = '<div class="loading"><div class="spinner"></div> Chargement\u2026</div>';
+  grid.innerHTML = `<div class="loading"><div class="spinner"></div> ${pt('Chargement…')}</div>`;
 
   let query = sb.from('trips_with_details').select('*');
 
@@ -3247,7 +3251,7 @@ async function renderTripsTab() {
   tripsCache = data || [];
 
   if (!tripsCache.length) {
-    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🚗</div><p>Aucun trajet trouvé</p></div>';
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">🚗</div><p>${pt('Aucun trajet trouvé')}</p></div>`;
     return;
   }
 
@@ -3623,7 +3627,7 @@ async function submitCreateTrip() {
 // ==========================================
 async function renderPassengerRequests() {
   const grid = document.getElementById('trips-grid');
-  grid.innerHTML = '<div class="loading"><div class="spinner"></div> Chargement\u2026</div>';
+  grid.innerHTML = `<div class="loading"><div class="spinner"></div> ${pt('Chargement…')}</div>`;
 
   const { data, error } = await sb.from('passenger_requests')
     .select('*')
@@ -3637,7 +3641,7 @@ async function renderPassengerRequests() {
   </div>`;
 
   if (!requests.length) {
-    grid.innerHTML = addBtn + '<div class="empty-state"><div class="empty-icon">🙋</div><p>Aucune demande de trajet pour le moment</p></div>';
+    grid.innerHTML = addBtn + `<div class="empty-state"><div class="empty-icon">🙋</div><p>${pt('Aucune demande de trajet pour le moment')}</p></div>`;
     return;
   }
 
@@ -3800,7 +3804,7 @@ async function loadTransactions() {
       </td>
       <td>${t.balance_after.toFixed(2)}</td>
     </tr>
-  `).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--text3)">Aucune transaction</td></tr>`;
+  `).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--text3)">${pt("Aucune transaction")}</td></tr>`;
 }
 
 function txLabel(type) {
@@ -4496,14 +4500,176 @@ function lmT(key, ...args) {
   const v = LANGS[lmLang][key];
   return typeof v === 'function' ? v(...args) : (v ?? LANGS['fr'][key] ?? key);
 }
+// ═══════════════════════════════════════════════
+//  PORTAL TRANSLATIONS
+// ═══════════════════════════════════════════════
+const PT = {
+  fr: {
+    // Dashboard
+    'Solde disponible': 'Solde disponible',
+    'Unité résidentielle': 'Unité résidentielle',
+    'Mes réservations récentes': 'Mes réservations récentes',
+    'Réservations d\'espaces': 'Réservations d\'espaces',
+    'Covoiturages': 'Covoiturages',
+    'Solde': 'Solde',
+    'Trajets publiés': 'Trajets publiés',
+    'Aucune réservation pour le moment': 'Aucune réservation pour le moment',
+    'En mode démo, les réservations ne sont pas enregistrées à votre compte.': 'En mode démo, les réservations ne sont pas enregistrées à votre compte.',
+    'Type': 'Type', 'Ressource': 'Ressource', 'Date': 'Date', 'Coût': 'Coût', 'Statut': 'Statut',
+    'Espace': 'Espace', 'Trajet': 'Trajet',
+    // Status
+    'Confirmée': 'Confirmée', 'En attente': 'En attente', 'Annulée': 'Annulée',
+    'Terminée': 'Terminée', 'Acceptée': 'Acceptée', 'Refusée': 'Refusée',
+    // Spaces
+    'Espaces communs': 'Espaces communs',
+    'Réservez par tranches de 15 minutes': 'Réservez par tranches de 15 minutes',
+    'Rechercher un espace…': 'Rechercher un espace…',
+    'Disponible': 'Disponible',
+    'personnes': 'personnes',
+    '/ 15 min': '/ 15 min',
+    'Réserver': 'Réserver',
+    'Aucun espace disponible': 'Aucun espace disponible',
+    'Chargement…': 'Chargement…',
+    // Trips
+    'Auto-partage & Véhicules': 'Auto-partage & Véhicules',
+    'Véhicules disponibles et réservation de trajets': 'Véhicules disponibles et réservation de trajets',
+    '+ Publier un trajet': '+ Publier un trajet',
+    'Trajets disponibles': 'Trajets disponibles',
+    'Demandes passagers': 'Demandes passagers',
+    'Mes trajets': 'Mes trajets',
+    'En tant que chauffeur': 'En tant que chauffeur',
+    // Transactions
+    'Historique des transactions': 'Historique des transactions',
+    'Description': 'Description', 'Montant': 'Montant', 'Solde après': 'Solde après',
+    // Admin
+    'Administration': 'Administration',
+    'Locataires': 'Locataires', 'Espaces': 'Espaces', 'Véhicules': 'Véhicules',
+    'Paiements': 'Paiements', 'Paramètres': 'Paramètres', 'Logs': 'Logs',
+    '+ Ajouter un locataire': '+ Ajouter un locataire',
+    '+ Ajouter un espace': '+ Ajouter un espace',
+    '+ Ajouter un véhicule': '+ Ajouter un véhicule',
+    'Nom': 'Nom', 'Unité': 'Unité', 'Rôle': 'Rôle', 'Chauffeur': 'Chauffeur',
+    'Actions': 'Actions', 'Capacité': 'Capacité', 'Lieu': 'Lieu',
+    'Prix/15min': 'Prix/15min', 'Modèle': 'Modèle', 'Plaque': 'Plaque',
+    'Places': 'Places', 'Prix/min': 'Prix/min', 'Prix/km': 'Prix/km', 'Dispo': 'Dispo',
+  },
+  en: {
+    'Solde disponible': 'Available balance',
+    'Unité résidentielle': 'Residential unit',
+    'Mes réservations récentes': 'My recent bookings',
+    'Réservations d\'espaces': 'Space bookings',
+    'Covoiturages': 'Carpools',
+    'Solde': 'Balance',
+    'Trajets publiés': 'Published trips',
+    'Aucune réservation pour le moment': 'No bookings yet',
+    'En mode démo, les réservations ne sont pas enregistrées à votre compte.': 'In demo mode, bookings are not saved to your account.',
+    'Type': 'Type', 'Ressource': 'Resource', 'Date': 'Date', 'Coût': 'Cost', 'Statut': 'Status',
+    'Espace': 'Space', 'Trajet': 'Trip',
+    'Confirmée': 'Confirmed', 'En attente': 'Pending', 'Annulée': 'Cancelled',
+    'Terminée': 'Completed', 'Acceptée': 'Accepted', 'Refusée': 'Rejected',
+    'Espaces communs': 'Common spaces',
+    'Réservez par tranches de 15 minutes': 'Book in 15-minute increments',
+    'Rechercher un espace…': 'Search a space…',
+    'Disponible': 'Available',
+    'personnes': 'people',
+    '/ 15 min': '/ 15 min',
+    'Réserver': 'Book',
+    'Aucun espace disponible': 'No spaces available',
+    'Chargement…': 'Loading…',
+    'Auto-partage & Véhicules': 'Carpooling & Vehicles',
+    'Véhicules disponibles et réservation de trajets': 'Available vehicles and trip booking',
+    '+ Publier un trajet': '+ Post a trip',
+    'Trajets disponibles': 'Available trips',
+    'Demandes passagers': 'Passenger requests',
+    'Mes trajets': 'My trips',
+    'En tant que chauffeur': 'As driver',
+    'Historique des transactions': 'Transaction history',
+    'Description': 'Description', 'Montant': 'Amount', 'Solde après': 'Balance after',
+    'Administration': 'Administration',
+    'Locataires': 'Tenants', 'Espaces': 'Spaces', 'Véhicules': 'Vehicles',
+    'Paiements': 'Payments', 'Paramètres': 'Settings', 'Logs': 'Logs',
+    '+ Ajouter un locataire': '+ Add tenant',
+    '+ Ajouter un espace': '+ Add space',
+    '+ Ajouter un véhicule': '+ Add vehicle',
+    'Nom': 'Name', 'Unité': 'Unit', 'Rôle': 'Role', 'Chauffeur': 'Driver',
+    'Actions': 'Actions', 'Capacité': 'Capacity', 'Lieu': 'Location',
+    'Prix/15min': 'Price/15min', 'Modèle': 'Model', 'Plaque': 'Plate',
+    'Places': 'Seats', 'Prix/min': 'Price/min', 'Prix/km': 'Price/km', 'Dispo': 'Avail.',
+  },
+  es: {
+    'Solde disponible': 'Saldo disponible',
+    'Unité résidentielle': 'Unidad residencial',
+    'Mes réservations récentes': 'Mis reservas recientes',
+    'Réservations d\'espaces': 'Reservas de espacios',
+    'Covoiturages': 'Viajes compartidos',
+    'Solde': 'Saldo',
+    'Trajets publiés': 'Viajes publicados',
+    'Aucune réservation pour le moment': 'Sin reservas por el momento',
+    'En mode démo, les réservations ne sont pas enregistrées à votre compte.': 'En modo demo, las reservas no se guardan en su cuenta.',
+    'Type': 'Tipo', 'Ressource': 'Recurso', 'Date': 'Fecha', 'Coût': 'Costo', 'Statut': 'Estado',
+    'Espace': 'Espacio', 'Trajet': 'Viaje',
+    'Confirmée': 'Confirmada', 'En attente': 'Pendiente', 'Annulée': 'Cancelada',
+    'Terminée': 'Completada', 'Acceptée': 'Aceptada', 'Refusée': 'Rechazada',
+    'Espaces communs': 'Espacios comunes',
+    'Réservez par tranches de 15 minutes': 'Reserve en intervalos de 15 minutos',
+    'Rechercher un espace…': 'Buscar un espacio…',
+    'Disponible': 'Disponible',
+    'personnes': 'personas',
+    '/ 15 min': '/ 15 min',
+    'Réserver': 'Reservar',
+    'Aucun espace disponible': 'No hay espacios disponibles',
+    'Chargement…': 'Cargando…',
+    'Auto-partage & Véhicules': 'Coche compartido & Vehículos',
+    'Véhicules disponibles et réservation de trajets': 'Vehículos disponibles y reserva de viajes',
+    '+ Publier un trajet': '+ Publicar un viaje',
+    'Trajets disponibles': 'Viajes disponibles',
+    'Demandes passagers': 'Solicitudes de pasajeros',
+    'Mes trajets': 'Mis viajes',
+    'En tant que chauffeur': 'Como conductor',
+    'Historique des transactions': 'Historial de transacciones',
+    'Description': 'Descripción', 'Montant': 'Monto', 'Solde après': 'Saldo después',
+    'Administration': 'Administración',
+    'Locataires': 'Inquilinos', 'Espaces': 'Espacios', 'Véhicules': 'Vehículos',
+    'Paiements': 'Pagos', 'Paramètres': 'Configuración', 'Logs': 'Registros',
+    '+ Ajouter un locataire': '+ Agregar inquilino',
+    '+ Ajouter un espace': '+ Agregar espacio',
+    '+ Ajouter un véhicule': '+ Agregar vehículo',
+    'Nom': 'Nombre', 'Unité': 'Unidad', 'Rôle': 'Rol', 'Chauffeur': 'Conductor',
+    'Actions': 'Acciones', 'Capacité': 'Capacidad', 'Lieu': 'Lugar',
+    'Prix/15min': 'Precio/15min', 'Modèle': 'Modelo', 'Plaque': 'Placa',
+    'Places': 'Asientos', 'Prix/min': 'Precio/min', 'Prix/km': 'Precio/km', 'Dispo': 'Dispon.',
+  }
+};
+
+function pt(key) {
+  return (PT[lmLang] || PT['fr'])[key] || (PT['fr'][key] || key);
+}
+
+function ptApply() {
+  // Translate static elements with data-pt attribute
+  document.querySelectorAll('[data-pt]').forEach(el => {
+    el.textContent = pt(el.dataset.pt);
+  });
+  // Re-render current page if loaded
+  const activePage = document.querySelector('.page.active');
+  if (activePage) {
+    const pageId = activePage.id;
+    if (pageId === 'page-dashboard' && typeof loadDashboard === 'function') loadDashboard();
+    else if (pageId === 'page-spaces' && typeof loadSpaces === 'function') loadSpaces();
+    else if (pageId === 'page-trips' && typeof loadTrips === 'function') loadTrips();
+    else if (pageId === 'page-transactions' && typeof loadTransactions === 'function') loadTransactions();
+    else if (pageId === 'page-admin' && typeof loadAdmin === 'function') loadAdmin();
+  }
+}
+
 function lmSetLang(l) {
   lmLang = l;
   try { localStorage.setItem('mllang', l); } catch(e) {}
-  // Update active state on nav lang buttons
   document.querySelectorAll('.nav-lang-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.lang === l);
   });
   lmApplyLang();
+  ptApply();
 }
 function lmApplyLang() {
   // Re-render all dynamic text
