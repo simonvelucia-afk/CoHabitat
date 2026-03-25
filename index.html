@@ -2785,6 +2785,9 @@ async function loadProfile() {
 function showLogin() {
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
+  // Effacer le mot de passe à chaque affichage de l'écran de login
+  const pwd = document.getElementById('auth-password');
+  if (pwd) pwd.value = '';
 }
 
 function showApp() {
