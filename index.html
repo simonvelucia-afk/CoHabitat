@@ -2197,6 +2197,62 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   </div>
 </div>
 
+<!-- Driver Cargo Modal -->
+<div class="modal-overlay" id="modal-driver-cargo">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h3>📦 Réserver du cargo</h3>
+      <button class="modal-close" onclick="closeModal('modal-driver-cargo')">×</button>
+    </div>
+    <input type="hidden" id="driver-cargo-trip-id">
+    <div style="font-size:0.85rem;color:var(--text2);margin-bottom:14px;">
+      Cargo disponible : <strong id="driver-cargo-left" style="color:var(--accent2)"></strong>%
+    </div>
+    <div class="form-group">
+      <label>Espace à réserver (%)</label>
+      <select id="driver-cargo-amount"></select>
+    </div>
+    <div class="form-group">
+      <label>Description (optionnel)</label>
+      <input type="text" id="driver-cargo-desc" placeholder="Ex: épicerie, équipement sport…" autocomplete="off">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-driver-cargo')">Annuler</button>
+      <button class="btn btn-primary" onclick="submitDriverCargo()">Réserver</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Dependent to Trip Modal -->
+<div class="modal-overlay" id="modal-add-dep-trip">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <h3>👨‍👩‍👧 Ajouter un dépendant au trajet</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-dep-trip')">×</button>
+    </div>
+    <input type="hidden" id="dep-trip-id">
+    <div style="font-size:0.85rem;color:var(--text2);margin-bottom:14px;">
+      Places restantes : <strong id="dep-trip-seats-left" style="color:var(--accent2)"></strong>
+    </div>
+    <div class="form-group">
+      <label>Dépendant</label>
+      <select id="dep-trip-select"></select>
+    </div>
+    <div class="form-group">
+      <label>Point d'embarquement</label>
+      <input type="text" id="dep-trip-pickup" placeholder="Adresse de départ">
+    </div>
+    <div class="form-group">
+      <label>Point de dépôt</label>
+      <input type="text" id="dep-trip-dropoff" placeholder="Adresse de destination">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-dep-trip')">Annuler</button>
+      <button class="btn btn-primary" onclick="submitDependentToTrip()">Confirmer</button>
+    </div>
+  </div>
+</div>
+
 <!-- Reactivate Trip Modal -->
 <div class="modal-overlay" id="modal-reactivate-trip">
   <div class="modal" style="max-width:460px">
@@ -3799,7 +3855,7 @@ async function cancelTrip(tripId) {
 async function openTripDetail(tripId) {
   const { data: trip } = await sb.from('trips_with_details').select('*').eq('id', tripId).single();
   const { data: bookings } = await sb.from('trip_bookings')
-    .select('*, profiles(full_name, unit)')
+    .select('*, profiles(full_name, unit), dependents(name)')
     .eq('trip_id', tripId)
     .neq('status', 'cancelled');
 
@@ -3811,9 +3867,19 @@ async function openTripDetail(tripId) {
 
   let passengersHtml = '';
   if (bookings?.length) {
-    passengersHtml = `<div class="passengers-list">${bookings.map(b => `
+    passengersHtml = `<div class="passengers-list">${bookings.map(b => {
+      const isDriverCargo = b.seats_requested === 0 && b.cargo_pct_requested > 0 && b.passenger_id === trip.driver_id;
+      const passengerName = isDriverCargo
+        ? `<span style="color:var(--accent)">📦 Cargo chauffeur</span> — ${b.notes || ''}`
+        : b.dependents?.name
+          ? `${b.dependents.name} <span style="font-size:0.78rem;color:var(--accent2)">(dépendant de ${b.profiles?.full_name})</span>`
+          : `${b.profiles?.full_name} (Unité ${b.profiles?.unit})`;
+      const details = isDriverCargo
+        ? `${b.cargo_pct_requested}% cargo`
+        : `${b.pickup_location} → ${b.dropoff_location} — ${b.seats_requested} place(s)${b.cargo_pct_requested ? ` · ${b.cargo_pct_requested}% cargo` : ''}`;
+      return `
       <div class="passenger-row">
-        <span>${b.profiles?.full_name} (Unité ${b.profiles?.unit}) — ${b.pickup_location} → ${b.dropoff_location} — ${b.seats_requested} place(s)</span>
+        <span>${passengerName} — ${details}</span>
         <span>
           <span class="badge ${statusBadge(b.status)}">${statusLabel(b.status)}</span>
           ${isDriver && b.status === 'pending' ? `
@@ -3821,8 +3887,8 @@ async function openTripDetail(tripId) {
             <button class="btn btn-danger btn-sm" onclick="rejectBooking('${b.id}')">✗</button>
           ` : ''}
         </span>
-      </div>
-    `).join('')}</div>`;
+      </div>`;
+    }).join('')}</div>`;
   } else {
     passengersHtml = '<p style="color:var(--text3);font-size:.9rem">Aucun passager pour l\'instant</p>';
   }
@@ -3850,10 +3916,98 @@ async function openTripDetail(tripId) {
   `;
 
   document.getElementById('trip-detail-footer').innerHTML = isDriver && trip.status === 'published' ? `
+    <button class="btn btn-success btn-sm" onclick="openAddDependentToTrip('${trip.id}', ${trip.available_seats - (trip.booked_seats||0)})">👨‍👩‍👧 Ajouter un dépendant</button>
+    <button class="btn btn-secondary btn-sm" onclick="openDriverCargo('${trip.id}', ${trip.cargo_available_pct - (trip.booked_cargo_pct||0)})">📦 Réserver du cargo</button>
     <button class="btn btn-danger" onclick="cancelTrip('${trip.id}');closeModal('modal-trip-detail')">Annuler le trajet</button>
   ` : '<button class="btn btn-secondary" onclick="closeModal(\'modal-trip-detail\')">Fermer</button>';
 
   openModal('modal-trip-detail');
+}
+
+async function openAddDependentToTrip(tripId, seatsLeft) {
+  const { data: deps } = await sb.from('dependents')
+    .select('id, name, age, allow_trips')
+    .eq('parent_id', currentProfile.id)
+    .order('name');
+
+  if (!deps || deps.length === 0) {
+    toast('Vous n\'avez aucun dépendant avec accès au service de covoiturage. Ajoutez-en dans votre Profil.', 'info');
+    return;
+  }
+
+  document.getElementById('dep-trip-id').value = tripId;
+  document.getElementById('dep-trip-seats-left').textContent = seatsLeft;
+
+  const sel = document.getElementById('dep-trip-select');
+  sel.innerHTML = '<option value="">— Choisir un dépendant —</option>' +
+    deps.map(d => `<option value="${d.id}">${d.name}${d.age ? ` (${d.age} ans)` : ''}${!d.allow_trips ? ' ⚠️ non autorisé' : ''}</option>`).join('');
+  sel.value = '';
+
+  document.getElementById('dep-trip-pickup').value = '';
+  document.getElementById('dep-trip-dropoff').value = '';
+
+  openModal('modal-add-dep-trip');
+}
+
+async function submitDependentToTrip() {
+  const tripId = document.getElementById('dep-trip-id').value;
+  const depId = document.getElementById('dep-trip-select').value;
+  const pickup = document.getElementById('dep-trip-pickup').value.trim();
+  const dropoff = document.getElementById('dep-trip-dropoff').value.trim();
+
+  if (!depId) { toast('Choisissez un dépendant', 'error'); return; }
+  if (!pickup || !dropoff) { toast('Remplissez les points d\'embarquement et de dépôt', 'error'); return; }
+
+  const { error } = await sb.from('trip_bookings').insert({
+    trip_id: tripId,
+    passenger_id: currentProfile.id, // booking au nom du parent
+    pickup_location: pickup,
+    dropoff_location: dropoff,
+    seats_requested: 1,
+    cargo_pct_requested: 0,
+    status: 'accepted', // auto-accepté par le chauffeur lui-même
+    dependent_id: depId
+  });
+
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Dépendant ajouté au trajet', 'success');
+  closeModal('modal-add-dep-trip');
+  openTripDetail(tripId);
+}
+
+function openDriverCargo(tripId, cargoLeft) {
+  document.getElementById('driver-cargo-trip-id').value = tripId;
+  document.getElementById('driver-cargo-left').textContent = cargoLeft;
+  // Build cargo options in steps of 10
+  const sel = document.getElementById('driver-cargo-amount');
+  sel.innerHTML = Array.from({length: Math.floor(cargoLeft/10)+1}, (_, i) => i*10)
+    .map(v => `<option value="${v}">${v}%</option>`).join('');
+  sel.value = '0';
+  openModal('modal-driver-cargo');
+}
+
+async function submitDriverCargo() {
+  const tripId = document.getElementById('driver-cargo-trip-id').value;
+  const amount = parseInt(document.getElementById('driver-cargo-amount').value) || 0;
+  const desc = document.getElementById('driver-cargo-desc').value.trim();
+  if (amount === 0) { toast('Choisissez un montant de cargo', 'error'); return; }
+
+  // Insert a booking in the driver's own name, auto-accepted
+  const { error } = await sb.from('trip_bookings').insert({
+    trip_id: tripId,
+    passenger_id: currentProfile.id,
+    pickup_location: 'Chauffeur',
+    dropoff_location: 'Chauffeur',
+    seats_requested: 0,
+    cargo_pct_requested: amount,
+    status: 'accepted',
+    notes: desc || 'Cargo réservé par le chauffeur'
+  });
+
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast(`${amount}% de cargo réservé`, 'success');
+  closeModal('modal-driver-cargo');
+  openTripDetail(tripId);
 }
 
 async function acceptBooking(id) {
