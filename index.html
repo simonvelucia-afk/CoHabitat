@@ -1428,7 +1428,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
           </div>
           <button class="btn btn-success btn-sm" onclick="openAddDependent()">+ Ajouter</button>
         </div>
-        <div id="dependents-list" style="display:flex;flex-direction:column;gap:12px;">
+        <div id="profile-dependents-list" style="display:flex;flex-direction:column;gap:12px;">
           <div style="color:var(--text3);font-size:0.9rem;text-align:center;padding:20px;">Chargement...</div>
         </div>
       </div>
@@ -3978,7 +3978,7 @@ async function saveProfile() {
 }
 
 async function loadDependents() {
-  const el = document.getElementById('dependents-list');
+  const el = document.getElementById('profile-dependents-list');
   if (!el) return;
   el.innerHTML = '<div style="color:var(--text3);font-size:0.9rem;text-align:center;padding:20px;">Chargement...</div>';
   const { data, error } = await sb.from('dependents').select('*').eq('parent_id', currentProfile.id).order('name');
@@ -4006,14 +4006,12 @@ async function loadDependents() {
 }
 
 function openAddDependent() {
-  document.getElementById('dep-editing-id').value = '';
-  document.getElementById('dep-name').value = '';
-  document.getElementById('dep-birthdate').value = '';
-  document.getElementById('dep-pin').value = '';
-  document.getElementById('dep-allow-spaces').checked = false;
-  document.getElementById('dep-allow-trips').checked = false;
-  document.getElementById('dep-allow-lunch').checked = true;
-  document.getElementById('dependent-modal-title').textContent = 'Ajouter un dépendant';
+  const fields = ['dep-editing-id','dep-name','dep-birthdate','dep-pin'];
+  fields.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  const cb = document.getElementById('dep-allow-spaces'); if(cb) cb.checked = false;
+  const cb2 = document.getElementById('dep-allow-trips'); if(cb2) cb2.checked = false;
+  const cb3 = document.getElementById('dep-allow-lunch'); if(cb3) cb3.checked = true;
+  const title = document.getElementById('dependent-modal-title'); if(title) title.textContent = 'Ajouter un dépendant';
   openModal('modal-dependent');
 }
 
@@ -4081,6 +4079,7 @@ async function confirmTransfer() {
   const { error: e1 } = await sb.rpc('adjust_balance', {
     p_user_id: currentProfile.id,
     p_amount: -amount,
+    p_type: 'transfer',
     p_description: `Transfert vers dépendant`
   });
   if (e1) { toast('Erreur débit parent: ' + e1.message, 'error'); return; }
