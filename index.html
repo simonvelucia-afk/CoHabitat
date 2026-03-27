@@ -707,6 +707,92 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   .balance-display { flex-direction: column; gap: 8px; text-align: center; }
 }
 
+/* ===== BURGER BUTTON ===== */
+#burger-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+}
+#burger-btn span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: all 0.25s ease;
+}
+#burger-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+#burger-btn.open span:nth-child(2) { opacity: 0; }
+#burger-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* ===== MOBILE DRAWER ===== */
+#mobile-drawer {
+  display: none;
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--surface);
+  z-index: 99;
+  flex-direction: column;
+  padding: 16px;
+  gap: 6px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  animation: drawerIn 0.2s ease;
+}
+#mobile-drawer.open { display: flex; }
+@keyframes drawerIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#mobile-drawer .mob-tab {
+  background: none;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background var(--transition);
+  border-bottom: 1px solid var(--border);
+}
+#mobile-drawer .mob-tab:last-child { border-bottom: none; }
+#mobile-drawer .mob-tab:hover,
+#mobile-drawer .mob-tab.active { background: rgba(200,169,110,0.12); color: var(--accent); }
+#mobile-drawer .mob-balance {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: var(--accent2);
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .nav-tabs { display: none; }
+  #burger-btn { display: flex; }
+  .nav-right .balance-pill { display: none !important; }
+  #navbar { padding: 0 16px; }
+  #nav-lang-switcher { display: none !important; }
+  #nav-clock { display: none !important; }
+}
+@media (min-width: 769px) {
+  #mobile-drawer { display: none !important; }
+  #burger-btn { display: none !important; }
+}
+
 /* ===== LOADING ===== */
 .loading {
   display: flex;
@@ -1240,6 +1326,9 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     </div>
     <div class="nav-tabs" id="nav-tabs"></div>
     <div class="nav-right">
+      <button id="burger-btn" onclick="toggleMobileMenu()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
       <div class="demo-badge" id="demo-badge" style="display:none">MODE DÉMO</div>
       <div class="balance-pill" id="nav-balance" style="display:none"></div>
       <div style="position:relative">
@@ -1278,6 +1367,9 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       </div>
     </div>
   </nav>
+
+  <!-- MOBILE DRAWER -->
+  <div id="mobile-drawer"></div>
 
   <!-- PAGES -->
   <main id="main">
@@ -3156,6 +3248,25 @@ function buildNav() {
   }
   tabs.innerHTML = html;
 
+  // Mobile drawer — same tabs as nav
+  const drawer = document.getElementById('mobile-drawer');
+  if (drawer) {
+    const pages = [
+      { key: 'dashboard', label: '🏠 ' + lmT('navDashboard') },
+      { key: 'spaces',    label: '🏢 ' + lmT('navSpaces') },
+      { key: 'trips',     label: '🚗 ' + lmT('navTrips') },
+      { key: 'lunch',     label: '🍱 ' + lmT('navLunch') },
+      { key: 'transactions', label: '💳 ' + lmT('navTransactions') },
+      { key: 'profile',   label: '👤 ' + lmT('navProfile') },
+      ...(isAdmin ? [{ key: 'admin', label: '⚙️ ' + lmT('navAdmin') }] : [])
+    ];
+    const balanceStr = `${(currentProfile?.virtual_balance || 0).toFixed(2)} $ CAD`;
+    drawer.innerHTML = `
+      <div class="mob-balance">💳 ${balanceStr}</div>
+      ${pages.map(p => `<button class="mob-tab" onclick="navigateTo('${p.key}');closeMobileMenu()">${p.label}</button>`).join('')}
+    `;
+  }
+
   // Avatar
   const initials = (currentProfile?.full_name || 'D').split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
   document.getElementById('avatar-initials').textContent = initials;
@@ -3185,6 +3296,7 @@ function buildNav() {
 }
 
 function navigateTo(page) {
+  closeMobileMenu();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   // Ajuster layout pour page lunch
@@ -3224,6 +3336,18 @@ function pageName(page) {
 // ==========================================
 // INACTIVE GUARD
 // ==========================================
+function toggleMobileMenu() {
+  const btn = document.getElementById('burger-btn');
+  const drawer = document.getElementById('mobile-drawer');
+  const isOpen = drawer.classList.toggle('open');
+  btn.classList.toggle('open', isOpen);
+}
+
+function closeMobileMenu() {
+  document.getElementById('burger-btn')?.classList.remove('open');
+  document.getElementById('mobile-drawer')?.classList.remove('open');
+}
+
 function checkActive() {
   return true;
 }
