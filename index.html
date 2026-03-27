@@ -3926,6 +3926,7 @@ async function openTripDetail(tripId) {
 
 async function openAddDependentToTrip(tripId, seatsLeft) {
   closeModal('modal-trip-detail');
+  await new Promise(r => setTimeout(r, 150));
   const { data: deps } = await sb.from('dependents')
     .select('id, name, age, allow_trips')
     .eq('parent_id', currentProfile.id)
@@ -3978,14 +3979,15 @@ async function submitDependentToTrip() {
 
 function openDriverCargo(tripId, cargoLeft) {
   closeModal('modal-trip-detail');
-  document.getElementById('driver-cargo-trip-id').value = tripId;
-  document.getElementById('driver-cargo-left').textContent = cargoLeft;
-  // Build cargo options in steps of 10
-  const sel = document.getElementById('driver-cargo-amount');
-  sel.innerHTML = Array.from({length: Math.floor(cargoLeft/10)+1}, (_, i) => i*10)
-    .map(v => `<option value="${v}">${v}%</option>`).join('');
-  sel.value = '0';
-  openModal('modal-driver-cargo');
+  setTimeout(() => {
+    document.getElementById('driver-cargo-trip-id').value = tripId;
+    document.getElementById('driver-cargo-left').textContent = cargoLeft;
+    const sel = document.getElementById('driver-cargo-amount');
+    sel.innerHTML = Array.from({length: Math.floor(cargoLeft/10)+1}, (_, i) => i*10)
+      .map(v => `<option value="${v}">${v}%</option>`).join('');
+    sel.value = '0';
+    openModal('modal-driver-cargo');
+  }, 150);
 }
 
 async function submitDriverCargo() {
