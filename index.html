@@ -2875,14 +2875,30 @@ async function authSubmit() {
 async function loginDemo() {
   isDemo = true;
   currentProfile = {
-    id: null, // profil fictif — aucune ligne en base de données
-    email: 'demo@demo.local',
-    full_name: 'Utilisateur Démo',
-    unit: 'DEMO',
+    id: null,
+    email: 'alex.tremblay@modulimo.com',
+    full_name: 'Alex Tremblay',
+    phone: '+1 514 555-0182',
+    unit: 'B-204',
     role: 'demo',
     is_approved_driver: false,
-    virtual_balance: 0
+    virtual_balance: 47.50,
+    notes: 'Végétarien. Préfère les réservations en soirée.'
   };
+  window._demoDependents = [
+    { id: 'dep-demo-1', name: 'Léa Tremblay', age: 12, phone: null, email: null, pin: '1234', allow_spaces: true, allow_trips: false, allow_lunch: true, virtual_balance: 15.00 },
+    { id: 'dep-demo-2', name: 'Noah Tremblay', age: 8, phone: null, email: null, pin: '5678', allow_spaces: false, allow_trips: false, allow_lunch: true, virtual_balance: 8.25 },
+  ];
+  window._demoTransactions = [
+    { created_at: new Date(Date.now() - 1*86400000).toISOString(), description: 'Réservation Salon commun A', amount: -12.00, balance_after: 47.50 },
+    { created_at: new Date(Date.now() - 3*86400000).toISOString(), description: 'Crédit par administrateur', amount: 50.00, balance_after: 59.50 },
+    { created_at: new Date(Date.now() - 5*86400000).toISOString(), description: 'Machine lunch — Case #3 : Poulet rôti', amount: -8.50, balance_after: 9.50 },
+    { created_at: new Date(Date.now() - 7*86400000).toISOString(), description: 'Réservation Salle de réunion', amount: -6.00, balance_after: 18.00 },
+    { created_at: new Date(Date.now() - 10*86400000).toISOString(), description: 'Crédit par administrateur', amount: 25.00, balance_after: 24.00 },
+    { created_at: new Date(Date.now() - 14*86400000).toISOString(), description: 'Machine lunch — Case #7 : Salade grecque', amount: -5.00, balance_after: -1.00 },
+    { created_at: new Date(Date.now() - 18*86400000).toISOString(), description: 'Réservation Terrasse', amount: -8.00, balance_after: 4.00 },
+    { created_at: new Date(Date.now() - 21*86400000).toISOString(), description: 'Crédit par administrateur — Paiement mensuel', amount: 100.00, balance_after: 12.00 },
+  ];
   showApp();
   toast('Mode démo activé — consultation uniquement', 'info');
 }
@@ -3002,10 +3018,8 @@ function buildNav() {
   html += `<button class="nav-tab" onclick="navigateTo('spaces')">${lmT('navSpaces')}</button>`;
   html += `<button class="nav-tab" onclick="navigateTo('trips')">${lmT('navTrips')}</button>`;
   html += `<button class="nav-tab" onclick="navigateTo('lunch')">${lmT('navLunch')}</button>`;
-  if (role !== 'demo') {
-    html += `<button class="nav-tab" onclick="navigateTo('transactions')">${lmT('navTransactions')}</button>`;
-    html += `<button class="nav-tab" onclick="navigateTo('profile')">👤 ${lmT('navProfile')}</button>`;
-  }
+  html += `<button class="nav-tab" onclick="navigateTo('transactions')">${lmT('navTransactions')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('profile')">👤 ${lmT('navProfile')}</button>`;
   if (isAdmin) {
     html += `<button class="nav-tab" onclick="navigateTo('admin')">${lmT('navAdmin')}</button>`;
   }
@@ -3921,7 +3935,14 @@ async function submitDriverOffer() {
 // ==========================================
 async function loadTransactions() {
   if (isDemo) {
-    document.getElementById('transactions-tbody').innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text3)">Non disponible en mode démo</td></tr>`;
+    const rows = (window._demoTransactions || []).map(t => `
+    <tr>
+      <td style="white-space:nowrap">${new Date(t.created_at).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+      <td>${t.description}</td>
+      <td style="color:${t.amount >= 0 ? 'var(--accent2)' : 'var(--accent3)'};font-weight:600">${t.amount >= 0 ? '+' : ''}${t.amount.toFixed(2)}</td>
+      <td>${t.balance_after.toFixed(2)}</td>
+    </tr>`).join('');
+    document.getElementById('transactions-tbody').innerHTML = rows || `<tr><td colspan="4" style="text-align:center;color:var(--text3)">Aucune transaction</td></tr>`;
     return;
   }
   const { data } = await sb.from('transactions')
@@ -3967,6 +3988,16 @@ async function loadProfilePage() {
   document.getElementById('prof-unit').value = currentProfile?.unit || '';
   document.getElementById('prof-notes').value = currentProfile?.notes || '';
   document.getElementById('prof-balance-display').textContent = (currentProfile?.virtual_balance || 0).toFixed(2);
+  // Read-only in demo
+  const editableFields = ['prof-name','prof-phone','prof-notes'];
+  editableFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.disabled = isDemo; el.style.opacity = isDemo ? '0.6' : '1'; }
+  });
+  const saveBtn = document.querySelector('#page-profile .btn-primary');
+  if (saveBtn) saveBtn.style.display = isDemo ? 'none' : '';
+  const addDepBtn = document.querySelector('#page-profile .btn-success');
+  if (addDepBtn) addDepBtn.style.display = isDemo ? 'none' : '';
   await loadDependents();
 }
 
@@ -3991,7 +4022,14 @@ async function loadDependents() {
   const el = document.getElementById('profile-dependents-list');
   if (!el) return;
   el.innerHTML = '<div style="color:var(--text3);font-size:0.9rem;text-align:center;padding:20px;">Chargement...</div>';
-  const { data, error } = await sb.from('dependents').select('*').eq('parent_id', currentProfile.id).order('name');
+
+  let data, error;
+  if (isDemo) {
+    data = window._demoDependents || [];
+  } else {
+    ({ data, error } = await sb.from('dependents').select('*').eq('parent_id', currentProfile.id).order('name'));
+  }
+
   if (error) { el.innerHTML = '<div style="color:var(--accent3);font-size:0.9rem;padding:12px;">Erreur: ' + error.message + '</div>'; return; }
   if (!data || data.length === 0) {
     el.innerHTML = '<div style="color:var(--text3);font-size:0.9rem;text-align:center;padding:20px;">Aucun dépendant ajouté</div>';
@@ -4000,17 +4038,17 @@ async function loadDependents() {
   el.innerHTML = data.map(d => {
     const svcs = [d.allow_spaces && '🏠 Espaces', d.allow_trips && '🚗 Auto-partage', d.allow_lunch && '🍱 Lunch'].filter(Boolean).join(' · ') || '<span style="color:var(--accent3)">Aucun service</span>';
     const age = d.age ? `${d.age} ans` : '';
+    const actions = isDemo ? '' : `
+      <button class="btn btn-success btn-sm" onclick="openTransfer('${d.id}','${d.name.replace(/'/g, "\\'")}','${(d.virtual_balance||0).toFixed(2)}')">💳 Crédits</button>
+      <button class="btn btn-secondary btn-sm" onclick='editDependent(${JSON.stringify(d)})'>✏️</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteDependent('${d.id}')">🗑</button>`;
     return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
       <div style="flex:1;min-width:160px;">
         <div style="font-weight:600;font-size:1rem;">${d.name}${age ? ` <span style="font-size:0.78rem;color:var(--text2);font-weight:400;">(${age})</span>` : ''}</div>
         <div style="font-size:0.82rem;color:var(--text2);margin-top:3px;">${svcs}</div>
         <div style="font-size:0.88rem;color:var(--accent2);margin-top:5px;font-weight:500;">${(d.virtual_balance || 0).toFixed(2)} $ CAD</div>
       </div>
-      <div style="display:flex;gap:8px;flex-shrink:0;">
-        <button class="btn btn-success btn-sm" onclick="openTransfer('${d.id}','${d.name.replace(/'/g, "\\'")}','${(d.virtual_balance||0).toFixed(2)}')">💳 Crédits</button>
-        <button class="btn btn-secondary btn-sm" onclick='editDependent(${JSON.stringify(d)})'>✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteDependent('${d.id}')">🗑</button>
-      </div>
+      ${actions ? `<div style="display:flex;gap:8px;flex-shrink:0;">${actions}</div>` : ''}
     </div>`;
   }).join('');
 }
