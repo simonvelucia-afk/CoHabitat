@@ -4076,15 +4076,9 @@ async function confirmTransfer() {
   if (!amount || amount <= 0) { toast('Montant invalide', 'error'); return; }
   if (amount > (currentProfile?.virtual_balance || 0)) { toast('Solde insuffisant', 'error'); return; }
 
-  // Debit parent via RPC
-  const { error: e1 } = await sb.rpc('adjust_balance', {
-    p_user_id: currentProfile.id,
-    p_amount: -amount,
-    p_type: 'admin_credit',
-    p_reference_id: null,
-    p_reference_type: 'transfer',
-    p_description: `Transfert vers dépendant`
-  });
+  // Debit parent directly
+  const newParentBalance = (currentProfile.virtual_balance || 0) - amount;
+  const { error: e1 } = await sb.from('profiles').update({ virtual_balance: newParentBalance }).eq('id', currentProfile.id);
   if (e1) { toast('Erreur débit parent: ' + e1.message, 'error'); return; }
 
   // Credit dependent
@@ -4095,7 +4089,7 @@ async function confirmTransfer() {
   if (e3) { toast('Erreur crédit dépendant: ' + e3.message, 'error'); return; }
 
   // Update local state
-  currentProfile.virtual_balance -= amount;
+  currentProfile.virtual_balance = newParentBalance;
   const pill = document.getElementById('nav-balance');
   if (pill) pill.textContent = `${currentProfile.virtual_balance.toFixed(2)}`;
   document.getElementById('prof-balance-display').textContent = currentProfile.virtual_balance.toFixed(2);
