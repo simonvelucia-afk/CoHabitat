@@ -3034,9 +3034,9 @@ function buildNav() {
 
   // Balance
   const balancePill = document.getElementById('nav-balance');
-  if (!isDemo && currentProfile) {
+  if (currentProfile) {
     balancePill.style.display = 'flex';
-    balancePill.textContent = `${(currentProfile.virtual_balance || 0).toFixed(2)} $ $`;
+    balancePill.textContent = `${(currentProfile.virtual_balance || 0).toFixed(2)} $ CAD`;
   }
 
   // Admin settings tab
