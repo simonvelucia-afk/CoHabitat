@@ -6328,8 +6328,24 @@ async function lmStartPurchase(id) {
       opt.value = t.id;
       opt.textContent = t.full_name + (t.unit ? ' — ' + t.unit : '');
       opt.dataset.balance = t.virtual_balance || 0;
+      opt.dataset.kind = 'tenant';
       sel.appendChild(opt);
     });
+    // Add dependents with allow_lunch
+    const { data: deps } = await sb.from('dependents').select('id, name, virtual_balance, parent_id').eq('allow_lunch', true).order('name');
+    if (deps && deps.length > 0) {
+      const grp = document.createElement('optgroup');
+      grp.label = '👨‍👩‍👧 Dépendants';
+      deps.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = 'dep:' + d.id;
+        opt.textContent = d.name + ' — ' + (d.virtual_balance || 0).toFixed(2) + ' $ CAD';
+        opt.dataset.balance = d.virtual_balance || 0;
+        opt.dataset.kind = 'dependent';
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    }
     sel.value = '';
   }
 
@@ -6376,8 +6392,12 @@ async function lmConfirmPurchase() {
   if (!lmSelectedTenantId) return;
   const slot = lmState.slots.find(s => s.id === lmSelectedSlotId);
   if (!slot) return;
-  const tenant = lmTenantsCache.find(t => t.id === lmSelectedTenantId);
-  const buyer = tenant ? tenant.full_name : 'Locataire';
+  const isDependent = lmSelectedTenantId.startsWith('dep:');
+  const depId = isDependent ? lmSelectedTenantId.slice(4) : null;
+  const tenant = isDependent ? null : lmTenantsCache.find(t => t.id === lmSelectedTenantId);
+  const buyer = isDependent
+    ? (document.querySelector(`#lm-tenant-select option[value="${lmSelectedTenantId}"]`)?.textContent?.split(' — ')[0] || 'Dépendant')
+    : (tenant ? tenant.full_name : 'Locataire');
   const zoneName = lmState.zones[slot.zone].name;
   const zoneId = slot.zone;
   const slotId = slot.id;
@@ -6387,7 +6407,22 @@ async function lmConfirmPurchase() {
   const xFrac = zoneId === LM_ZONE_IDS[0] ? 0.551 : 0.849;
   const btn = document.getElementById('lm-confirm-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
-  const result = await lmDebitTenant(lmSelectedTenantId, price, slotId, slotDesc);
+
+  let result;
+  if (isDependent) {
+    // Débit dépendant directement sur dependents.virtual_balance
+    if (price > 0) {
+      const { data: dep } = await sb.from('dependents').select('virtual_balance').eq('id', depId).single();
+      const newBal = Math.max(0, (dep?.virtual_balance || 0) - price);
+      const { error } = await sb.from('dependents').update({ virtual_balance: newBal }).eq('id', depId);
+      result = { ok: !error, msg: error?.message || '' };
+    } else {
+      result = { ok: true };
+    }
+  } else {
+    result = await lmDebitTenant(lmSelectedTenantId, price, slotId, slotDesc);
+  }
+
   if (!result.ok) {
     if (btn) { btn.disabled = false; btn.textContent = 'Confirmer ✓'; btn.style.opacity = '1'; }
     toast('Erreur lors du débit' + (result.msg ? ' : ' + result.msg : '.'), 'error');
