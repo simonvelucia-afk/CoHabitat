@@ -2125,8 +2125,8 @@ tr:hover td { background: rgba(255,255,255,0.02); }
         <input type="text" id="dep-name" placeholder="Marie Tremblay" autocomplete="off">
       </div>
       <div class="form-group">
-        <label>Date de naissance</label>
-        <input type="date" id="dep-birthdate">
+        <label>Âge</label>
+        <input type="number" id="dep-age" min="1" max="25" placeholder="ex: 10" autocomplete="off">
       </div>
       <div class="form-group">
         <label>PIN d'accès (4 chiffres)</label>
@@ -3989,7 +3989,7 @@ async function loadDependents() {
   }
   el.innerHTML = data.map(d => {
     const svcs = [d.allow_spaces && '🏠 Espaces', d.allow_trips && '🚗 Auto-partage', d.allow_lunch && '🍱 Lunch'].filter(Boolean).join(' · ') || '<span style="color:var(--accent3)">Aucun service</span>';
-    const age = d.birthdate ? (() => { const y = new Date().getFullYear() - new Date(d.birthdate).getFullYear(); return `${y} ans`; })() : '';
+    const age = d.age ? `${d.age} ans` : '';
     return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
       <div style="flex:1;min-width:160px;">
         <div style="font-weight:600;font-size:1rem;">${d.name}${age ? ` <span style="font-size:0.78rem;color:var(--text2);font-weight:400;">(${age})</span>` : ''}</div>
@@ -4006,7 +4006,7 @@ async function loadDependents() {
 }
 
 function openAddDependent() {
-  const fields = ['dep-editing-id','dep-name','dep-birthdate','dep-pin'];
+  const fields = ['dep-editing-id','dep-name','dep-pin'];
   fields.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   const cb = document.getElementById('dep-allow-spaces'); if(cb) cb.checked = false;
   const cb2 = document.getElementById('dep-allow-trips'); if(cb2) cb2.checked = false;
@@ -4018,7 +4018,7 @@ function openAddDependent() {
 function editDependent(d) {
   document.getElementById('dep-editing-id').value = d.id;
   document.getElementById('dep-name').value = d.name;
-  document.getElementById('dep-birthdate').value = d.birthdate || '';
+  document.getElementById('dep-age').value = d.age || '';
   document.getElementById('dep-pin').value = d.pin || '';
   document.getElementById('dep-allow-spaces').checked = !!d.allow_spaces;
   document.getElementById('dep-allow-trips').checked = !!d.allow_trips;
@@ -4030,14 +4030,15 @@ function editDependent(d) {
 async function saveDependent() {
   const id = document.getElementById('dep-editing-id').value;
   const name = document.getElementById('dep-name').value.trim();
-  const birthdate = document.getElementById('dep-birthdate').value || null;
+  const birthdate = document.getElementById('dep-birthdate') ? document.getElementById('dep-birthdate').value || null : null;
+  const age = document.getElementById('dep-age') ? parseInt(document.getElementById('dep-age').value) || null : null;
   const pin = document.getElementById('dep-pin').value.trim();
   const allow_spaces = document.getElementById('dep-allow-spaces').checked;
   const allow_trips = document.getElementById('dep-allow-trips').checked;
   const allow_lunch = document.getElementById('dep-allow-lunch').checked;
   if (!name) { toast('Le nom est requis', 'error'); return; }
   if (pin && !/^\d{4}$/.test(pin)) { toast('Le PIN doit être exactement 4 chiffres', 'error'); return; }
-  const payload = { parent_id: currentProfile.id, name, birthdate, pin: pin || null, allow_spaces, allow_trips, allow_lunch };
+  const payload = { parent_id: currentProfile.id, name, age, pin: pin || null, allow_spaces, allow_trips, allow_lunch };
   let error;
   if (id) {
     ({ error } = await sb.from('dependents').update(payload).eq('id', id));
@@ -4079,7 +4080,7 @@ async function confirmTransfer() {
   const { error: e1 } = await sb.rpc('adjust_balance', {
     p_user_id: currentProfile.id,
     p_amount: -amount,
-    p_type: 'transfer',
+    p_type: 'admin_credit',
     p_reference_id: null,
     p_reference_type: 'transfer',
     p_description: `Transfert vers dépendant`
