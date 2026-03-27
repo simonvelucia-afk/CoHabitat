@@ -4080,6 +4080,8 @@ async function confirmTransfer() {
     p_user_id: currentProfile.id,
     p_amount: -amount,
     p_type: 'transfer',
+    p_reference_id: null,
+    p_reference_type: 'transfer',
     p_description: `Transfert vers dépendant`
   });
   if (e1) { toast('Erreur débit parent: ' + e1.message, 'error'); return; }
