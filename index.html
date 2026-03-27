@@ -2123,10 +2123,20 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       <div class="form-group">
         <label>Prénom / Nom</label>
         <input type="text" id="dep-name" placeholder="Marie Tremblay" autocomplete="off">
-      </div>
-      <div class="form-group">
-        <label>Âge</label>
-        <input type="number" id="dep-age" min="1" max="25" placeholder="ex: 10" autocomplete="off">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0">
+            <label>Âge</label>
+            <input type="number" id="dep-age" min="1" max="25" placeholder="ex: 10" autocomplete="off">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Téléphone</label>
+            <input type="tel" id="dep-phone" placeholder="+1 514 000-0000" autocomplete="off">
+          </div>
+          </div>
+          <div class="form-group">
+            <label>Courriel</label>
+            <input type="email" id="dep-email" placeholder="marie@exemple.com" autocomplete="off">
       </div>
       <div class="form-group">
         <label>PIN d'accès (4 chiffres)</label>
@@ -4006,7 +4016,7 @@ async function loadDependents() {
 }
 
 function openAddDependent() {
-  const fields = ['dep-editing-id','dep-name','dep-pin'];
+  const fields = ['dep-editing-id','dep-name','dep-pin','dep-phone','dep-email'];
   fields.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   const cb = document.getElementById('dep-allow-spaces'); if(cb) cb.checked = false;
   const cb2 = document.getElementById('dep-allow-trips'); if(cb2) cb2.checked = false;
@@ -4019,6 +4029,8 @@ function editDependent(d) {
   document.getElementById('dep-editing-id').value = d.id;
   document.getElementById('dep-name').value = d.name;
   document.getElementById('dep-age').value = d.age || '';
+  document.getElementById('dep-phone').value = d.phone || '';
+  document.getElementById('dep-email').value = d.email || '';
   document.getElementById('dep-pin').value = d.pin || '';
   document.getElementById('dep-allow-spaces').checked = !!d.allow_spaces;
   document.getElementById('dep-allow-trips').checked = !!d.allow_trips;
@@ -4032,13 +4044,15 @@ async function saveDependent() {
   const name = document.getElementById('dep-name').value.trim();
   const birthdate = document.getElementById('dep-birthdate') ? document.getElementById('dep-birthdate').value || null : null;
   const age = document.getElementById('dep-age') ? parseInt(document.getElementById('dep-age').value) || null : null;
+  const phone = document.getElementById('dep-phone')?.value.trim() || null;
+  const email = document.getElementById('dep-email')?.value.trim() || null;
   const pin = document.getElementById('dep-pin').value.trim();
   const allow_spaces = document.getElementById('dep-allow-spaces').checked;
   const allow_trips = document.getElementById('dep-allow-trips').checked;
   const allow_lunch = document.getElementById('dep-allow-lunch').checked;
   if (!name) { toast('Le nom est requis', 'error'); return; }
   if (pin && !/^\d{4}$/.test(pin)) { toast('Le PIN doit être exactement 4 chiffres', 'error'); return; }
-  const payload = { parent_id: currentProfile.id, name, age, pin: pin || null, allow_spaces, allow_trips, allow_lunch };
+  const payload = { parent_id: currentProfile.id, name, age, phone, email, pin: pin || null, allow_spaces, allow_trips, allow_lunch };
   let error;
   if (id) {
     ({ error } = await sb.from('dependents').update(payload).eq('id', id));
