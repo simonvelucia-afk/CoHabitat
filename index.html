@@ -3009,6 +3009,20 @@ function showApp() {
   document.getElementById('app').style.display = 'flex';
   buildNav();
   ptApply();
+  // Bandeau compte inactif
+  let banner = document.getElementById('inactive-banner');
+  if (currentProfile?.is_active === false) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'inactive-banner';
+      banner.style.cssText = 'background:rgba(224,112,96,0.15);border-bottom:1px solid rgba(224,112,96,0.4);color:var(--accent3);text-align:center;padding:10px 20px;font-size:0.88rem;font-weight:500;';
+      banner.textContent = '⚠️ Votre compte est inactif — la consultation est possible mais les réservations sont désactivées. Contactez l\'administrateur.';
+      document.getElementById('app').insertBefore(banner, document.getElementById('navbar').nextSibling);
+    }
+    banner.style.display = '';
+  } else if (banner) {
+    banner.style.display = 'none';
+  }
   navigateTo(isDemo ? 'spaces' : 'dashboard');
 }
 
@@ -3096,6 +3110,17 @@ function pageName(page) {
 }
 
 // ==========================================
+// ==========================================
+// INACTIVE GUARD
+// ==========================================
+function checkActive() {
+  if (currentProfile?.is_active === false) {
+    toast('Votre compte est inactif. Contactez l\'administrateur pour effectuer des réservations.', 'error');
+    return false;
+  }
+  return true;
+}
+
 // TOAST
 // ==========================================
 function toast(msg, type = 'info') {
@@ -3259,6 +3284,7 @@ function filterSpaces() {
 }
 
 function openBookSpace(spaceId, spaceName) {
+  if (!checkActive()) return;
   currentBookingSpaceId = spaceId;
   document.getElementById('book-space-title').textContent = `Réserver — ${spaceName}`;
   const today = new Date().toISOString().split('T')[0];
@@ -3511,6 +3537,7 @@ function renderTripBookings(bookings) {
 }
 
 function openBookTrip(tripId) {
+  if (!checkActive()) return;
   currentBookingTripId = tripId;
   const trip = tripsCache.find(t => t.id === tripId);
   if (!trip) return;
@@ -3554,6 +3581,7 @@ function openBookTrip(tripId) {
 }
 
 async function submitTripBooking() {
+  if (!checkActive()) return;
   if (isDemo) {
     toast('Mode démo — demande simulée avec succès !', 'success');
     closeModal('modal-book-trip');
@@ -3680,6 +3708,7 @@ let dependentsCount = 0;
 let stopsCount = 0;
 
 async function openCreateTrip() {
+  if (!checkActive()) return;
   dependentsCount = 0; stopsCount = 0;
   document.getElementById('dependents-list').innerHTML = '';
   document.getElementById('stops-list').innerHTML = '';
@@ -3854,6 +3883,7 @@ function openPassengerRequest() {
 }
 
 async function submitPassengerRequest() {
+  if (!checkActive()) return;
   const from = document.getElementById('pr-from').value.trim();
   const to = document.getElementById('pr-to').value.trim();
   const date = document.getElementById('pr-date').value;
@@ -3914,6 +3944,7 @@ async function openDriverOffer(requestId, from, to, luggage, seats) {
 }
 
 async function submitDriverOffer() {
+  if (!checkActive()) return;
   const requestId = document.querySelector('#modal-driver-offer .btn-primary').getAttribute('data-request-id');
   const vehicleId = document.getElementById('offer-vehicle').value;
   const luggage = parseFloat(document.getElementById('offer-luggage').value) || 0;
@@ -6354,6 +6385,7 @@ function lmMigrateState(parsed) {
 
 // Sélecteur de locataires lors de l'achat
 async function lmStartPurchase(id) {
+  if (!checkActive()) return;
   lmCloseModal();
   lmSelectedSlotId = id;
   lmSelectedTenantId = null;
