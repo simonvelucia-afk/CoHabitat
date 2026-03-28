@@ -1449,24 +1449,22 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     <div id="page-babillard" class="page">
       <div class="section-header">
         <div class="section-title">
-          <h2>📌 Babillard</h2>
-          <p style="color:var(--text2);font-size:0.9rem">Messages et annonces de la communauté</p>
+          <h2 data-pt="bbTitle">📌 Babillard</h2>
+          <p style="color:var(--text2);font-size:0.9rem" data-pt="bbSubtitle">Messages et annonces de la communauté</p>
         </div>
       </div>
 
       <!-- Composer -->
       <div class="bb-compose" id="bb-compose-box">
-        <div style="font-size:0.82rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;font-weight:500;margin-bottom:10px;">Nouveau message</div>
-        <textarea id="bb-new-message" placeholder="Partagez une annonce, une question ou un avis avec vos voisins…" autocomplete="off"></textarea>
+        <div style="font-size:0.82rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;font-weight:500;margin-bottom:10px;" data-pt="bbNewLabel">Nouveau message</div>
+        <textarea id="bb-new-message" autocomplete="off"></textarea>
         <div style="display:flex;justify-content:flex-end;margin-top:10px;">
-          <button class="btn btn-primary btn-sm" onclick="bbPostMessage()">Publier</button>
+          <button class="btn btn-primary btn-sm" onclick="bbPostMessage()" data-pt="bbPublish">Publier</button>
         </div>
       </div>
 
       <!-- Feed -->
-      <div id="bb-feed">
-        <div class="bb-empty"><div class="empty-icon">📋</div>Chargement…</div>
-      </div>
+      <div id="bb-feed"></div>
     </div>
 
     <!-- ==================== TENANT: DASHBOARD ==================== -->
@@ -5497,6 +5495,25 @@ const PT = {
     'Actions': 'Actions', 'Capacité': 'Capacité', 'Lieu': 'Lieu',
     'Prix/15min': 'Prix/15min', 'Modèle': 'Modèle', 'Plaque': 'Plaque',
     'Places': 'Places', 'Prix/min': 'Prix/min', 'Prix/km': 'Prix/km', 'Dispo': 'Dispo',
+    // Babillard
+    'bbTitle': '📌 Babillard',
+    'bbSubtitle': 'Messages et annonces de la communauté',
+    'bbNewLabel': 'Nouveau message',
+    'bbPlaceholder': 'Partagez une annonce, une question ou un avis avec vos voisins…',
+    'bbPublish': 'Publier',
+    'bbPostedOn': 'Publié le',
+    'bbDeleteTitle': 'Supprimer',
+    'bbLoading': 'Chargement…',
+    'bbEmpty': 'Aucun message pour le moment. Soyez le premier à publier !',
+    'bbError': 'Erreur de chargement. Vérifiez que la table <code>bulletin_board</code> existe dans Supabase.',
+    'bbDemoUnavail': 'Indisponible en mode démo',
+    'bbErrEmpty': 'Le message ne peut pas être vide.',
+    'bbErrTooLong': 'Message trop long (max 2000 caractères).',
+    'bbErrPost': 'Erreur lors de la publication : ',
+    'bbPosted': 'Message publié !',
+    'bbConfirmDelete': 'Supprimer ce message ?',
+    'bbErrDelete': 'Erreur : ',
+    'bbAuthor': 'Locataire',
   },
   en: {
     'Solde disponible': 'Available balance',
@@ -5540,6 +5557,25 @@ const PT = {
     'Actions': 'Actions', 'Capacité': 'Capacity', 'Lieu': 'Location',
     'Prix/15min': 'Price/15min', 'Modèle': 'Model', 'Plaque': 'Plate',
     'Places': 'Seats', 'Prix/min': 'Price/min', 'Prix/km': 'Price/km', 'Dispo': 'Avail.',
+    // Bulletin board
+    'bbTitle': '📌 Bulletin board',
+    'bbSubtitle': 'Community messages and announcements',
+    'bbNewLabel': 'New message',
+    'bbPlaceholder': 'Share an announcement, question or opinion with your neighbours…',
+    'bbPublish': 'Post',
+    'bbPostedOn': 'Posted on',
+    'bbDeleteTitle': 'Delete',
+    'bbLoading': 'Loading…',
+    'bbEmpty': 'No messages yet. Be the first to post!',
+    'bbError': 'Load error. Make sure the <code>bulletin_board</code> table exists in Supabase.',
+    'bbDemoUnavail': 'Unavailable in demo mode',
+    'bbErrEmpty': 'Message cannot be empty.',
+    'bbErrTooLong': 'Message too long (max 2000 characters).',
+    'bbErrPost': 'Error posting: ',
+    'bbPosted': 'Message posted!',
+    'bbConfirmDelete': 'Delete this message?',
+    'bbErrDelete': 'Error: ',
+    'bbAuthor': 'Tenant',
   },
   es: {
     'Solde disponible': 'Saldo disponible',
@@ -5583,6 +5619,25 @@ const PT = {
     'Actions': 'Acciones', 'Capacité': 'Capacidad', 'Lieu': 'Lugar',
     'Prix/15min': 'Precio/15min', 'Modèle': 'Modelo', 'Plaque': 'Placa',
     'Places': 'Asientos', 'Prix/min': 'Precio/min', 'Prix/km': 'Precio/km', 'Dispo': 'Dispon.',
+    // Tablón de anuncios
+    'bbTitle': '📌 Tablón',
+    'bbSubtitle': 'Mensajes y anuncios de la comunidad',
+    'bbNewLabel': 'Nuevo mensaje',
+    'bbPlaceholder': 'Comparte un anuncio, pregunta u opinión con tus vecinos…',
+    'bbPublish': 'Publicar',
+    'bbPostedOn': 'Publicado el',
+    'bbDeleteTitle': 'Eliminar',
+    'bbLoading': 'Cargando…',
+    'bbEmpty': 'Sin mensajes por el momento. ¡Sé el primero en publicar!',
+    'bbError': 'Error de carga. Verifica que la tabla <code>bulletin_board</code> exista en Supabase.',
+    'bbDemoUnavail': 'No disponible en modo demo',
+    'bbErrEmpty': 'El mensaje no puede estar vacío.',
+    'bbErrTooLong': 'Mensaje demasiado largo (máx 2000 caracteres).',
+    'bbErrPost': 'Error al publicar: ',
+    'bbPosted': '¡Mensaje publicado!',
+    'bbConfirmDelete': '¿Eliminar este mensaje?',
+    'bbErrDelete': 'Error: ',
+    'bbAuthor': 'Inquilino',
   }
 };
 
@@ -5598,6 +5653,8 @@ function ptApply() {
   // Update search placeholder
   const spacesSearch = document.getElementById('spaces-search');
   if (spacesSearch) spacesSearch.placeholder = pt('Rechercher un espace…');
+  const bbTa = document.getElementById('bb-new-message');
+  if (bbTa) bbTa.placeholder = pt('bbPlaceholder');
   // Re-render current active page
   const activePage = document.querySelector('.page.active');
   if (activePage && typeof navigateTo === 'function') {
@@ -7196,7 +7253,7 @@ window.addEventListener('pagehide', (e) => {
 async function loadBabillard() {
   const feed = document.getElementById('bb-feed');
   if (!feed) return;
-  feed.innerHTML = '<div class="bb-empty"><div class="empty-icon">📋</div>Chargement…</div>';
+  feed.innerHTML = '<div class="bb-empty"><div class="empty-icon">📋</div>' + pt('bbLoading') + '</div>';
 
   // Masquer le composeur en mode démo
   const compose = document.getElementById('bb-compose-box');
@@ -7220,13 +7277,13 @@ async function loadBabillard() {
     .limit(100);
 
   if (error) {
-    feed.innerHTML = '<div class="bb-empty"><div class="empty-icon">⚠️</div>Erreur de chargement. Vérifiez que la table <code>bulletin_board</code> existe dans Supabase.</div>';
+    feed.innerHTML = '<div class="bb-empty"><div class="empty-icon">⚠️</div>' + pt('bbError') + '</div>';
     console.error('bulletin_board load error:', error);
     return;
   }
 
   if (!data || data.length === 0) {
-    feed.innerHTML = '<div class="bb-empty"><div class="empty-icon">📌</div>Aucun message pour le moment. Soyez le premier à publier !</div>';
+    feed.innerHTML = '<div class="bb-empty"><div class="empty-icon">📌</div>' + pt('bbEmpty') + '</div>';
     return;
   }
 
@@ -7237,11 +7294,13 @@ async function loadBabillard() {
 }
 
 function bbRenderPost(p, isOwner, isAdmin) {
-  const name = p.profiles?.full_name || 'Locataire';
+  const name = p.profiles?.full_name || pt('bbAuthor');
   const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
   const date = new Date(p.created_at);
-  const dateStr = date.toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' })
-    + ' à ' + date.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
+  const locale = lmLang === 'fr' ? 'fr-CA' : lmLang === 'es' ? 'es-ES' : 'en-CA';
+  const timeSep = lmLang === 'es' ? ' a las ' : lmLang === 'en' ? ' at ' : ' à ';
+  const dateStr = pt('bbPostedOn') + ' ' + date.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
+    + timeSep + date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   const canDelete = isOwner || isAdmin;
 
   return `
@@ -7251,37 +7310,37 @@ function bbRenderPost(p, isOwner, isAdmin) {
         <div class="bb-author-avatar">${initials}</div>
         <div>
           <div class="bb-author-name">${escHtml(name)}</div>
-          <div class="bb-post-date">Publié le ${dateStr}</div>
+          <div class="bb-post-date">${dateStr}</div>
         </div>
       </div>
-      ${canDelete ? `<button class="btn btn-danger btn-sm btn-icon" title="Supprimer" onclick="bbDeletePost('${p.id}')">✕</button>` : ''}
+      ${canDelete ? `<button class="btn btn-danger btn-sm btn-icon" title="${pt('bbDeleteTitle')}" onclick="bbDeletePost('${p.id}')">✕</button>` : ''}
     </div>
     <div class="bb-post-body">${escHtml(p.content)}</div>
   </div>`;
 }
 
 async function bbPostMessage() {
-  if (isDemo) { toast('Indisponible en mode démo', 'info'); return; }
+  if (isDemo) { toast(pt('bbDemoUnavail'), 'info'); return; }
   const ta = document.getElementById('bb-new-message');
   const content = ta?.value?.trim();
-  if (!content) { toast('Le message ne peut pas être vide.', 'error'); return; }
-  if (content.length > 2000) { toast('Message trop long (max 2000 caractères).', 'error'); return; }
+  if (!content) { toast(pt('bbErrEmpty'), 'error'); return; }
+  if (content.length > 2000) { toast(pt('bbErrTooLong'), 'error'); return; }
 
   const { error } = await sb.from('bulletin_board').insert({ content, user_id: currentProfile.id });
-  if (error) { toast('Erreur lors de la publication : ' + error.message, 'error'); return; }
+  if (error) { toast(pt('bbErrPost') + error.message, 'error'); return; }
   ta.value = '';
-  toast('Message publié !', 'success');
+  toast(pt('bbPosted'), 'success');
   loadBabillard();
 }
 
 async function bbDeletePost(id) {
-  if (!confirm('Supprimer ce message ?')) return;
+  if (!confirm(pt('bbConfirmDelete'))) return;
   const { error } = await sb.from('bulletin_board').delete().eq('id', id);
-  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  if (error) { toast(pt('bbErrDelete') + error.message, 'error'); return; }
   document.getElementById(`bb-post-${id}`)?.remove();
   const feed = document.getElementById('bb-feed');
   if (feed && !feed.querySelector('.bb-post')) {
-    feed.innerHTML = '<div class="bb-empty"><div class="empty-icon">📌</div>Aucun message pour le moment. Soyez le premier à publier !</div>';
+    feed.innerHTML = '<div class="bb-empty"><div class="empty-icon">📌</div>' + pt('bbEmpty') + '</div>';
   }
 }
 
