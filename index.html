@@ -4038,7 +4038,7 @@ function openBookTrip(tripId) {
     <div class="info-box" style="margin-bottom:14px">
       <strong>${escHtml(trip.title)}</strong><br>
       ${escHtml(trip.departure_point)} → ${escHtml(trip.destination)}<br>
-      Chauffeur: ${escHtml(trip.driver_name)} · ${new Date(trip.departure_time).toLocaleString('fr-CA', { dateStyle: 'full', timeStyle: 'short' })}
+      Chauffeur: ${escHtml(isDemo ? anonName(trip.driver_id) : trip.driver_name)} · ${new Date(trip.departure_time).toLocaleString('fr-CA', { dateStyle: 'full', timeStyle: 'short' })}
     </div>
     <div class="form-group">
       <label>Point d'embarquement souhaité</label>
@@ -7114,7 +7114,7 @@ async function lmStartPurchase(id) {
       deps.forEach(d => {
         const opt = document.createElement('option');
         opt.value = 'dep:' + d.id;
-        opt.textContent = d.name + ' — ' + (d.virtual_balance || 0).toFixed(2) + ' $ CAD';
+        opt.textContent = (isDemo ? anonName(d.id) : d.name) + ' — ' + (d.virtual_balance || 0).toFixed(2) + ' $ CAD';
         opt.dataset.balance = d.virtual_balance || 0;
         opt.dataset.kind = 'dependent';
         grp.appendChild(opt);
@@ -7172,7 +7172,7 @@ async function lmConfirmPurchase() {
   const tenant = isDependent ? null : lmTenantsCache.find(t => t.id === lmSelectedTenantId);
   const buyer = isDependent
     ? (document.querySelector(`#lm-tenant-select option[value="${lmSelectedTenantId}"]`)?.textContent?.split(' — ')[0] || 'Dépendant')
-    : (tenant ? tenant.full_name : 'Locataire');
+    : (tenant ? (isDemo ? anonName(tenant.id) : tenant.full_name) : 'Locataire');
   const zoneName = lmState.zones[slot.zone].name;
   const zoneId = slot.zone;
   const slotId = slot.id;
