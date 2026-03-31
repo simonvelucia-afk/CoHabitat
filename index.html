@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CoHabitat — Gestion des ressources communes</title>
+<!-- v26 — Machine Lunch online : achat web, pickup PIN, admin confirme en place -->
 <script>
 // Intercepter le hash Supabase AVANT l'init du SDK
 (function() {
@@ -6639,6 +6640,11 @@ async function lmSaveSlotDesc(confirm = false) {
   lmSaveState();
   lmRenderAdminCases();
   lmFlashSave();
+  trackFeature('lunch_machine', confirm ? 'slot_confirmed_inplace' : 'slot_configured', {
+    slot_id: lmAdminSelectedSlot,
+    price: price,
+    has_expiry: !!expiresAt
+  });
   toast(confirm ? '✓ Case confirmée en place — visible en ligne' : '💾 Case préparée (pas encore visible en ligne)', confirm ? 'success' : 'info');
 }
 function lmClearSlotDesc() {
@@ -7375,7 +7381,11 @@ async function onLunchPageShow() {
   lmShowScreen('screen-home');
 
   // Expirer les slots périmés côté serveur
-  sb.rpc('lm_expire_slots').catch(() => {});
+  sb.rpc('lm_expire_slots').then(({ data }) => {
+    if (data && data > 0) {
+      trackFeature('lunch_machine', 'slots_expired', { count: data });
+    }
+  }).catch(() => {});
 
   // Charger les slots depuis lm_slots (Supabase) — source de vérité
   try {
@@ -7444,6 +7454,7 @@ async function lmCheckPendingOrder() {
 
 function lmShowMenuOnline() {
   lmShowScreen('screen-menu');
+  trackFeature('lunch_machine', 'menu_online_open', { user_type: isDemo ? 'demo' : 'resident' });
   lmRenderMenuOnline();
 }
 
@@ -7501,6 +7512,7 @@ async function lmBuySlotOnline(slotId) {
     toast('Connectez-vous pour acheter en ligne', 'error');
     return;
   }
+  trackFeature('lunch_machine', 'slot_view_online', { slot_id: slotId, user_type: 'resident' });
   if (!confirm('Acheter la case #' + slotId + ' ?')) return;
 
   const { data, error } = await sb.rpc('lm_purchase_slot', {
