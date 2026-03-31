@@ -3784,6 +3784,7 @@ async function confirmBookSpace() {
   document.getElementById('nav-balance').textContent = `${currentProfile.virtual_balance.toFixed(2)}`;
 
   toast('Réservation confirmée !', 'success');
+  trackFeature('shared_spaces', 'space_reserved', { space_name: space?.name || '', cost: cost, slots: slots });
   closeModal('modal-book-space');
   await logRequest(currentBookingSpaceId, 'space', 'book', { reservation_id: res.id });
 }
@@ -4130,6 +4131,7 @@ async function submitTripBooking() {
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
   await logRequest(currentBookingTripId, 'trip', 'request', { booking_id: data.id });
   toast('Demande envoyée ! Le chauffeur doit l\'accepter.', 'success');
+  trackFeature('covoiturage', 'booking_request', { seats: seats, cargo: cargo });
   closeModal('modal-book-trip');
 }
 
@@ -4605,6 +4607,7 @@ async function submitDriverOffer() {
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
 
   toast('Proposition envoyée au passager !', 'success');
+  trackFeature('covoiturage', 'driver_offer', { vehicle_id: vehicleId });
   closeModal('modal-driver-offer');
 }
 
@@ -6256,6 +6259,7 @@ function lmConfirmKioskReservation() {
   window.gantryQueue.push({ slotId: slotId, xFrac: xFrac, desc: slotDesc, price: price });
 
   lmShowSuccess(lmT('successMsg', buyer), '#' + slotId + ' — ' + zoneName + ' — ' + priceStr);
+  trackFeature('lunch_machine', 'slot_reserved', { slot_id: slotId, zone: zoneName, price: price });
 }
 
 function lmShowSuccess(msg, sub) {
@@ -7461,96 +7465,7 @@ async function bbDeletePost(id) {
   </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  const lmApp = document.getElementById('lm-app');
-  if (lmApp) {
-    trackFeature('lunch_machine', 'module_open');
-    trackStep('lunch_machine', 'home_open');
-  }
 
-  document.querySelectorAll('.slot').forEach((slot, index) => {
-    slot.addEventListener('click', function () {
-      const slotId = slot.dataset.slot || slot.getAttribute('data-slot') || index + 1;
-      trackFeature('lunch_machine', 'slot_click', { slot_id: slotId });
-      trackStep('lunch_machine', 'slot_selection', { slot_id: slotId });
-    });
-  });
-
-  document.querySelectorAll('.admin-tab, .admin-nav-item, .lm-admin-tab').forEach(tab => {
-    tab.addEventListener('click', function () {
-      trackFeature('lunch_machine', 'admin_open', {
-        tab_name: (tab.innerText || '').trim()
-      });
-    });
-  });
-
-  document.querySelectorAll('.nav-tab, .mob-tab').forEach(tab => {
-    tab.addEventListener('click', function () {
-      trackFeature('navigation', 'tab_click', {
-        tab_name: (tab.innerText || '').trim()
-      });
-    });
-  });
-
-  document.querySelectorAll('button, a').forEach(el => {
-    const txt = (el.innerText || el.textContent || '').toLowerCase().trim();
-    if (!txt) return;
-
-    if (txt.includes('auto-partage') || txt.includes('autopartage') || txt.includes('car share') || txt.includes('minivan')) {
-      el.addEventListener('click', function () {
-        trackFeature('car_share', 'module_open', { label: txt });
-        trackStep('car_share', 'vehicle_selection', { label: txt });
-      });
-    }
-
-    if (txt.includes('terrasse') || txt.includes('espace commun') || txt.includes('salle commune') || txt.includes('rooftop') || txt.includes('common space')) {
-      el.addEventListener('click', function () {
-        trackFeature('shared_spaces', 'module_open', { label: txt });
-        trackStep('shared_spaces', 'space_selection', { label: txt });
-      });
-    }
-
-    if (txt.includes('démo') || txt.includes('demo')) {
-      el.addEventListener('click', function () {
-        trackFeature('platform', 'demo_click', { label: txt });
-      });
-    }
-  });
-
-  window.trackLunchReservation = function(slotId) {
-    trackFeature('lunch_machine', 'slot_reserved', { slot_id: slotId || '' });
-    trackStep('lunch_machine', 'reservation_confirmed', { slot_id: slotId || '' });
-  };
-
-  window.trackVehicleReservation = function(vehicleType) {
-    trackFeature('car_share', 'vehicle_reserved', { vehicle_type: vehicleType || 'minivan' });
-    trackStep('car_share', 'reservation_confirmed', { vehicle_type: vehicleType || 'minivan' });
-  };
-
-  window.trackSharedSpaceReservation = function(spaceName) {
-    trackFeature('shared_spaces', 'space_reserved', { space_name: spaceName || '' });
-    trackStep('shared_spaces', 'reservation_confirmed', { space_name: spaceName || '' });
-  };
-
-  const loginPage = document.getElementById('login-page');
-  if (loginPage) {
-    loginPage.querySelectorAll('button').forEach(btn => {
-      const txt = (btn.innerText || btn.textContent || '').toLowerCase();
-      if (txt.includes('connexion') || txt.includes('login') || txt.includes('sign in')) {
-        btn.addEventListener('click', function() {
-          trackFeature('platform', 'login_attempt');
-        });
-      }
-      if (txt.includes('créer') || txt.includes('inscription') || txt.includes('sign up') || txt.includes('register')) {
-        btn.addEventListener('click', function() {
-          trackFeature('platform', 'signup_attempt');
-        });
-      }
-    });
-  }
-});
-</script>
 
 </body>
 </html>
