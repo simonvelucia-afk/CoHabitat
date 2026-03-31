@@ -1880,8 +1880,14 @@ tr:hover td { background: rgba(255,255,255,0.02); }
                 <input type="number" id="lm-slot-price" min="0" step="0.25" placeholder="0.00" style="width:100%;">
               </div>
             </div>
+            <div style="margin-bottom:10px;">
+              <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px;">Disponible jusqu'au</label>
+              <input type="datetime-local" id="lm-slot-expires" style="width:100%;">
+              <div style="font-size:10px;color:var(--text-faint);margin-top:3px;">Laissez vide = pas d'expiration automatique</div>
+            </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn btn-success btn-sm" onclick="lmSaveSlotDesc()">✓ Sauvegarder</button>
+              <button class="btn btn-secondary btn-sm" onclick="lmSaveSlotDesc(false)">💾 Préparer (pas encore en place)</button>
+              <button class="btn btn-success btn-sm" onclick="lmSaveSlotDesc(true)">✓ Confirmer en place → visible en ligne</button>
               <button class="btn btn-secondary btn-sm" onclick="lmClearSlotDesc()">Vider la case</button>
               <button class="btn btn-danger btn-sm" onclick="lmCancelReservation()">Annuler réservation</button>
             </div>
@@ -2050,6 +2056,15 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
         <div style="background:#1a3a1a;padding:3px 4px;flex-shrink:0;">
           <span style="font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5de88c;">&#9660; CUEILLETTE</span>
+        </div>
+        <!-- Boutons menu en ligne + retrait commande (résidents connectés) -->
+        <div id="lm-online-btns" style="display:none;flex-direction:column;gap:4px;padding:5px;">
+          <button onclick="lmShowMenuOnline()" style="width:100%;background:#0a1a2a;border:1px solid #2a5a8a;color:#4fa3e8;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.06em;padding:5px 3px;border-radius:3px;cursor:pointer;">
+            🛒 MENU EN LIGNE
+          </button>
+          <button id="lm-pickup-btn" onclick="lmShowPickupScreen()" style="display:none;width:100%;background:#0a180a;border:1px solid #3a8a3a;color:#5de88c;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.06em;padding:5px 3px;border-radius:3px;cursor:pointer;">
+            ✓ RETIRER MA COMMANDE
+          </button>
         </div>
         <!-- Vide -->
         <div id="pickup-col-empty" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:4px;">
@@ -2242,6 +2257,46 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     </div>
   </div>
 
+
+  <!-- MENU EN LIGNE (résident connecté, achat web) -->
+  <div id="screen-menu" class="screen">
+    <div class="topbar">
+      <div class="topbar-title"><span style="color:var(--accent);">Menu</span> en ligne</div>
+      <div class="topbar-sep"></div>
+      <button class="topbar-btn" onclick="lmShowScreen('screen-home')">← Retour</button>
+    </div>
+    <div class="temp-strip" id="temp-strip-menu"></div>
+    <div class="content" id="menu-content" style="overflow-y:auto;padding:10px 14px;"></div>
+  </div>
+
+  <!-- PICKUP KIOSK (résident entre son PIN au kiosk) -->
+  <div id="screen-pickup" class="screen">
+    <div class="topbar">
+      <div class="topbar-title"><span style="color:var(--accent2);">Retrait</span> commande</div>
+      <div class="topbar-sep"></div>
+      <button class="topbar-btn" onclick="lmShowScreen('screen-home')">← Annuler</button>
+    </div>
+    <div class="content" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;">
+      <div style="font-size:13px;color:var(--text2);text-align:center;">Entrez votre PIN pour récupérer votre commande</div>
+      <div id="pickup-order-info" style="background:var(--surface2);border:1px solid var(--border-active);border-radius:6px;padding:10px 16px;font-size:13px;color:var(--text);width:100%;max-width:320px;text-align:center;"></div>
+      <div class="pin-display" id="pickup-pin-display">____</div>
+      <div class="pin-error" id="pickup-pin-error"></div>
+      <div class="numpad">
+        <button class="numpad-btn" onclick="lmPickupKey('1')">1</button>
+        <button class="numpad-btn" onclick="lmPickupKey('2')">2</button>
+        <button class="numpad-btn" onclick="lmPickupKey('3')">3</button>
+        <button class="numpad-btn" onclick="lmPickupKey('4')">4</button>
+        <button class="numpad-btn" onclick="lmPickupKey('5')">5</button>
+        <button class="numpad-btn" onclick="lmPickupKey('6')">6</button>
+        <button class="numpad-btn" onclick="lmPickupKey('7')">7</button>
+        <button class="numpad-btn" onclick="lmPickupKey('8')">8</button>
+        <button class="numpad-btn" onclick="lmPickupKey('9')">9</button>
+        <button class="numpad-btn del" onclick="lmPickupKey('del')">⌫</button>
+        <button class="numpad-btn" onclick="lmPickupKey('0')">0</button>
+        <button class="numpad-btn ok" onclick="lmPickupKey('ok')">OK</button>
+      </div>
+    </div>
+  </div>
 
   <!-- SLOT MODAL -->
   <div class="modal-overlay" id="slot-modal">
@@ -6440,7 +6495,13 @@ function lmSelectAdminSlot(id) {
   document.getElementById('lm-edit-slot-label').textContent = `Case #${id} — ${zone?.name || 'Zone '+slot.zone}`;
   document.getElementById('lm-slot-desc').value = slot.desc || '';
   document.getElementById('lm-slot-price').value = slot.price ?? 0;
-  // Render quick menu buttons
+  // Pré-remplir expires_at si présent dans le slot
+  const expEl = document.getElementById('lm-slot-expires');
+  if (expEl) {
+    expEl.value = slot.expires_at
+      ? new Date(slot.expires_at).toISOString().slice(0,16)
+      : '';
+  }
   lmRenderQuickMenus();
   lmRenderAdminCases();
 }
@@ -6546,13 +6607,39 @@ function lmDeleteMenu(i) {
   lmFlashSave();
 }
 
-function lmSaveSlotDesc() {
-  if(lmAdminSelectedSlot===null) return;
-  const slot = lmState.slots.find(s=>s.id===lmAdminSelectedSlot);
-  slot.desc = document.getElementById('lm-slot-desc').value.trim();
+async function lmSaveSlotDesc(confirm = false) {
+  if (lmAdminSelectedSlot === null) return;
+  const descVal = document.getElementById('lm-slot-desc').value.trim();
   const p = parseFloat(document.getElementById('lm-slot-price').value);
-  slot.price = isNaN(p) ? 0 : Math.round(p * 100) / 100;
-  lmSaveState(); lmRenderAdminCases(); lmFlashSave();
+  const price = isNaN(p) ? 0 : Math.round(p * 100) / 100;
+  const expVal = document.getElementById('lm-slot-expires')?.value || '';
+  const expiresAt = expVal ? new Date(expVal).toISOString() : null;
+
+  const { data, error } = await sb.rpc('lm_admin_configure_slot', {
+    p_slot_id:    lmAdminSelectedSlot,
+    p_description: descVal,
+    p_price:      price,
+    p_expires_at: expiresAt,
+    p_confirm:    confirm
+  });
+
+  if (error || !data?.ok) {
+    toast('Erreur: ' + (error?.message || data?.error || 'inconnue'), 'error');
+    return;
+  }
+
+  // Sync local state
+  const slot = lmState.slots.find(s => s.id === lmAdminSelectedSlot);
+  if (slot) {
+    slot.desc = descVal;
+    slot.price = price;
+    slot.expires_at = expiresAt;
+    slot.status = confirm ? 'available' : 'empty';
+  }
+  lmSaveState();
+  lmRenderAdminCases();
+  lmFlashSave();
+  toast(confirm ? '✓ Case confirmée en place — visible en ligne' : '💾 Case préparée (pas encore visible en ligne)', confirm ? 'success' : 'info');
 }
 function lmClearSlotDesc() {
   if(lmAdminSelectedSlot===null) return;
@@ -7284,23 +7371,253 @@ async function lmConfirmPurchase() {
   lmShowSuccess(lmT('successMsg', buyer), '#' + slotId + ' — ' + zoneName + ' — ' + priceStr);
 }
 
-function onLunchPageShow() {
+async function onLunchPageShow() {
   lmShowScreen('screen-home');
-  // Sync depuis DB au premier affichage
-  if (!window._lmDBSynced) {
-    window._lmDBSynced = true;
-    lmLoadStateFromDB().then(dbState => {
-      if (dbState) {
-        lmState = dbState;
-        lmRenderTempStrips();
-        lmRenderMachineZoneOverlays();
-        lmRenderHomeStats();
-        lmRenderMachineSlots();
-      }
-    });
+
+  // Expirer les slots périmés côté serveur
+  sb.rpc('lm_expire_slots').catch(() => {});
+
+  // Charger les slots depuis lm_slots (Supabase) — source de vérité
+  try {
+    const { data: dbSlots } = await sb.from('lm_slots').select('*').order('id');
+    if (dbSlots && dbSlots.length) {
+      dbSlots.forEach(row => {
+        const slot = lmState.slots.find(s => s.id === row.id);
+        if (slot) {
+          slot.desc        = row.description || '';
+          slot.price       = parseFloat(row.price) || 0;
+          slot.status      = row.status || 'empty';
+          slot.expires_at  = row.expires_at || null;
+          slot.reserved    = row.status === 'reserved';
+          slot.reservedBy  = row.status === 'reserved' ? 'Réservé en ligne' : '';
+        }
+      });
+      lmRenderTempStrips();
+      lmRenderMachineZoneOverlays();
+      lmRenderHomeStats();
+      lmRenderMachineSlots();
+      lmRenderGrid();
+    }
+  } catch(e) {
+    // Fallback sur system_settings si lm_slots pas encore créé
+    if (!window._lmDBSynced) {
+      window._lmDBSynced = true;
+      lmLoadStateFromDB().then(dbState => {
+        if (dbState) {
+          lmState = dbState;
+          lmRenderTempStrips();
+          lmRenderMachineZoneOverlays();
+          lmRenderHomeStats();
+          lmRenderMachineSlots();
+        }
+      });
+    }
+  }
+
+  // Afficher boutons en ligne si résident connecté (pas kiosk seul)
+  const onlineBtns = document.getElementById('lm-online-btns');
+  if (onlineBtns && currentUser && !isDemo) {
+    onlineBtns.style.display = 'flex';
+    // Vérifier si l'usager a une commande en attente de pickup
+    lmCheckPendingOrder();
   }
 }
 
+
+// ═══════════════════════════════════════════════
+// LUNCH MACHINE — MENU EN LIGNE + ACHAT WEB
+// ═══════════════════════════════════════════════
+
+async function lmCheckPendingOrder() {
+  if (!currentUser) return;
+  const { data } = await sb.from('lm_orders')
+    .select('id, slot_id, status, expires_at, lm_slots(description, zone)')
+    .eq('tenant_id', currentUser.id)
+    .eq('status', 'pending_pickup')
+    .gt('expires_at', new Date().toISOString())
+    .order('purchased_at', { ascending: false })
+    .limit(1);
+  const btn = document.getElementById('lm-pickup-btn');
+  if (btn) btn.style.display = (data && data.length) ? '' : 'none';
+  window._lmPendingOrder = (data && data.length) ? data[0] : null;
+}
+
+function lmShowMenuOnline() {
+  lmShowScreen('screen-menu');
+  lmRenderMenuOnline();
+}
+
+async function lmRenderMenuOnline() {
+  const el = document.getElementById('menu-content');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;color:var(--text-faint);padding:20px;font-size:12px;">Chargement…</div>';
+
+  const { data: slots, error } = await sb.from('lm_slots')
+    .select('*, lm_orders(id, status, tenant_id)')
+    .eq('status', 'available')
+    .order('id');
+
+  if (error || !slots || !slots.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text-faint);padding:30px;font-size:13px;">Aucun article disponible pour le moment.</div>';
+    return;
+  }
+
+  // Grouper par zone
+  const byZone = {};
+  slots.forEach(s => {
+    if (!byZone[s.zone]) byZone[s.zone] = [];
+    byZone[s.zone].push(s);
+  });
+
+  let html = '';
+  Object.entries(byZone).forEach(([zone, zSlots]) => {
+    const zoneName = LM_ZONE_NAMES[zone] || zone;
+    const color = lmZoneColor(lmState.zones[zone]);
+    html += `<div class="section-header">
+      <div style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:${color}22;color:${color};border:1px solid ${color}55;">${zoneName}</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="slots-row">`;
+    zSlots.forEach(s => {
+      const priceStr = s.price > 0 ? s.price.toFixed(2) + ' $' : 'Gratuit';
+      const expStr = s.expires_at ? 'jusqu\'au ' + new Date(s.expires_at).toLocaleString('fr-CA', { dateStyle:'short', timeStyle:'short' }) : '';
+      html += `<div class="slot available" style="cursor:pointer;" onclick="lmBuySlotOnline(${s.id})">
+        <div class="slot-num">#${s.id}</div>
+        <div class="slot-status libre">Disponible</div>
+        <div class="slot-desc" style="font-weight:500;">${(s.description||'').substring(0,28)}</div>
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);margin-top:2px;">${priceStr}</div>
+        ${expStr ? `<div style="font-size:9px;color:var(--text-faint);margin-top:1px;">${expStr}</div>` : ''}
+        <div class="slot-temp-bar" style="background:${color};"></div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+async function lmBuySlotOnline(slotId) {
+  if (!currentUser || isDemo) {
+    toast('Connectez-vous pour acheter en ligne', 'error');
+    return;
+  }
+  if (!confirm('Acheter la case #' + slotId + ' ?')) return;
+
+  const { data, error } = await sb.rpc('lm_purchase_slot', {
+    p_slot_id: slotId,
+    p_tenant_id: currentUser.id
+  });
+
+  if (error || !data?.ok) {
+    toast('Erreur: ' + (error?.message || data?.error || 'inconnue'), 'error');
+    return;
+  }
+
+  // Refresh balance navbar
+  currentProfile.virtual_balance = Math.max(0, (currentProfile.virtual_balance || 0) - data.amount);
+  const pill = document.getElementById('nav-balance');
+  if (pill) pill.textContent = currentProfile.virtual_balance.toFixed(2);
+
+  // Refresh local slot state
+  const slot = lmState.slots.find(s => s.id === slotId);
+  if (slot) { slot.reserved = true; slot.reservedBy = 'Réservé en ligne'; slot.status = 'reserved'; }
+
+  toast(`✓ Achat confirmé — Case #${slotId} : ${data.plat} — ${data.amount.toFixed(2)} $`, 'success');
+  trackFeature('lunch_machine', 'slot_purchased_online', { slot_id: slotId, amount: data.amount, user_type: 'resident' });
+
+  window._lmPendingOrder = { id: data.order_id, slot_id: slotId };
+  const pickupBtn = document.getElementById('lm-pickup-btn');
+  if (pickupBtn) pickupBtn.style.display = '';
+
+  lmRenderMenuOnline(); // refresh menu
+}
+
+// ═══════════════════════════════════════════════
+// LUNCH MACHINE — PICKUP KIOSK (PIN)
+// ═══════════════════════════════════════════════
+let _lmPickupPin = '';
+
+async function lmShowPickupScreen() {
+  if (!window._lmPendingOrder) {
+    await lmCheckPendingOrder();
+    if (!window._lmPendingOrder) {
+      toast('Aucune commande en attente de retrait', 'info');
+      return;
+    }
+  }
+  _lmPickupPin = '';
+  const order = window._lmPendingOrder;
+  const infoEl = document.getElementById('pickup-order-info');
+  if (infoEl) {
+    const slot = lmState.slots.find(s => s.id === order.slot_id);
+    infoEl.innerHTML = `Case <strong>#${order.slot_id}</strong>${slot?.desc ? ' — ' + slot.desc : ''}`;
+  }
+  const dispEl = document.getElementById('pickup-pin-display');
+  if (dispEl) dispEl.textContent = '____';
+  const errEl = document.getElementById('pickup-pin-error');
+  if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+  lmShowScreen('screen-pickup');
+}
+
+function lmPickupKey(k) {
+  const disp = document.getElementById('pickup-pin-display');
+  const err = document.getElementById('pickup-pin-error');
+  if (k === 'del') {
+    _lmPickupPin = _lmPickupPin.slice(0, -1);
+  } else if (k === 'ok') {
+    lmConfirmPickupPin();
+    return;
+  } else {
+    if (_lmPickupPin.length >= 6) return;
+    _lmPickupPin += k;
+  }
+  if (disp) disp.textContent = _lmPickupPin.padEnd(4, '_').substring(0, Math.max(4, _lmPickupPin.length));
+  if (err) { err.textContent = ''; err.style.display = 'none'; }
+}
+
+async function lmConfirmPickupPin() {
+  if (!_lmPickupPin || _lmPickupPin.length < 4) return;
+  if (!window._lmPendingOrder) { lmShowScreen('screen-home'); return; }
+
+  const { data, error } = await sb.rpc('lm_pickup_slot', {
+    p_order_id: window._lmPendingOrder.id,
+    p_pin: _lmPickupPin
+  });
+
+  if (error || !data?.ok) {
+    const errEl = document.getElementById('pickup-pin-error');
+    if (errEl) {
+      errEl.textContent = data?.error || error?.message || 'Erreur';
+      errEl.style.display = 'block';
+    }
+    _lmPickupPin = '';
+    const disp = document.getElementById('pickup-pin-display');
+    if (disp) disp.textContent = '____';
+    return;
+  }
+
+  // Succès — déclencher le gantry
+  const slot = lmState.slots.find(s => s.id === data.slot_id);
+  const xFrac = slot?.zone === LM_ZONE_IDS[0] ? 0.551 : 0.849;
+  window.gantryQueue = window.gantryQueue || [];
+  window.gantryQueue.push({ slotId: data.slot_id, xFrac, desc: slot?.desc || '', price: slot?.price || 0 });
+
+  // Sync local state
+  if (slot) { slot.reserved = false; slot.reservedBy = ''; slot.desc = ''; slot.price = 0; slot.status = 'picked_up'; }
+  if (lmState.boxCount > 0) lmState.boxCount--;
+  lmSaveState();
+
+  window._lmPendingOrder = null;
+  const pickupBtn = document.getElementById('lm-pickup-btn');
+  if (pickupBtn) pickupBtn.style.display = 'none';
+
+  lmShowScreen('screen-home');
+  lmRenderGrid();
+  lmRenderHomeStats();
+  lmRenderMachineSlots();
+  lmShowSuccess('Commande en route !', 'Case #' + data.slot_id);
+  trackFeature('lunch_machine', 'slot_picked_up', { slot_id: data.slot_id, user_type: 'resident' });
+}
 
 // ═══════════════════════════════════════════════
 // LUNCH MACHINE — Init kiosk après login PE
