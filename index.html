@@ -3979,14 +3979,14 @@ function renderAvailableTrips(trips) {
 function renderDriverTrips(trips) {
   const grid = document.getElementById('trips-grid');
   const now = new Date();
-  const upcoming = trips.filter(t => new Date(t.departure_time) > now && t.status === 'published');
+  const upcoming    = trips.filter(t => new Date(t.departure_time) > now && t.status === 'published');
   const unconfirmed = trips.filter(t => new Date(t.departure_time) <= now && t.status === 'published' && !t.confirmed_at);
 
   function tripCard(t, isUnconfirmed = false) {
     const depTime = new Date(t.departure_time);
     const displayStatus = isUnconfirmed ? 'unconfirmed' : t.status;
     return `
-    <div class="card${isUnconfirmed ? ' style="border-left:3px solid var(--warning,#f59e0b)"' : ''}">
+    <div class="card">
       <div class="card-header">
         <div>
           <div class="card-title">${escHtml(t.title)}</div>
@@ -4047,7 +4047,6 @@ async function renderTripHistory() {
   const grid = document.getElementById('trips-grid');
   grid.innerHTML = `<div class="loading"><div class="spinner"></div> Chargement…</div>`;
   const now = new Date().toISOString();
-  // Fetch completed/cancelled AND past published (unconfirmed)
   const [{ data: done }, { data: unconf }] = await Promise.all([
     sb.from('trips_with_details').select('*')
       .eq('driver_id', currentProfile.id)
@@ -4166,19 +4165,47 @@ function renderTripBookings(bookings) {
     grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🎫</div><p>Aucun covoiturage réservé</p></div>';
     return;
   }
-  grid.innerHTML = `<div class="table-container"><table>
-    <thead><tr><th>Trajet</th><th>Départ</th><th>Embarquement</th><th>Coût</th><th>Statut</th><th>Actions</th></tr></thead>
-    <tbody>${bookings.map(b => `
-      <tr>
+  const now = new Date();
+  const active = bookings.filter(b => b.trips?.departure_time && new Date(b.trips.departure_time) > now && b.status !== 'cancelled');
+  const past   = bookings.filter(b => !b.trips?.departure_time || new Date(b.trips.departure_time) <= now || b.status === 'cancelled');
+
+  function tableRows(list, isPast) {
+    return list.map(b => `
+      <tr style="${isPast ? 'opacity:0.65' : ''}">
         <td>${b.trips?.title || '—'}</td>
         <td>${b.trips?.departure_time ? new Date(b.trips.departure_time).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
+        <td>${b.trips?.destination || b.trips_with_details?.destination || '—'}</td>
         <td>${b.pickup_location || '—'}</td>
         <td>${(b.total_cost || 0).toFixed(2)} $</td>
         <td><span class="badge ${statusBadge(b.status)}">${statusLabel(b.status)}</span></td>
-        <td>${b.status === 'pending' || b.status === 'accepted' ? `<button class="btn btn-danger btn-sm" onclick="cancelBooking('${b.id}')">Annuler</button>` : ''}</td>
+        <td>
+          ${!isPast && (b.status === 'pending' || b.status === 'accepted')
+            ? `<button class="btn btn-danger btn-sm" onclick="cancelBooking('${b.id}')">Annuler</button>`
+            : ''
+          }
+          ${isPast && b.trips?.id
+            ? `<button class="btn btn-secondary btn-sm" onclick="openBookTrip('${b.trips.id}')">🔄 Rebooker</button>`
+            : ''
+          }
+        </td>
       </tr>
-    `).join('')}</tbody>
-  </table></div>`;
+    `).join('');
+  }
+
+  const thead = `<thead><tr><th>Trajet</th><th>Départ</th><th>Destination</th><th>Embarquement</th><th>Coût</th><th>Statut</th><th>Actions</th></tr></thead>`;
+
+  let html = '';
+  if (active.length) {
+    html += `<div class="table-container"><table>${thead}<tbody>${tableRows(active, false)}</tbody></table></div>`;
+  }
+  if (past.length) {
+    html += `<div style="margin:24px 0 8px;font-weight:600;color:var(--text-secondary)">🕐 Trajets passés</div>`;
+    html += `<div class="table-container"><table>${thead}<tbody>${tableRows(past, true)}</tbody></table></div>`;
+  }
+  if (!active.length && !past.length) {
+    html = '<div class="empty-state"><div class="empty-icon">🎫</div><p>Aucun covoiturage réservé</p></div>';
+  }
+  grid.innerHTML = html;
 }
 
 function openBookTrip(tripId) {
