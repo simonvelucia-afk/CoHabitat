@@ -3047,34 +3047,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const spacesDate = document.getElementById('spaces-date');
   if (spacesDate) spacesDate.value = today;
 
-  // Check existing session on load
-  const { data: { session } } = await sb.auth.getSession();
-  console.log('Initial session:', session?.user?.email || 'none');
-
-  if (session) {
-    currentUser = session.user;
-    await initApp();
-    _resetAutoLogout();
-  } else {
-    showLogin();
-  }
-
-  // Listen for auth changes (login/logout)
+  // Enregistrer onAuthStateChange EN PREMIER pour ne manquer aucun event
   sb.auth.onAuthStateChange(async (event, session) => {
     if (isDemo) return;
     console.log('Auth event:', event, session?.user?.email);
     if (event === 'PASSWORD_RECOVERY') {
       showResetPasswordModal();
     } else if (event === 'SIGNED_IN' && session) {
-      // Vérifier si c'est une session de récupération de mot de passe
-      // en regardant l'URL hash ou un flag sessionStorage
-      var isRecovery = window.location.hash.includes('type=recovery')
-        || sessionStorage.getItem('pw_recovery') === '1';
-      if (isRecovery) {
-        sessionStorage.removeItem('pw_recovery');
-        showResetPasswordModal();
-        return;
-      }
       if (document.getElementById('reset-password-modal').style.display === 'flex') return;
       currentUser = session.user;
       await initApp();
@@ -3088,6 +3067,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       showLogin();
     }
   });
+
+  // Check existing session on load (après onAuthStateChange)
+  const { data: { session } } = await sb.auth.getSession();
+  console.log('Initial session:', session?.user?.email || 'none');
+
+  // Si session de récupération détectée via le flag (injecté par le snippet en haut de page)
+  if (session && sessionStorage.getItem('pw_recovery') === '1') {
+    sessionStorage.removeItem('pw_recovery');
+    console.log('Recovery session detected via flag');
+    showResetPasswordModal();
+  } else if (session) {
+    currentUser = session.user;
+    await initApp();
+    _resetAutoLogout();
+  } else {
+    showLogin();
+  }
 });
 
 async function initApp() {
