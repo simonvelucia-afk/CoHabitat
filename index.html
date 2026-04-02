@@ -4055,35 +4055,7 @@ function loadConditions() {
 
   const t = terms[activeLang];
   const container = document.getElementById('conditions-content');
-  if (!container) return;
-  container.innerHTML = `
-    <div style="max-width:780px;margin:0 auto">
-      <!-- Header -->
-      <div style="background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;margin-bottom:20px;text-align:center;">
-        <div style="font-size:2rem;margin-bottom:10px">📋</div>
-        <h2 id="terms-title" style="margin:0 0 6px;font-size:1.4rem;color:var(--text)">${t.title}</h2>
-        <p id="terms-subtitle" style="margin:0 0 16px;color:var(--text2);font-size:.9rem">${t.subtitle}</p>
-        <!-- Language switcher -->
-        <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap" id="terms-lang-switcher">
-          ${langBtn('fr','🇫🇷 Français')}
-          ${langBtn('en','🇬🇧 English')}
-          ${langBtn('es','🇪🇸 Español')}
-        </div>
-        <p id="terms-updated" style="margin:14px 0 0;font-size:.78rem;color:var(--text3);font-style:italic">${t.updated}</p>
-      </div>
 
-      <!-- Sections -->
-      <div id="terms-sections" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 24px 16px">
-        ${renderSections(t)}
-      </div>
-
-      <!-- Footer -->
-      <div style="text-align:center;margin-top:16px;padding:14px;font-size:.78rem;color:var(--text3)">
-        © ${new Date().getFullYear()} Modulimo · contribution@modulimo.com
-      </div>
-    </div>`;
-
-}
 
 function toggleFormulaAccordion() {
   const body = document.getElementById('formula-body');
@@ -4110,10 +4082,10 @@ async function renderTripsTab() {
       return;
     }
     query = query.eq('passenger_join', currentProfile?.id);
-    // Fallback: get bookings
     const { data: bookings } = await sb.from('trip_bookings')
-      .select('*, trips(*), trips_with_details(*)')
+      .select('*, trips(*)')
       .eq('passenger_id', currentProfile?.id)
+      .neq('status', 'rejected')
       .order('created_at', { ascending: false });
     renderTripBookings(bookings || []);
     return;
@@ -4384,7 +4356,7 @@ function renderTripBookings(bookings) {
       <tr style="${isPast ? 'opacity:0.65' : ''}">
         <td>${b.trips?.title || '—'}</td>
         <td>${b.trips?.departure_time ? new Date(b.trips.departure_time).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
-        <td>${b.trips?.destination || b.trips_with_details?.destination || '—'}</td>
+        <td>${b.trips?.destination || '—'}</td>
         <td>${b.pickup_location || '—'}</td>
         <td>${(b.total_cost || 0).toFixed(2)} $</td>
         <td><span class="badge ${statusBadge(b.status)}">${statusLabel(b.status)}</span></td>
