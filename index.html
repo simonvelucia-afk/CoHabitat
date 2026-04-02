@@ -3747,13 +3747,13 @@ async function loadDashboard() {
 }
 
 function statusBadge(s) {
-  return { confirmed: 'badge-green', pending: 'badge-yellow', cancelled: 'badge-red', completed: 'badge-gray', accepted: 'badge-green', rejected: 'badge-red', unconfirmed: 'badge-orange' }[s] || 'badge-gray';
+  return { confirmed: 'badge-green', pending: 'badge-yellow', cancelled: 'badge-red', completed: 'badge-gray', accepted: 'badge-green', rejected: 'badge-red', unconfirmed: 'badge-orange', published: 'badge-green' }[s] || 'badge-gray';
 }
 function statusLabel(s) {
   return {
     confirmed: pt('Confirmée'), pending: pt('En attente'), cancelled: pt('Annulée'),
     completed: pt('Complété'), accepted: pt('Acceptée'), rejected: pt('Refusée'),
-    unconfirmed: pt('Non confirmé')
+    unconfirmed: pt('Non confirmé'), published: pt('Publié')
   }[s] || s;
 }
 
@@ -4348,8 +4348,30 @@ async function cancelTrip(tripId) {
 }
 
 async function openTripDetail(tripId) {
-  const { data: trip } = await sb.from('trips_with_details').select('*').eq('id', tripId).single();
-  if (!trip) { toast('Trajet introuvable', 'error'); return; }
+  // Try view first
+  let { data: trip, error: viewErr } = await sb.from('trips_with_details').select('*').eq('id', tripId).single();
+  if (viewErr) console.warn('trips_with_details error:', viewErr.message, 'tripId:', tripId);
+
+  if (!trip) {
+    // Fallback 1: trips + vehicles séparément (évite l'ambiguïté FK profiles)
+    const { data: rawTrip } = await sb.from('trips').select('*').eq('id', tripId).single();
+    if (!rawTrip) { toast('Trajet introuvable — ID: ' + tripId, 'error'); return; }
+
+    const { data: veh } = rawTrip.vehicle_id
+      ? await sb.from('vehicles').select('model, license_plate').eq('id', rawTrip.vehicle_id).single()
+      : { data: null };
+    const { data: drv } = await sb.from('profiles').select('full_name, unit').eq('id', rawTrip.driver_id).single();
+
+    trip = {
+      ...rawTrip,
+      vehicle_model: veh?.model || '—',
+      license_plate: veh?.license_plate || '',
+      driver_name: drv?.full_name || '—',
+      driver_unit: drv?.unit || '?',
+      booked_seats: 0,
+      booked_cargo_pct: 0,
+    };
+  }
 
   const { data: bookings } = await sb.from('trip_bookings')
     .select('*, profiles(full_name, unit), dependents(name)')
