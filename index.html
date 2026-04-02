@@ -5552,7 +5552,13 @@ async function saveVehicle() {
     vehicleId = data?.id;
   }
   if (vehicleId) {
-    await sb.from('vehicle_pricing').upsert({ vehicle_id: vehicleId, price_per_minute: priceMin, price_per_km: priceKm, price_per_cargo_slot: priceCargo, driver_reduction_pct: driverReduction, created_by: currentProfile.id });
+    const pricing = { price_per_minute: priceMin, price_per_km: priceKm, price_per_cargo_slot: priceCargo, driver_reduction_pct: driverReduction };
+    const { data: existing } = await sb.from('vehicle_pricing').select('id').eq('vehicle_id', vehicleId).single();
+    if (existing) {
+      await sb.from('vehicle_pricing').update(pricing).eq('vehicle_id', vehicleId);
+    } else {
+      await sb.from('vehicle_pricing').insert({ ...pricing, vehicle_id: vehicleId, created_by: currentProfile.id });
+    }
   }
   toast('Véhicule enregistré', 'success');
   closeModal('modal-add-vehicle');
