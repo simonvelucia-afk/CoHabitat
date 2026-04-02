@@ -1577,6 +1577,41 @@ tr:hover td { background: rgba(255,255,255,0.02); }
         <button class="admin-tab" id="driver-tab" style="display:none" onclick="switchTripsTab('driving')" data-pt="En tant que chauffeur">En tant que chauffeur</button>
         <button class="admin-tab" id="history-tab" style="display:none" onclick="switchTripsTab('history')" data-pt="Historique">🕐 Historique</button>
       </div>
+
+      <!-- Formule de tarification accordion -->
+      <div id="trips-formula-accordion" style="display:none;margin-bottom:16px;">
+        <button onclick="toggleFormulaAccordion()" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 16px;text-align:left;cursor:pointer;color:var(--text);display:flex;justify-content:space-between;align-items:center;font-size:.9rem;">
+          <span>💡 Comment est calculé le coût d'un trajet ?</span>
+          <span id="formula-chevron" style="transition:transform .2s">▼</span>
+        </button>
+        <div id="formula-body" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);padding:20px;background:var(--surface2);">
+          <p style="color:var(--text2);font-size:.9rem;margin-bottom:16px">Le coût est calculé à partir du temps d'utilisation du véhicule et des kilomètres réels parcourus par chaque passager. Le chauffeur bénéficie d'une réduction en reconnaissance du service rendu à la communauté.</p>
+          <div style="display:grid;gap:12px;">
+            <div style="background:var(--surface);border-radius:var(--radius-sm);padding:14px;">
+              <div style="font-size:.78rem;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🚗 Coût total du véhicule</div>
+              <div style="font-family:monospace;font-size:.9rem;color:var(--text)">
+                (durée en minutes × tarif/min) + (km totaux × tarif/km)
+              </div>
+            </div>
+            <div style="background:var(--surface);border-radius:var(--radius-sm);padding:14px;">
+              <div style="font-size:.78rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🧍 Part par passager</div>
+              <div style="font-family:monospace;font-size:.9rem;color:var(--text)">
+                (ses km × tarif/km) + (durée × tarif/min × places/total_places)
+              </div>
+              <div style="font-size:.8rem;color:var(--text3);margin-top:6px">Les kilomètres sont comptés de son point d'embarquement à son point de dépôt.</div>
+            </div>
+            <div style="background:var(--surface);border-radius:var(--radius-sm);padding:14px;">
+              <div style="font-size:.78rem;font-weight:700;color:var(--accent3,#f59e0b);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🏅 Réduction chauffeur</div>
+              <div style="font-family:monospace;font-size:.9rem;color:var(--text)" id="formula-reduction-line">
+                Part chauffeur × (1 − réduction%)
+              </div>
+              <div style="font-size:.8rem;color:var(--text3);margin-top:6px" id="formula-reduction-note">Le % de réduction varie selon le véhicule utilisé (défaut : 25%).</div>
+            </div>
+          </div>
+          <p style="font-size:.78rem;color:var(--text3);margin-top:14px;font-style:italic">Les montants sont calculés et appliqués par le chauffeur après confirmation du trajet. Tout ajustement est visible dans vos transactions.</p>
+        </div>
+      </div>
+
       <div id="trips-grid">
         <div class="loading"><div class="spinner"></div> Chargement…</div>
       </div>
@@ -2935,6 +2970,11 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       <input type="number" id="veh-price-cargo" placeholder="0.50" min="0" step="0.01">
     </div>
     <div class="form-group">
+      <label>Réduction chauffeur (%)</label>
+      <input type="number" id="veh-driver-reduction" placeholder="25" min="0" max="100" step="1" value="25">
+      <small style="color:var(--text3)">Le chauffeur obtient cette réduction sur sa part du coût en reconnaissance du service rendu.</small>
+    </div>
+    <div class="form-group">
       <label>
         <input type="checkbox" id="veh-available" style="width:auto;margin-right:6px" checked>
         Disponible
@@ -3877,6 +3917,8 @@ async function loadTrips() {
   document.getElementById('driver-tab').style.display = isDriver ? '' : 'none';
   document.getElementById('history-tab').style.display = isDriver ? '' : 'none';
   document.getElementById('requests-tab').style.display = '';
+  const accordion = document.getElementById('trips-formula-accordion');
+  if (accordion) accordion.style.display = currentTripsTab === 'available' ? '' : 'none';
   await renderTripsTab();
 }
 
@@ -3885,7 +3927,17 @@ function switchTripsTab(tab) {
   document.querySelectorAll('#page-trips .admin-tab').forEach((t, i) => {
     t.classList.toggle('active', ['available', 'requests', 'mine', 'driving', 'history'][i] === tab);
   });
+  const accordion = document.getElementById('trips-formula-accordion');
+  if (accordion) accordion.style.display = tab === 'available' ? '' : 'none';
   renderTripsTab();
+}
+
+function toggleFormulaAccordion() {
+  const body = document.getElementById('formula-body');
+  const chevron = document.getElementById('formula-chevron');
+  const open = body.style.display === 'none';
+  body.style.display = open ? '' : 'none';
+  chevron.style.transform = open ? 'rotate(180deg)' : '';
 }
 
 async function renderTripsTab() {
@@ -3979,8 +4031,8 @@ function renderAvailableTrips(trips) {
 function renderDriverTrips(trips) {
   const grid = document.getElementById('trips-grid');
   const now = new Date();
-  const upcoming    = trips.filter(t => new Date(t.departure_time) > now && t.status === 'published');
-  const unconfirmed = trips.filter(t => new Date(t.departure_time) <= now && t.status === 'published' && !t.confirmed_at);
+  const upcoming    = trips.filter(t => new Date(t.departure_time) > now);
+  const unconfirmed = trips.filter(t => new Date(t.departure_time) <= now && !t.confirmed_at);
 
   function tripCard(t, isUnconfirmed = false) {
     const depTime = new Date(t.departure_time);
@@ -4006,7 +4058,7 @@ function renderDriverTrips(trips) {
       <div class="card-actions">
         <button class="btn btn-secondary btn-sm" onclick="openTripDetail('${t.id}')">Gérer</button>
         ${isUnconfirmed
-          ? `<button class="btn btn-success btn-sm" onclick="confirmTrip('${t.id}')">✅ Confirmer le trajet</button>`
+          ? `<button class="btn btn-success btn-sm" onclick="openTripDetail('${t.id}')">✅ Compléter</button>`
           : `<button class="btn btn-danger btn-sm" onclick="cancelTrip('${t.id}')">Annuler</button>`
         }
       </div>
@@ -4015,7 +4067,7 @@ function renderDriverTrips(trips) {
 
   let html = '';
   if (unconfirmed.length) {
-    html += `<div style="margin-bottom:8px;font-weight:600;color:var(--warning,#f59e0b)">⚠️ À confirmer (${unconfirmed.length})</div>`;
+    html += `<div style="margin-bottom:8px;font-weight:600;color:var(--warning,#f59e0b)">⚠️ À compléter (${unconfirmed.length})</div>`;
     html += `<div class="cards-grid">${unconfirmed.map(t => tripCard(t, true)).join('')}</div>`;
     if (upcoming.length) html += `<div style="margin:20px 0 8px;font-weight:600;color:var(--text-secondary)">📅 À venir</div>`;
   }
@@ -4023,7 +4075,7 @@ function renderDriverTrips(trips) {
     html += `<div class="cards-grid">${upcoming.map(t => tripCard(t, false)).join('')}</div>`;
   }
   if (!unconfirmed.length && !upcoming.length) {
-    html = `<div class="empty-state"><div class="empty-icon">🚗</div><p>${pt('Aucun trajet trouvé')}</p></div>`;
+    html = `<div class="empty-state"><div class="empty-icon">🚗</div><p>Aucun trajet trouvé</p></div>`;
   }
   grid.innerHTML = html;
 }
@@ -4051,14 +4103,12 @@ async function renderTripHistory() {
     sb.from('trips_with_details').select('*')
       .eq('driver_id', currentProfile.id)
       .in('status', ['cancelled', 'completed'])
-      .order('departure_time', { ascending: false })
-      .limit(50),
+      .order('departure_time', { ascending: false }).limit(50),
     sb.from('trips_with_details').select('*')
       .eq('driver_id', currentProfile.id)
       .eq('status', 'published')
       .lt('departure_time', now)
-      .order('departure_time', { ascending: false })
-      .limit(50)
+      .order('departure_time', { ascending: false }).limit(50)
   ]);
   const data = [...(unconf || []), ...(done || [])];
   if (!data.length) {
@@ -4086,10 +4136,11 @@ async function renderTripHistory() {
       <div class="card-meta">
         <span class="meta-item">🚗 ${escHtml(t.vehicle_model || '—')}</span>
         <span class="meta-item">👥 ${t.available_seats} places</span>
-        ${t.confirmed_at ? `<span class="meta-item">✅ Confirmé le ${new Date(t.confirmed_at).toLocaleString('fr-CA', { dateStyle: 'short', timeStyle: 'short' })}</span>` : ''}
+        ${t.actual_km ? `<span class="meta-item">📏 ${t.actual_km} km réels</span>` : ''}
+        ${t.confirmed_at ? `<span class="meta-item">✅ ${new Date(t.confirmed_at).toLocaleDateString('fr-CA')}</span>` : ''}
       </div>
       <div class="card-actions">
-        ${isPastPublished ? `<button class="btn btn-success btn-sm" onclick="confirmTrip('${t.id}')">✅ Confirmer le trajet</button>` : ''}
+        ${isPastPublished ? `<button class="btn btn-success btn-sm" onclick="openTripDetail('${t.id}')">✅ Compléter</button>` : ''}
         <button class="btn btn-secondary btn-sm" onclick="openReactivateTrip('${t.id}')">🔄 Réactiver</button>
       </div>
     </div>`;
@@ -4165,7 +4216,7 @@ function renderTripBookings(bookings) {
     grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🎫</div><p>Aucun covoiturage réservé</p></div>';
     return;
   }
-  const now = new Date();
+  const now    = new Date();
   const active = bookings.filter(b => b.trips?.departure_time && new Date(b.trips.departure_time) > now && b.status !== 'cancelled');
   const past   = bookings.filter(b => !b.trips?.departure_time || new Date(b.trips.departure_time) <= now || b.status === 'cancelled');
 
@@ -4181,30 +4232,22 @@ function renderTripBookings(bookings) {
         <td>
           ${!isPast && (b.status === 'pending' || b.status === 'accepted')
             ? `<button class="btn btn-danger btn-sm" onclick="cancelBooking('${b.id}')">Annuler</button>`
-            : ''
-          }
+            : ''}
           ${isPast && b.trips?.id
             ? `<button class="btn btn-secondary btn-sm" onclick="openBookTrip('${b.trips.id}')">🔄 Rebooker</button>`
-            : ''
-          }
+            : ''}
         </td>
-      </tr>
-    `).join('');
+      </tr>`).join('');
   }
 
   const thead = `<thead><tr><th>Trajet</th><th>Départ</th><th>Destination</th><th>Embarquement</th><th>Coût</th><th>Statut</th><th>Actions</th></tr></thead>`;
-
   let html = '';
-  if (active.length) {
-    html += `<div class="table-container"><table>${thead}<tbody>${tableRows(active, false)}</tbody></table></div>`;
-  }
+  if (active.length) html += `<div class="table-container"><table>${thead}<tbody>${tableRows(active, false)}</tbody></table></div>`;
   if (past.length) {
     html += `<div style="margin:24px 0 8px;font-weight:600;color:var(--text-secondary)">🕐 Trajets passés</div>`;
     html += `<div class="table-container"><table>${thead}<tbody>${tableRows(past, true)}</tbody></table></div>`;
   }
-  if (!active.length && !past.length) {
-    html = '<div class="empty-state"><div class="empty-icon">🎫</div><p>Aucun covoiturage réservé</p></div>';
-  }
+  if (!html) html = '<div class="empty-state"><div class="empty-icon">🎫</div><p>Aucun covoiturage réservé</p></div>';
   grid.innerHTML = html;
 }
 
@@ -4306,43 +4349,180 @@ async function cancelTrip(tripId) {
 
 async function openTripDetail(tripId) {
   const { data: trip } = await sb.from('trips_with_details').select('*').eq('id', tripId).single();
+  if (!trip) { toast('Trajet introuvable', 'error'); return; }
+
   const { data: bookings } = await sb.from('trip_bookings')
     .select('*, profiles(full_name, unit), dependents(name)')
     .eq('trip_id', tripId)
     .neq('status', 'cancelled');
 
-  if (!trip) return;
-  document.getElementById('trip-detail-title').textContent = trip.title;
+  // Fetch vehicle pricing for reduction % and rates
+  const { data: vPricing } = trip.vehicle_id
+    ? await sb.from('vehicle_pricing').select('*').eq('vehicle_id', trip.vehicle_id).single()
+    : { data: null };
+  const reductionPct = vPricing?.driver_reduction_pct ?? 25;
+  const priceMin = vPricing?.price_per_minute || trip.price_per_minute || 0;
+  const priceKm  = vPricing?.price_per_km || trip.price_per_km || 0;
 
   const isDriver = trip.driver_id === currentProfile?.id;
-  const depTime = new Date(trip.departure_time);
+  const isPast   = new Date(trip.departure_time) < new Date();
+  const depTime  = new Date(trip.departure_time);
+
+  document.getElementById('trip-detail-title').textContent = trip.title;
+
+  // ---- Passagers ----
+  const activeBookings = (bookings || []).filter(b => b.seats_requested > 0 || b.cargo_pct_requested > 0);
+  const totalSeats = activeBookings.reduce((s, b) => s + (b.seats_requested || 0), 0);
 
   let passengersHtml = '';
-  if (bookings?.length) {
-    passengersHtml = `<div class="passengers-list">${bookings.map(b => {
+  if (activeBookings.length) {
+    passengersHtml = `<div class="passengers-list">${activeBookings.map(b => {
       const isDriverCargo = b.seats_requested === 0 && b.cargo_pct_requested > 0 && b.passenger_id === trip.driver_id;
       const passengerName = isDriverCargo
-        ? `<span style="color:var(--accent)">📦 Cargo chauffeur</span> — ${b.notes || ''}`
+        ? `<span style="color:var(--accent)">📦 Cargo chauffeur</span>`
         : b.dependents?.name
-          ? `${isDemo ? anonName(b.dependents.name) : b.dependents.name} <span style="font-size:0.78rem;color:var(--accent2)">(dépendant de ${isDemo ? anonName(b.profiles?.id || b.profiles?.full_name) : b.profiles?.full_name})</span>`
-          : `${isDemo ? anonName(b.profiles?.id || b.profiles?.full_name) : b.profiles?.full_name} (Unité ${isDemo ? (b.profiles?.unit ? anonUnit(b.profiles?.id || b.profiles?.full_name) : '?') : (b.profiles?.unit || '?')})`;
-      const details = isDriverCargo
-        ? `${b.cargo_pct_requested}% cargo`
-        : `${b.pickup_location} → ${b.dropoff_location} — ${b.seats_requested} place(s)${b.cargo_pct_requested ? ` · ${b.cargo_pct_requested}% cargo` : ''}`;
+          ? `${isDemo ? anonName(b.dependents.name) : b.dependents.name} <span style="font-size:.78rem;color:var(--accent2)">(dépendant)</span>`
+          : `${isDemo ? anonName(b.profiles?.full_name) : (b.profiles?.full_name || '—')} (Unité ${isDemo ? anonUnit(b.passenger_id) : (b.profiles?.unit || '?')})`;
+
+      // Cost preview per passenger
+      let costHtml = '';
+      if (isPast && trip.actual_km && trip.vehicle_taken_at && trip.vehicle_returned_at && b.actual_km) {
+        const durationMin = (new Date(trip.vehicle_returned_at) - new Date(trip.vehicle_taken_at)) / 60000;
+        const durationShare = totalSeats > 0 ? (b.seats_requested || 0) / totalSeats : 0;
+        const cost = (b.actual_km * priceKm) + (durationMin * priceMin * durationShare);
+        costHtml = `<span style="font-size:.82rem;color:var(--accent2);margin-left:8px;font-weight:600">≈ ${cost.toFixed(2)} $</span>`;
+      }
+
+      // Km input per passenger (driver only, past trip, not yet completed)
+      const kmInput = isDriver && isPast && trip.status !== 'completed'
+        ? `<label style="font-size:.82rem;color:var(--text2)">km passager :</label>
+           <input type="number" placeholder="km" min="0" step="0.1" value="${b.actual_km || ''}"
+             style="width:80px;padding:3px 6px;font-size:.82rem;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text)"
+             onchange="updateBookingKm('${b.id}', this.value, '${tripId}')">`
+        : (b.actual_km ? `<span style="font-size:.82rem;color:var(--text3)">${b.actual_km} km</span>` : '');
+
+      // Passenger confirm button
+      const myBooking = !isDriver && b.passenger_id === currentProfile?.id;
+      const passengerConfirm = myBooking && isPast && !b.passenger_confirmed
+        ? `<button class="btn btn-success btn-sm" style="font-size:.78rem" onclick="confirmPassengerTrip('${b.id}','${tripId}')">✅ Confirmer</button>`
+        : b.passenger_confirmed ? `<span style="font-size:.78rem;color:var(--accent2)">✅ Confirmé</span>` : '';
+
       return `
-      <div class="passenger-row">
-        <span>${passengerName} — ${details}</span>
-        <span>
-          <span class="badge ${statusBadge(b.status)}">${statusLabel(b.status)}</span>
-          ${isDriver && b.status === 'pending' ? `
-            <button class="btn btn-success btn-sm" style="margin-left:6px" onclick="acceptBooking('${b.id}')">✓</button>
-            <button class="btn btn-danger btn-sm" onclick="rejectBooking('${b.id}')">✗</button>
-          ` : ''}
-        </span>
+      <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-weight:500">${passengerName}${costHtml}</span>
+          <span style="display:flex;align-items:center;gap:4px">
+            <span class="badge ${statusBadge(b.status)}">${statusLabel(b.status)}</span>
+            ${isDriver && b.status === 'pending' ? `
+              <button class="btn btn-success btn-sm" onclick="acceptBooking('${b.id}')">✓</button>
+              <button class="btn btn-danger btn-sm" onclick="rejectBooking('${b.id}')">✗</button>` : ''}
+          </span>
+        </div>
+        <div style="font-size:.82rem;color:var(--text3);margin-bottom:4px">${b.pickup_location || ''} → ${b.dropoff_location || ''} · ${b.seats_requested || 0} place(s)${b.cargo_pct_requested ? ` · ${b.cargo_pct_requested}% cargo` : ''}</div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">
+          ${kmInput}${passengerConfirm}
+          ${b.passenger_note ? `<span style="font-size:.78rem;font-style:italic;color:var(--text3)">"${escHtml(b.passenger_note)}"</span>` : ''}
+        </div>
       </div>`;
     }).join('')}</div>`;
   } else {
     passengersHtml = '<p style="color:var(--text3);font-size:.9rem">Aucun passager pour l\'instant</p>';
+  }
+
+  // ---- Panneau chauffeur — compléter le trajet ----
+  let driverPanelHtml = '';
+  if (isDriver && isPast && trip.status !== 'completed' && trip.status !== 'cancelled') {
+    let costPreviewHtml = '';
+    if (trip.actual_km && trip.vehicle_taken_at && trip.vehicle_returned_at) {
+      const durationMin = (new Date(trip.vehicle_returned_at) - new Date(trip.vehicle_taken_at)) / 60000;
+      const grossCost   = (durationMin * priceMin) + (trip.actual_km * priceKm);
+      const driverShare = totalSeats > 0 ? 1 / (totalSeats + 1) : 1;
+      const driverCost  = grossCost * driverShare * (1 - reductionPct / 100);
+      costPreviewHtml = `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-top:12px">
+          <div style="font-size:.78rem;font-weight:700;color:var(--accent2);text-transform:uppercase;margin-bottom:8px">Aperçu du coût</div>
+          <div style="font-size:.85rem;color:var(--text2);display:grid;gap:4px">
+            <div>Durée : <strong>${Math.round(durationMin)} min</strong></div>
+            <div>Km totaux : <strong>${trip.actual_km} km</strong></div>
+            <div>Coût brut véhicule : <strong>${grossCost.toFixed(2)} $</strong></div>
+            <div style="color:var(--accent3,#f59e0b)">Votre part (−${reductionPct}% réduction) : <strong>${driverCost.toFixed(2)} $</strong></div>
+          </div>
+        </div>`;
+    }
+    driverPanelHtml = `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin-top:16px">
+        <p class="form-section-title" style="margin-top:0">🚗 Compléter le trajet</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="margin:0">
+            <label style="font-size:.82rem">Km réels parcourus</label>
+            <input type="number" id="td-actual-km" min="0" step="0.1" placeholder="ex: 24.5" value="${trip.actual_km || ''}"
+              style="padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);width:100%"
+              oninput="previewTripCost('${tripId}', ${priceMin}, ${priceKm}, ${reductionPct}, ${totalSeats})">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:.82rem">Heure de prise du véhicule</label>
+            <input type="datetime-local" id="td-taken-at" value="${trip.vehicle_taken_at ? new Date(trip.vehicle_taken_at).toISOString().slice(0,16) : ''}"
+              style="padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);width:100%"
+              oninput="previewTripCost('${tripId}', ${priceMin}, ${priceKm}, ${reductionPct}, ${totalSeats})">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:.82rem">Heure de retour du véhicule</label>
+            <input type="datetime-local" id="td-returned-at" value="${trip.vehicle_returned_at ? new Date(trip.vehicle_returned_at).toISOString().slice(0,16) : ''}"
+              style="padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);width:100%"
+              oninput="previewTripCost('${tripId}', ${priceMin}, ${priceKm}, ${reductionPct}, ${totalSeats})">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:.82rem">Note (optionnel)</label>
+            <input type="text" id="td-driver-note" placeholder="Commentaire sur le trajet" value="${escHtml(trip.driver_note || '')}"
+              style="padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);width:100%">
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:.88rem;cursor:pointer">
+            <input type="checkbox" id="td-vehicle-returned" ${trip.vehicle_returned_confirmed ? 'checked' : ''} style="width:auto;margin:0">
+            ✅ Je confirme avoir retourné le véhicule
+          </label>
+        </div>
+        <div id="td-cost-preview">${costPreviewHtml}</div>
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" onclick="saveTripData('${tripId}', false)">💾 Sauvegarder</button>
+          <button class="btn btn-success btn-sm" onclick="saveTripData('${tripId}', true)">✅ Confirmer & Facturer</button>
+        </div>
+      </div>`;
+  }
+
+  // ---- Note passager (trajet passé) ----
+  let passengerNoteHtml = '';
+  if (!isDriver && isPast) {
+    const myBooking = (bookings || []).find(b => b.passenger_id === currentProfile?.id);
+    if (myBooking && !myBooking.passenger_confirmed) {
+      passengerNoteHtml = `
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:16px">
+          <p class="form-section-title" style="margin-top:0">Votre retour</p>
+          <input type="text" id="td-passenger-note" placeholder="Tout s'est bien passé !" value="${escHtml(myBooking.passenger_note || '')}"
+            style="padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);width:100%;margin-bottom:10px">
+          <button class="btn btn-success btn-sm" onclick="confirmPassengerTrip('${myBooking.id}','${tripId}')">✅ Confirmer mon trajet</button>
+        </div>`;
+    } else if (myBooking?.passenger_confirmed && myBooking?.passenger_note) {
+      passengerNoteHtml = `<p style="font-size:.82rem;font-style:italic;color:var(--text3);margin-top:12px">Votre note : "${escHtml(myBooking.passenger_note)}"</p>`;
+    }
+  }
+
+  // ---- Récapitulatif trajet complété ----
+  let completedSummary = '';
+  if (trip.status === 'completed' && trip.confirmed_at) {
+    const durationMin = trip.vehicle_taken_at && trip.vehicle_returned_at
+      ? Math.round((new Date(trip.vehicle_returned_at) - new Date(trip.vehicle_taken_at)) / 60000) : null;
+    completedSummary = `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
+        <div style="font-size:.78rem;font-weight:700;color:var(--accent2);text-transform:uppercase;margin-bottom:8px">Récapitulatif</div>
+        <div style="font-size:.85rem;color:var(--text2);display:grid;gap:4px">
+          ${trip.actual_km ? `<div>Km réels : <strong>${trip.actual_km} km</strong></div>` : ''}
+          ${durationMin ? `<div>Durée : <strong>${durationMin} min</strong></div>` : ''}
+          ${trip.driver_note ? `<div>Note chauffeur : <em>"${escHtml(trip.driver_note)}"</em></div>` : ''}
+          <div style="color:var(--accent2)">✅ Confirmé le ${new Date(trip.confirmed_at).toLocaleString('fr-CA', {dateStyle:'medium',timeStyle:'short'})}</div>
+        </div>
+      </div>`;
   }
 
   document.getElementById('trip-detail-content').innerHTML = `
@@ -4358,22 +4538,140 @@ async function openTripDetail(tripId) {
       </div>
     </div>
     <div class="card-meta" style="margin-bottom:12px">
-      <span class="meta-item">🚗 ${escHtml(trip.vehicle_model)} — ${trip.license_plate}</span>
+      <span class="meta-item">🚗 ${escHtml(trip.vehicle_model || '—')} ${trip.license_plate ? '— ' + trip.license_plate : ''}</span>
       <span class="meta-item">👥 ${trip.booked_seats || 0}/${trip.available_seats} places</span>
       <span class="meta-item">📦 Cargo: ${trip.cargo_available_pct - (trip.booked_cargo_pct || 0)}% restant</span>
+      <span class="badge ${statusBadge(trip.status)}">${statusLabel(trip.status)}</span>
     </div>
+    ${completedSummary}
     <p class="form-section-title">Passagers</p>
     ${passengersHtml}
     ${trip.description ? `<p style="color:var(--text2);font-size:.88rem;margin-top:12px">${escHtml(trip.description)}</p>` : ''}
+    ${driverPanelHtml}
+    ${passengerNoteHtml}
   `;
 
-  document.getElementById('trip-detail-footer').innerHTML = isDriver && trip.status === 'published' ? `
-    <button class="btn btn-success btn-sm" onclick="openAddDependentToTrip('${trip.id}', ${trip.available_seats - (trip.booked_seats||0)})">👨‍👩‍👧 Ajouter un dépendant</button>
-    <button class="btn btn-secondary btn-sm" onclick="openDriverCargo('${trip.id}', ${trip.cargo_available_pct - (trip.booked_cargo_pct||0)})">📦 Réserver du cargo</button>
-    <button class="btn btn-danger" onclick="cancelTrip('${trip.id}');closeModal('modal-trip-detail')">Annuler le trajet</button>
-  ` : '<button class="btn btn-secondary" onclick="closeModal(\'modal-trip-detail\')">Fermer</button>';
+  const footerBtns = [];
+  if (isDriver && trip.status === 'published' && !isPast) {
+    footerBtns.push(`<button class="btn btn-success btn-sm" onclick="closeModal('modal-trip-detail');openAddDependentToTrip('${trip.id}', ${trip.available_seats - (trip.booked_seats||0)})">👨‍👩‍👧 Dépendant</button>`);
+    footerBtns.push(`<button class="btn btn-secondary btn-sm" onclick="closeModal('modal-trip-detail');openDriverCargo('${trip.id}', ${trip.cargo_available_pct - (trip.booked_cargo_pct||0)})">📦 Cargo</button>`);
+    footerBtns.push(`<button class="btn btn-danger" onclick="cancelTrip('${trip.id}');closeModal('modal-trip-detail')">Annuler le trajet</button>`);
+  } else {
+    footerBtns.push(`<button class="btn btn-secondary" onclick="closeModal('modal-trip-detail')">Fermer</button>`);
+  }
+  document.getElementById('trip-detail-footer').innerHTML = footerBtns.join('');
 
   openModal('modal-trip-detail');
+}
+
+// Update km for a specific passenger booking
+async function updateBookingKm(bookingId, km, tripId) {
+  const val = parseFloat(km) || 0;
+  await sb.from('trip_bookings').update({ actual_km: val }).eq('id', bookingId);
+}
+
+// Live cost preview in driver panel
+function previewTripCost(tripId, priceMin, priceKm, reductionPct, totalSeats) {
+  const km      = parseFloat(document.getElementById('td-actual-km')?.value) || 0;
+  const takenAt = document.getElementById('td-taken-at')?.value;
+  const retAt   = document.getElementById('td-returned-at')?.value;
+  const preview = document.getElementById('td-cost-preview');
+  if (!preview) return;
+  if (!km || !takenAt || !retAt) { preview.innerHTML = ''; return; }
+  const durationMin = (new Date(retAt) - new Date(takenAt)) / 60000;
+  if (durationMin <= 0) { preview.innerHTML = ''; return; }
+  const grossCost  = (durationMin * priceMin) + (km * priceKm);
+  const driverShare = totalSeats > 0 ? 1 / (totalSeats + 1) : 1;
+  const driverCost  = grossCost * driverShare * (1 - reductionPct / 100);
+  preview.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-top:12px">
+      <div style="font-size:.78rem;font-weight:700;color:var(--accent2);text-transform:uppercase;margin-bottom:8px">Aperçu du coût</div>
+      <div style="font-size:.85rem;color:var(--text2);display:grid;gap:4px">
+        <div>Durée : <strong>${Math.round(durationMin)} min</strong></div>
+        <div>Km totaux : <strong>${km} km</strong></div>
+        <div>Coût brut véhicule : <strong>${grossCost.toFixed(2)} $</strong></div>
+        <div style="color:var(--accent3,#f59e0b)">Votre part (−${reductionPct}% réduction) : <strong>${driverCost.toFixed(2)} $</strong></div>
+      </div>
+    </div>`;
+}
+
+// Save trip data (driver), optionally confirm + bill
+async function saveTripData(tripId, andConfirm) {
+  const actualKm        = parseFloat(document.getElementById('td-actual-km')?.value) || null;
+  const takenAt         = document.getElementById('td-taken-at')?.value || null;
+  const returnedAt      = document.getElementById('td-returned-at')?.value || null;
+  const driverNote      = document.getElementById('td-driver-note')?.value?.trim() || null;
+  const vehicleReturned = document.getElementById('td-vehicle-returned')?.checked || false;
+
+  if (andConfirm) {
+    if (!actualKm)        { toast('Entrez les km réels avant de confirmer', 'error'); return; }
+    if (!takenAt)         { toast("Entrez l'heure de prise du véhicule", 'error'); return; }
+    if (!returnedAt)      { toast("Entrez l'heure de retour du véhicule", 'error'); return; }
+    if (!vehicleReturned) { toast('Confirmez le retour du véhicule', 'error'); return; }
+  }
+
+  const updatePayload = {
+    actual_km: actualKm,
+    vehicle_taken_at: takenAt ? new Date(takenAt).toISOString() : null,
+    vehicle_returned_at: returnedAt ? new Date(returnedAt).toISOString() : null,
+    vehicle_returned_confirmed: vehicleReturned,
+    driver_note: driverNote,
+    ...(andConfirm ? { status: 'completed', confirmed_at: new Date().toISOString() } : {})
+  };
+
+  const { error } = await sb.from('trips').update(updatePayload).eq('id', tripId);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+
+  if (andConfirm && actualKm && takenAt && returnedAt) {
+    const { data: bookings } = await sb.from('trip_bookings')
+      .select('id, passenger_id, seats_requested, actual_km')
+      .eq('trip_id', tripId).neq('status', 'cancelled').gt('seats_requested', 0);
+    const { data: tripRow }  = await sb.from('trips').select('driver_id, vehicle_id').eq('id', tripId).single();
+    const { data: pricing }  = tripRow?.vehicle_id
+      ? await sb.from('vehicle_pricing').select('*').eq('vehicle_id', tripRow.vehicle_id).single()
+      : { data: null };
+    const pMin   = pricing?.price_per_minute || 0;
+    const pKm    = pricing?.price_per_km || 0;
+    const redPct = pricing?.driver_reduction_pct ?? 25;
+    const totalSeats  = (bookings || []).reduce((s, b) => s + (b.seats_requested || 0), 0);
+    const durationMin = (new Date(returnedAt) - new Date(takenAt)) / 60000;
+
+    for (const b of (bookings || [])) {
+      const bKm  = b.actual_km || 0;
+      const dShare = totalSeats > 0 ? (b.seats_requested || 0) / totalSeats : 0;
+      const cost = (bKm * pKm) + (durationMin * pMin * dShare);
+      if (cost > 0) {
+        await sb.from('trip_bookings').update({ total_cost: cost }).eq('id', b.id);
+        await sb.rpc('adjust_balance', { p_user_id: b.passenger_id, p_amount: -cost, p_description: 'Covoiturage #' + tripId.slice(0,8), p_type: 'trip_booking' }).catch(() => {});
+      }
+    }
+
+    // Driver reduction credit
+    const grossCost   = (durationMin * pMin) + (actualKm * pKm);
+    const driverShare = totalSeats > 0 ? 1 / (totalSeats + 1) : 1;
+    const driverCredit = grossCost * driverShare * (redPct / 100);
+    if (driverCredit > 0 && tripRow?.driver_id) {
+      await sb.rpc('adjust_balance', { p_user_id: tripRow.driver_id, p_amount: driverCredit, p_description: 'Réduction chauffeur #' + tripId.slice(0,8), p_type: 'trip_driver_reduction' }).catch(() => {});
+    }
+
+    toast('Trajet confirmé et facturé !', 'success');
+    closeModal('modal-trip-detail');
+    switchTripsTab('history');
+  } else {
+    toast('Données sauvegardées', 'success');
+    openTripDetail(tripId);
+  }
+}
+
+// Passenger confirms their trip and leaves a note
+async function confirmPassengerTrip(bookingId, tripId) {
+  const note = document.getElementById('td-passenger-note')?.value?.trim() || null;
+  const { error } = await sb.from('trip_bookings')
+    .update({ passenger_confirmed: true, passenger_note: note })
+    .eq('id', bookingId);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Trajet confirmé, merci !', 'success');
+  openTripDetail(tripId);
 }
 
 async function openAddDependentToTrip(tripId, seatsLeft) {
@@ -5180,6 +5478,7 @@ function openAddVehicle() {
   document.getElementById('veh-cargo').value = '0';
   document.getElementById('veh-year').value = new Date().getFullYear();
   ['veh-price-min','veh-price-km','veh-price-cargo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('veh-driver-reduction').value = '25';
   document.getElementById('veh-available').checked = true;
   openModal('modal-add-vehicle');
 }
@@ -5198,6 +5497,7 @@ async function editVehicle(id) {
   document.getElementById('veh-price-min').value = v.vehicle_pricing?.[0]?.price_per_minute || '';
   document.getElementById('veh-price-km').value = v.vehicle_pricing?.[0]?.price_per_km || '';
   document.getElementById('veh-price-cargo').value = v.vehicle_pricing?.[0]?.price_per_cargo_slot || '';
+  document.getElementById('veh-driver-reduction').value = v.vehicle_pricing?.[0]?.driver_reduction_pct ?? 25;
   document.getElementById('veh-available').checked = v.is_available;
   openModal('modal-add-vehicle');
 }
@@ -5212,6 +5512,7 @@ async function saveVehicle() {
   const priceMin = parseFloat(document.getElementById('veh-price-min').value) || 0;
   const priceKm = parseFloat(document.getElementById('veh-price-km').value) || 0;
   const priceCargo = parseFloat(document.getElementById('veh-price-cargo').value) || 0;
+  const driverReduction = parseFloat(document.getElementById('veh-driver-reduction').value) ?? 25;
   const available = document.getElementById('veh-available').checked;
 
   if (!model || !plate) { toast('Modèle et plaque requis', 'error'); return; }
@@ -5224,7 +5525,7 @@ async function saveVehicle() {
     vehicleId = data?.id;
   }
   if (vehicleId) {
-    await sb.from('vehicle_pricing').upsert({ vehicle_id: vehicleId, price_per_minute: priceMin, price_per_km: priceKm, price_per_cargo_slot: priceCargo, created_by: currentProfile.id });
+    await sb.from('vehicle_pricing').upsert({ vehicle_id: vehicleId, price_per_minute: priceMin, price_per_km: priceKm, price_per_cargo_slot: priceCargo, driver_reduction_pct: driverReduction, created_by: currentProfile.id });
   }
   toast('Véhicule enregistré', 'success');
   closeModal('modal-add-vehicle');
