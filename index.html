@@ -3307,10 +3307,10 @@ async function loadLandingPlans() {
       const featHtml = feats.map(function(f) {
         return '<li class="' + (f.included ? '' : 'off') + '">' + f.label + '</li>';
       }).join('');
-      const planCode = p.code;
-      const planName = p.name;
-      return '<div class="plan-card ' + (p.featured ? 'featured' : '') + '" onmouseenter="trackPlanHover('' + planCode + '','' + planName + '')">'
-        + (p.featured ? '<div class="plan-badge">Le plus populaire</div>' : '')
+      const planCode = p.code || '';
+      const planName = (p.name || '').replace(/'/g, '');
+      const hoverAttr = 'onmouseenter="trackPlanHover(\u0027' + planCode + '\u0027,\u0027' + planName + '\u0027)"';
+      return '<div class="plan-card ' + (p.featured ? 'featured' : '') + '" ' + hoverAttr + '>'     + (p.featured ? '<div class="plan-badge">Le plus populaire</div>' : '')
         + '<div class="plan-name">' + p.name + '</div>'
         + '<div class="plan-price">' + price + '</div>'
         + '<div class="plan-units">' + units + '</div>'
