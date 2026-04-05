@@ -3161,7 +3161,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Enregistrer onAuthStateChange EN PREMIER pour ne manquer aucun event
   sb.auth.onAuthStateChange(async (event, session) => {
     if (isDemo) return;
-    console.log('Auth event:', event, session?.user?.email);
     if (event === 'PASSWORD_RECOVERY') {
       showResetPasswordModal();
     } else if (event === 'SIGNED_IN' && session) {
@@ -3181,13 +3180,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Check existing session on load (après onAuthStateChange)
   const { data: { session } } = await sb.auth.getSession();
-  console.log('Initial session:', session?.user?.email || 'none');
 
   // Si session de récupération détectée via le flag (injecté par le snippet en haut de page)
   if (session && sessionStorage.getItem('pw_recovery') === '1') {
     sessionStorage.removeItem('pw_recovery');
-    console.log('Recovery session detected via flag');
-    showResetPasswordModal();
+      showResetPasswordModal();
   } else if (session) {
     currentUser = session.user;
     await initApp();
@@ -3198,13 +3195,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function initApp() {
-  console.log('initApp() start, uid=', currentUser?.id);
   try {
     const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-    console.log('profiles query result:', data, error);
     if (error || !data) {
       // Try to create profile
-      console.log('Creating profile...');
       const { error: insertError } = await sb.from('profiles').insert({
         id: currentUser.id,
         email: currentUser.email || '',
@@ -3213,7 +3207,6 @@ async function initApp() {
           || 'Utilisateur',
         role: 'tenant'
       });
-      console.log('Insert result:', insertError);
       // Fetch again
       const { data: data2 } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
       currentProfile = data2;
@@ -3221,7 +3214,7 @@ async function initApp() {
       currentProfile = data;
     }
   } catch(e) {
-    console.error('initApp error:', e);
+    console.error('initApp error');
   }
 
   if (!currentProfile) {
@@ -3236,7 +3229,6 @@ async function initApp() {
     };
   }
 
-  console.log('currentProfile:', currentProfile?.email, currentProfile?.role);
   if (window._gaConsent === 'granted') gtag('set', 'user_properties', { user_type: 'resident' });
   trackFeature('platform', 'resident_login');
   showApp();
@@ -3485,15 +3477,12 @@ async function logout() {
 // ==========================================
 async function loadProfile() {
   if (!currentUser) return;
-  console.log('loadProfile: fetching for uid =', currentUser.id);
   const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-  console.log('loadProfile result — data:', data, '| error:', error);
   if (error) {
-    console.error('loadProfile FAILED:', error.code, error.message, error.details);
+    console.error('loadProfile FAILED:', error.code);
     throw error;
   }
   currentProfile = data;
-  console.log('Profile OK:', currentProfile?.email, currentProfile?.role);
 }
 
 // ==========================================
