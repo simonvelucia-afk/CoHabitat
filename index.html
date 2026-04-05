@@ -1492,7 +1492,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
         <button onclick="showLoginConditions()" style="background:none;border:none;color:var(--text3);font-size:.82rem;cursor:pointer;text-decoration:underline">
           📋 Conditions d'utilisation
         </button>
-        <button onclick="document.getElementById('login-page').style.display='none';document.getElementById('landing').style.display='block';window.scrollTo(0,0);loadLandingPlans();" style="background:none;border:none;color:var(--accent2);font-size:.82rem;cursor:pointer;text-decoration:underline">
+        <button onclick="document.getElementById('login-page').style.display='none';document.getElementById('landing').style.display='block';window.scrollTo(0,0);loadLandingPlans();trackLandingView();" style="background:none;border:none;color:var(--accent2);font-size:.82rem;cursor:pointer;text-decoration:underline">
           💡 Découvrir les forfaits CoHabitat
         </button>
       </div>
@@ -1525,7 +1525,8 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   <div class="landing-contact">
     <h3>Prêt à moderniser votre co-housing ?</h3>
     <p>Contactez-nous pour une démonstration gratuite ou pour discuter de vos besoins spécifiques.</p>
-    <button onclick="window.location.href='mai'+('lto:contribut')+('ion@modulimo.com')" style="display:inline-block;background:var(--accent);color:#0f0f0f;padding:11px 28px;border-radius:6px;font-weight:600;font-size:.9rem;border:none;cursor:pointer;font-family:var(--font-sans);"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="3c5f5352484e555e49485553527c5153584950555153125f5351">[email&#160;protected]</a></button>
+    <button id="landing-contact-btn" style="display:inline-block;background:var(--accent);color:#0f0f0f;padding:11px 28px;border-radius:6px;font-weight:600;font-size:.9rem;border:none;cursor:pointer;font-family:var(--font-sans);">contribution&#64;modulimo.com</button>
+    <script>document.getElementById('landing-contact-btn').onclick=function(){var e=['contribution','modulimo.com'].join('@');window.location.href='mailto:'+e;trackFeature('landing','contact_click');};</script>
   </div>
 </div>
 
@@ -3264,6 +3265,27 @@ let currentBookingTripId = null;
 // ==========================================
 // INIT
 // ==========================================
+const _planHoverTimers = {};
+function trackPlanHover(code, name) {
+  // Tracker seulement si le survol dure plus d'1 seconde
+  if (_planHoverTimers[code]) return;
+  _planHoverTimers[code] = setTimeout(function() {
+    trackFeature('landing', 'plan_hover', { plan_code: code, plan_name: name });
+    delete _planHoverTimers[code];
+  }, 1000);
+}
+
+function trackLandingView() {
+  if (window._gaConsent === 'granted' && typeof gtag === 'function') {
+    gtag('event', 'page_view', {
+      page_title: 'Page de vente CoHabitat',
+      page_location: window.location.href,
+      feature_category: 'landing'
+    });
+  }
+  trackFeature('landing', 'landing_view');
+}
+
 async function loadLandingPlans() {
   const grid = document.getElementById('landing-plans-grid');
   if (!grid) return;
@@ -3285,7 +3307,9 @@ async function loadLandingPlans() {
       const featHtml = feats.map(function(f) {
         return '<li class="' + (f.included ? '' : 'off') + '">' + f.label + '</li>';
       }).join('');
-      return '<div class="plan-card ' + (p.featured ? 'featured' : '') + '">'
+      const planCode = p.code;
+      const planName = p.name;
+      return '<div class="plan-card ' + (p.featured ? 'featured' : '') + '" onmouseenter="trackPlanHover('' + planCode + '','' + planName + '')">'
         + (p.featured ? '<div class="plan-badge">Le plus populaire</div>' : '')
         + '<div class="plan-name">' + p.name + '</div>'
         + '<div class="plan-price">' + price + '</div>'
