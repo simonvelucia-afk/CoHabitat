@@ -235,6 +235,18 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   border: 1px solid rgba(126,184,160,0.3);
 }
 .btn-success:hover { background: rgba(126,184,160,0.25); }
+.btn-warning {
+  background: rgba(232,197,71,0.15);
+  color: var(--accent);
+  border: 1px solid rgba(232,197,71,0.4);
+}
+.btn-warning:hover { background: rgba(232,197,71,0.25); }
+.btn-info {
+  background: rgba(79,163,232,0.15);
+  color: var(--accent2);
+  border: 1px solid rgba(79,163,232,0.35);
+}
+.btn-info:hover { background: rgba(79,163,232,0.25); }
 .btn-sm { padding: 7px 14px; font-size: 0.85rem; }
 .btn-icon { padding: 8px; width: 36px; height: 36px; border-radius: 8px; }
 .login-divider {
@@ -3520,6 +3532,93 @@ async function requestAccountDeletion() {
   loadProfile();
 }
 
+// ── GESTION DES ACCÈS DÉPENDANTS PAR RESSOURCE ──────────────────────────────
+let depAccessManagerId = null;
+let depAccessManagerName = '';
+
+async function openDepAccessManager(depId, depName) {
+  depAccessManagerId = depId;
+  depAccessManagerName = depName;
+  document.getElementById('dep-access-title').textContent = '🗝 Accès — ' + depName;
+
+  const [{ data: spaces }, { data: vehicles }, { data: dep }] = await Promise.all([
+    sb.from('common_spaces').select('id, name').eq('is_available', true).order('name'),
+    sb.from('vehicles').select('id, model, license_plate').eq('is_available', true).order('model'),
+    sb.from('dependents').select('allow_spaces, allow_trips, allow_lunch').eq('id', depId).single()
+  ]);
+
+  // Pour les dépendants on utilise allow_spaces/allow_trips/allow_lunch
+  // + resource_access pour la granularité par ressource spécifique
+  const { data: access } = await sb.from('resource_access')
+    .select('resource_type, resource_id')
+    .eq('dependent_id', depId);
+
+  const depAccessSpaces  = new Set((access || []).filter(r => r.resource_type === 'space').map(r => r.resource_id));
+  const depAccessVehicles = new Set((access || []).filter(r => r.resource_type === 'vehicle').map(r => r.resource_id));
+
+  const spaceRows = (spaces || []).map(s => {
+    const has = depAccessSpaces.has(s.id);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:13px;">🏠 ${escHtml(s.name)}</span>
+      <button class="btn ${has ? 'btn-warning' : 'btn-success'} btn-sm"
+        onclick="toggleDepResourceAccess('space','${s.id}',${!has},'${escHtml(s.name)}')">
+        ${has ? '🔒 Retirer' : '🔓 Accorder'}
+      </button>
+    </div>`;
+  }).join('');
+
+  const vehicleRows = (vehicles || []).map(v => {
+    const has = depAccessVehicles.has(v.id);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:13px;">🚗 ${escHtml(v.model)} (${escHtml(v.license_plate)})</span>
+      <button class="btn ${has ? 'btn-warning' : 'btn-success'} btn-sm"
+        onclick="toggleDepResourceAccess('vehicle','${v.id}',${!has},'${escHtml(v.model)}')">
+        ${has ? '🔒 Retirer' : '🔓 Accorder'}
+      </button>
+    </div>`;
+  }).join('');
+
+  // Bouton suspend global
+  const allActive = dep?.allow_spaces || dep?.allow_trips || dep?.allow_lunch;
+  document.getElementById('dep-access-body').innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="btn ${allActive ? 'btn-warning' : 'btn-success'} btn-sm"
+        onclick="toggleDependentAccess('${depId}', ${!allActive})">
+        ${allActive ? '🔒 Suspendre tout' : '🔓 Réactiver tout'}
+      </button>
+    </div>
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:8px;">Espaces communs</div>
+      ${spaceRows || '<p style="color:var(--text3);font-size:13px;">Aucun espace</p>'}
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:8px;">Véhicules</div>
+      ${vehicleRows || '<p style="color:var(--text3);font-size:13px;">Aucun véhicule</p>'}
+    </div>`;
+
+  openModal('modal-dep-access');
+}
+
+async function toggleDepResourceAccess(type, resourceId, grant, name) {
+  if (grant) {
+    const { error } = await sb.from('resource_access').insert({
+      dependent_id: depAccessManagerId,
+      resource_type: type,
+      resource_id: resourceId,
+      granted_by: currentProfile.id
+    });
+    if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  } else {
+    const { error } = await sb.from('resource_access').delete()
+      .eq('dependent_id', depAccessManagerId)
+      .eq('resource_type', type)
+      .eq('resource_id', resourceId);
+    if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  }
+  toast(grant ? '🔓 Accès accordé' : '🔒 Accès retiré', 'success');
+  openDepAccessManager(depAccessManagerId, depAccessManagerName);
+}
+
 async function loadResourceAccess() {
   if (isDemo || !currentProfile) return;
   const { data } = await sb.from('resource_access')
@@ -5652,7 +5751,7 @@ async function loadDependents() {
     const age = d.age ? `${d.age} ans` : '';
     const actions = isDemo ? '' : `
       <button class="btn btn-success btn-sm" onclick="openTransfer('${d.id}','${d.name.replace(/'/g, "\\'")}','${(d.virtual_balance||0).toFixed(2)}')">💳 Crédits</button>
-      <button class="btn ${(d.allow_spaces||d.allow_trips||d.allow_lunch) ? 'btn-warning' : 'btn-secondary'} btn-sm" onclick="toggleDependentAccess('${d.id}', ${!(d.allow_spaces||d.allow_trips||d.allow_lunch)})">${(d.allow_spaces||d.allow_trips||d.allow_lunch) ? '🔒 Suspendre' : '🔓 Réactiver'}</button>
+      <button class="btn btn-info btn-sm" onclick="openDepAccessManager('${d.id}', '${escHtml(d.name)}')">🗝 Accès</button>
       <button class="btn btn-secondary btn-sm" onclick='editDependent(${JSON.stringify(d)})'>✏️</button>
       <button class="btn btn-danger btn-sm" onclick="deleteDependent('${d.id}')">🗑</button>`;
     return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
@@ -8950,6 +9049,21 @@ async function bbDeletePost(id) {
 
 
 
+
+
+<!-- Modal gestion accès dépendants par ressource -->
+<div id="modal-dep-access" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:520px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);max-height:80vh;display:flex;flex-direction:column;">
+    <div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <span id="dep-access-title" style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;"></span>
+      <button onclick="closeModal('modal-dep-access')" style="background:none;border:none;color:var(--text2);font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
+    </div>
+    <div id="dep-access-body" style="padding:16px 20px;overflow-y:auto;flex:1;"></div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;flex-shrink:0;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-dep-access');loadDependents();">Fermer</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal gestion accès par ressource -->
 <div id="modal-access-manager" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;padding:20px;">
