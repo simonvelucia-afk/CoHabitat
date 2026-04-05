@@ -1848,7 +1848,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
         <div class="table-container">
           <table>
             <thead><tr>
-              <th>Nom</th><th>Unité</th><th>Rôle</th><th>Chauffeur</th><th>Solde</th><th>Actions</th>
+              <th>Nom</th><th>Unité</th><th>Rôle</th><th>Chauffeur</th><th>Forfait</th><th>Solde</th><th>Actions</th>
             </tr></thead>
             <tbody id="tenants-tbody"></tbody>
           </table>
@@ -3922,8 +3922,23 @@ async function loadResourceAccess() {
   resourceAccessCache.vehicles = new Set((data || []).filter(r => r.resource_type === 'vehicle').map(r => r.resource_id));
 }
 
-function hasSpaceAccess(spaceId)    { return isDemo || resourceAccessCache.spaces.has(spaceId); }
-function hasVehicleAccess(vehicleId) { return isDemo || resourceAccessCache.vehicles.has(vehicleId); }
+function hasSpaceAccess(spaceId) {
+  if (isDemo) return true;
+  // Vérifier plan résident actif
+  const plan = currentProfile?.resident_plan || 'none';
+  const until = currentProfile?.resident_plan_until;
+  const planActive = plan !== 'none' && (!until || new Date(until) > new Date());
+  if (!planActive) return false;
+  return resourceAccessCache.spaces.has(spaceId);
+}
+function hasVehicleAccess(vehicleId) {
+  if (isDemo) return true;
+  const plan = currentProfile?.resident_plan || 'none';
+  const until = currentProfile?.resident_plan_until;
+  const planActive = plan !== 'none' && (!until || new Date(until) > new Date());
+  if (!planActive) return false;
+  return resourceAccessCache.vehicles.has(vehicleId);
+}
 
 async function loadProfile() {
   if (!currentUser) return;
@@ -4441,7 +4456,9 @@ function renderSpaces(spaces) {
         ${!isDemo
           ? hasSpaceAccess(s.id)
             ? `<button class="btn btn-primary btn-sm" onclick="openBookSpace('${s.id}', '${escHtml(s.name)}')">${pt('Réserver')}</button>`
-            : `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Accès restreint — contactez l'administrateur">🔒 Accès restreint</button>`
+            : (currentProfile?.resident_plan && currentProfile.resident_plan !== 'none')
+              ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Accès restreint — contactez l'administrateur">🔒 Accès restreint</button>`
+              : `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Forfait Local ou Réseau requis — contactez votre administrateur">📦 Forfait requis</button>`
           : ''
         }
       </div>
@@ -4478,9 +4495,11 @@ function renderNetworkSpaces() {
       + '</div>'
       + '<div class="card-price">' + price.toFixed(2) + ' $ <small style="font-size:.75rem;color:var(--text2)">' + pt('/ 15 min') + '</small></div>'
       + '<div class="card-actions">'
-      + (!isDemo
-          ? '<button class="btn btn-secondary btn-sm net-book-space" data-sid="' + s.id + '" data-sname="' + escHtml(s.name).replace(/"/g,'') + '" data-url="' + s._memberUrl + '" data-key="' + s._memberKey + '" data-cid="' + s._memberClientId + '">' + pt('Réserver') + '</button>'
-          : '<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Connexion requise pour réserver">🔒 Connexion requise</button>')
+      + (isDemo
+          ? '<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Connexion requise pour réserver">🔒 Connexion requise</button>'
+          : (currentProfile?.resident_plan === 'network' && (!currentProfile?.resident_plan_until || new Date(currentProfile.resident_plan_until) > new Date()))
+            ? '<button class="btn btn-secondary btn-sm net-book-space" data-sid="' + s.id + '" data-sname="' + escHtml(s.name).replace(/"/g,'') + '" data-url="' + s._memberUrl + '" data-key="' + s._memberKey + '" data-cid="' + s._memberClientId + '">' + pt('Réserver') + '</button>'
+            : '<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Forfait Réseau requis — contactez votre administrateur">🔗 Forfait Réseau requis</button>')
       + '</div>'
       + '</div>';
   }).join('');
@@ -6498,9 +6517,18 @@ async function loadTenants() {
       <td>${displayUnit}</td>
       <td><span class="badge badge-gray">${t.role}</span></td>
       <td>${t.is_approved_driver ? '<span class="badge badge-green">✓ Chauffeur</span>' : '—'}</td>
+      <td>
+        ${t.resident_plan && t.resident_plan !== 'none'
+          ? '<span class="badge ' + (t.resident_plan === 'network' ? 'badge-green' : 'badge-yellow') + '">'
+            + (t.resident_plan === 'network' ? '🔗 Réseau' : '🏠 Local')
+            + (t.resident_plan_until ? ' — ' + new Date(t.resident_plan_until).toLocaleDateString('fr-CA') : '')
+            + '</span>'
+          : '<span class="badge badge-gray">Aucun</span>'}
+      </td>
       <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
       <td class="td-actions">
         <button class="btn ${t.is_active === false ? 'btn-success' : 'btn-warning'} btn-sm" onclick="quickToggleTenant('${t.id}', ${t.is_active === false})">${t.is_active === false ? '🔓 Réactiver' : '🔒 Suspendre'}</button>
+        <button class="btn btn-info btn-sm" onclick="openPlanManager('${t.id}', '${escHtml(t.full_name)}', '${t.resident_plan || 'none'}', '${t.resident_plan_until || ''}')">📦 Forfait</button>
         <button class="btn btn-info btn-sm" onclick="openAccessManager('${t.id}', '${escHtml(t.full_name)}')">🗝 Accès</button>
         <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Modifier</button>
       </td>
@@ -6576,6 +6604,29 @@ async function toggleResourceAccess(type, resourceId, grant) {
   }
   renderAccessManager();
   toast(grant ? '🔓 Accès accordé' : '🔒 Accès retiré', 'success');
+}
+
+// ── GESTION DES FORFAITS RÉSIDENTS ──────────────────────────────────────────
+async function openPlanManager(userId, userName, currentPlan, currentUntil) {
+  document.getElementById('plan-mgr-title').textContent = '📦 Forfait — ' + userName;
+  document.getElementById('plan-mgr-user-id').value = userId;
+  document.getElementById('plan-mgr-plan').value = currentPlan || 'none';
+  document.getElementById('plan-mgr-until').value = currentUntil ? currentUntil.slice(0,10) : '';
+  openModal('modal-plan-manager');
+}
+
+async function savePlanManager() {
+  const userId = document.getElementById('plan-mgr-user-id').value;
+  const plan   = document.getElementById('plan-mgr-plan').value;
+  const until  = document.getElementById('plan-mgr-until').value || null;
+  const { error } = await sb.from('profiles').update({
+    resident_plan: plan,
+    resident_plan_until: until ? new Date(until + 'T23:59:59').toISOString() : null
+  }).eq('id', userId);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Forfait mis à jour', 'success');
+  closeModal('modal-plan-manager');
+  loadTenants();
 }
 
 async function quickToggleTenant(id, activate) {
@@ -9552,6 +9603,39 @@ async function bbDeletePost(id) {
     <div id="dep-access-body" style="padding:16px 20px;overflow-y:auto;flex:1;"></div>
     <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;flex-shrink:0;">
       <button class="btn btn-secondary" onclick="closeModal('modal-dep-access');loadDependents();">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal gestion forfait résident -->
+<div id="modal-plan-manager" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:420px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;">
+    <div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <span id="plan-mgr-title" style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;"></span>
+      <button onclick="closeModal('modal-plan-manager')" style="background:none;border:none;color:var(--text2);font-size:1.2rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:20px;">
+      <input type="hidden" id="plan-mgr-user-id">
+      <div class="form-group">
+        <label>Forfait résident</label>
+        <select id="plan-mgr-plan" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 14px;font-size:0.95rem;outline:none;">
+          <option value="none">Aucun forfait</option>
+          <option value="local">🏠 Forfait Local — espaces du bâtiment</option>
+          <option value="network">🔗 Forfait Réseau — accès multi-bâtiments</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Valide jusqu'au (laisser vide = illimité)</label>
+        <input type="date" id="plan-mgr-until" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 14px;font-size:0.95rem;outline:none;">
+      </div>
+      <div style="background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.2);border-radius:6px;padding:12px;font-size:0.82rem;color:var(--text2);line-height:1.5;">
+        <strong style="color:var(--accent);">🏠 Forfait Local</strong> — Réservations dans ce bâtiment uniquement.<br>
+        <strong style="color:var(--accent2);">🔗 Forfait Réseau</strong> — Tout le Local + accès aux ressources partagées des bâtiments du réseau.
+      </div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-plan-manager')">Annuler</button>
+      <button class="btn btn-primary" onclick="savePlanManager()">Enregistrer</button>
     </div>
   </div>
 </div>
