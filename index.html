@@ -6511,6 +6511,9 @@ async function loadTenants() {
   document.getElementById('tenants-tbody').innerHTML = tenantsCache.map(t => {
     const displayName = isDemo ? anonName(t.id) : escHtml(t.full_name);
     const displayUnit = isDemo ? (t.unit ? anonUnit(t.id) : '—') : (t.unit || '—');
+    const tid = t.id;
+    const planBtn = '<button class="btn btn-info btn-sm" onclick="openPlanManagerById(\u0027' + tid + '\u0027)">&#128230; Forfait</button>';
+    const accessBtn = '<button class="btn btn-info btn-sm" onclick="openAccessManagerById(\u0027' + tid + '\u0027)">&#128273; Acc&egrave;s</button>';
     return `
     <tr style="${t.is_active === false ? 'opacity:0.5' : ''}">
       <td>${displayName}${t.is_active === false ? ' <span class="badge badge-gray" style="font-size:0.7rem;margin-left:4px">Inactif</span>' : ''}</td>
@@ -6528,8 +6531,8 @@ async function loadTenants() {
       <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
       <td class="td-actions">
         ${t.role !== 'principal_admin' ? `<button class="btn ${t.is_active === false ? 'btn-success' : 'btn-warning'} btn-sm" onclick="quickToggleTenant('${t.id}', ${t.is_active === false})">${t.is_active === false ? '🔓 Réactiver' : '🔒 Suspendre'}</button>` : ''}
-        <button class="btn btn-info btn-sm" onclick="openPlanManagerById('${t.id}')">📦 Forfait</button>
-        <button class="btn btn-info btn-sm" onclick="openAccessManagerById('${t.id}')">🗝 Accès</button>
+        ${planBtn}
+        ${accessBtn}
         <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Modifier</button>
       </td>
     </tr>`;
