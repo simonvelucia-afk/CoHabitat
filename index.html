@@ -67,7 +67,7 @@ function trackFeature(category, action, details = {}) {
   // Supabase usage_logs (fire-and-forget, ne bloque pas l'UI)
   if (typeof sb !== 'undefined') {
     const demo = typeof isDemo !== 'undefined' ? isDemo : false;
-    const lang = typeof lmLang !== 'undefined' ? lmLang : null;
+    const lang = typeof appLang !== 'undefined' ? appLang : null;
     const { user_type, language, ...meta } = details;
     Promise.resolve(sb.rpc('insert_usage_log', {
       p_module:   category,
@@ -1460,7 +1460,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   <nav id="navbar">
     <div class="nav-left" id="nav-left" style="display:flex;">
       <a href="https://www.modulimo.com" target="_blank" style="display:flex;align-items:center;flex-shrink:0;text-decoration:none;margin-right:10px;"><img src="data:image/png;base64,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" alt="Modulimo" style="height:24px;width:auto;display:block;"></a>
-      <div id="nav-lang-switcher" style="display:flex;gap:3px;margin-right:6px;"><button class="nav-lang-btn" data-lang="fr" onclick="lmSetLang('fr')">🇫🇷 FR</button><button class="nav-lang-btn" data-lang="en" onclick="lmSetLang('en')">🇬🇧 EN</button><button class="nav-lang-btn" data-lang="es" onclick="lmSetLang('es')">🇪🇸 ES</button></div>
+      <div id="nav-lang-switcher" style="display:flex;gap:3px;margin-right:6px;"><button class="nav-lang-btn" data-lang="fr" onclick="setLang('fr')">🇫🇷 FR</button><button class="nav-lang-btn" data-lang="en" onclick="setLang('en')">🇬🇧 EN</button><button class="nav-lang-btn" data-lang="es" onclick="setLang('es')">🇪🇸 ES</button></div>
       <div id="nav-clock" style="font-family:'Space Mono',monospace;font-size:12px;color:var(--text2);white-space:nowrap;">--:--</div>
     </div>
     <div class="nav-tabs" id="nav-tabs"></div>
@@ -3599,16 +3599,16 @@ function buildNav() {
   const role = currentProfile?.role;
 
   let html = '';
-  html += `<button class="nav-tab" onclick="navigateTo('conditions')">📋 ${lmT('navConditions')}</button>`;
-  html += `<button class="nav-tab" onclick="navigateTo('babillard')">${lmT('navBabillard')}</button>`;
-  html += `<button class="nav-tab" onclick="navigateTo('dashboard')">${lmT('navDashboard')}</button>`;
-  html += `<button class="nav-tab" onclick="navigateTo('spaces')">${lmT('navSpaces')}</button>`;
-  html += `<button class="nav-tab" onclick="navigateTo('trips')">${lmT('navTrips')}</button>`;
-  html += `<button class="nav-tab" onclick="navigateTo('lunch')">${lmT('navLunch')}</button>`;
-  html += `<button class="nav-tab" onclick="navigateTo('transactions')">${lmT('navTransactions')}</button>`;
-  html += `<button class="nav-tab" onclick="navigateTo('profile')">👤 ${lmT('navProfile')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('conditions')">📋 ${t('navConditions')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('babillard')">${t('navBabillard')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('dashboard')">${t('navDashboard')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('spaces')">${t('navSpaces')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('trips')">${t('navTrips')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('lunch')">${t('navLunch')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('transactions')">${t('navTransactions')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('profile')">👤 ${t('navProfile')}</button>`;
   if (isAdmin) {
-    html += `<button class="nav-tab" onclick="navigateTo('admin')">${lmT('navAdmin')}</button>`;
+    html += `<button class="nav-tab" onclick="navigateTo('admin')">${t('navAdmin')}</button>`;
   }
   tabs.innerHTML = html;
 
@@ -3616,15 +3616,15 @@ function buildNav() {
   const drawer = document.getElementById('mobile-drawer');
   if (drawer) {
     const pages = [
-      { key: 'conditions', label: '📋 ' + lmT('navConditions') },
-      { key: 'babillard',    label: '📌 ' + lmT('navBabillard') },
-      { key: 'dashboard', label: '🏠 ' + lmT('navDashboard') },
-      { key: 'spaces',    label: '🏢 ' + lmT('navSpaces') },
-      { key: 'trips',     label: '🚗 ' + lmT('navTrips') },
-      { key: 'lunch',     label: '🍱 ' + lmT('navLunch') },
-      { key: 'transactions', label: '💳 ' + lmT('navTransactions') },
-      { key: 'profile',   label: '👤 ' + lmT('navProfile') },
-      ...(isAdmin ? [{ key: 'admin', label: '⚙️ ' + lmT('navAdmin') }] : [])
+      { key: 'conditions', label: '📋 ' + t('navConditions') },
+      { key: 'babillard',    label: '📌 ' + t('navBabillard') },
+      { key: 'dashboard', label: '🏠 ' + t('navDashboard') },
+      { key: 'spaces',    label: '🏢 ' + t('navSpaces') },
+      { key: 'trips',     label: '🚗 ' + t('navTrips') },
+      { key: 'lunch',     label: '🍱 ' + t('navLunch') },
+      { key: 'transactions', label: '💳 ' + t('navTransactions') },
+      { key: 'profile',   label: '👤 ' + t('navProfile') },
+      ...(isAdmin ? [{ key: 'admin', label: '⚙️ ' + t('navAdmin') }] : [])
     ];
     const balanceStr = `${(currentProfile?.virtual_balance || 0).toFixed(2)} $ CAD`;
     drawer.innerHTML = `
@@ -3917,7 +3917,7 @@ async function loadDashboard() {
       <tbody>${combined.map(r => `<tr>
         <td><span class="badge badge-gray">${r.type}</span></td>
         <td>${r.name || '—'}</td>
-        <td>${r.date ? new Date(r.date).toLocaleString(lmLang === 'fr' ? 'fr-CA' : lmLang === 'es' ? 'es-ES' : 'en-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
+        <td>${r.date ? new Date(r.date).toLocaleString(appLang === 'fr' ? 'fr-CA' : appLang === 'es' ? 'es-ES' : 'en-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
         <td>${(r.cost || 0).toFixed(2)} $</td>
         <td><span class="badge ${statusBadge(r.status)}">${statusLabel(r.status)}</span></td>
       </tr>`).join('')}</tbody>
@@ -4117,7 +4117,7 @@ function showLoginConditions() {
   const container = document.getElementById('modal-login-conditions-content');
   if (!modal || !container) return;
   // Reuse loadConditions logic with this container
-  const lang = (typeof lmLang !== 'undefined' ? lmLang : 'fr').slice(0,2);
+  const lang = (typeof appLang !== 'undefined' ? appLang : 'fr').slice(0,2);
   // Temporarily swap container and call loadConditions logic
   const realContainer = document.getElementById('conditions-content');
   // Swap
@@ -4131,7 +4131,7 @@ function showLoginConditions() {
 }
 
 function loadConditions() {
-  const lang = (typeof lmLang !== 'undefined' ? lmLang : 'fr').slice(0,2);
+  const lang = (typeof appLang !== 'undefined' ? appLang : 'fr').slice(0,2);
 
   const terms = {
     fr: {
@@ -6404,9 +6404,9 @@ const LANGS = {
   },
 };
 
-let lmLang = 'fr';
-function lmT(key, ...args) {
-  const v = LANGS[lmLang][key];
+let appLang = 'fr';
+function t(key, ...args) {
+  const v = LANGS[appLang][key];
   return typeof v === 'function' ? v(...args) : (v ?? LANGS['fr'][key] ?? key);
 }
 // ═══════════════════════════════════════════════
@@ -6608,7 +6608,7 @@ const PT = {
 };
 
 function pt(key) {
-  return (PT[lmLang] || PT['fr'])[key] || (PT['fr'][key] || key);
+  return (PT[appLang] || PT['fr'])[key] || (PT['fr'][key] || key);
 }
 
 function ptApply() {
@@ -6637,9 +6637,9 @@ function ptApply() {
   }
 }
 
-function lmSetLang(l) {
-  lmLang = l;
-  try { localStorage.setItem('mllang', l); } catch(e) {}
+function setLang(l) {
+  appLang = l;
+  try { localStorage.setItem('applang', l); } catch(e) {}
   document.querySelectorAll('.nav-lang-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.lang === l);
   });
@@ -6658,8 +6658,8 @@ function lmApplyLang() {
   // Update static HTML elements
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
-    if(el.dataset.i18nHtml) el.innerHTML = lmT(key);
-    else el.textContent = lmT(key);
+    if(el.dataset.i18nHtml) el.innerHTML = t(key);
+    else el.textContent = t(key);
   });
   // Re-render current screen content
   if(document.getElementById('screen-grid').classList.contains('active')) lmRenderGrid();
@@ -6668,17 +6668,17 @@ function lmApplyLang() {
   // admin géré par PointeEst
 }
 function lmRenderLangBtns() {
-  document.querySelectorAll('.lmLang-btn').forEach(btn => {
-    btn.style.color = btn.dataset.lmLang === lmLang ? 'var(--accent)' : 'var(--text-dim)';
-    btn.style.borderColor = btn.dataset.lmLang === lmLang ? 'var(--accent)' : 'var(--border)';
+  document.querySelectorAll('.appLang-btn').forEach(btn => {
+    btn.style.color = btn.dataset.appLang === appLang ? 'var(--accent)' : 'var(--text-dim)';
+    btn.style.borderColor = btn.dataset.appLang === appLang ? 'var(--accent)' : 'var(--border)';
   });
   // Update centered topbar titles
   var pairs = [['tth-main','tth-sub'],['ttg-main','ttg-sub'],['ttp-main','ttp-sub']];
   pairs.forEach(function(p) {
     var m = document.getElementById(p[0]);
     var s = document.getElementById(p[1]);
-    if(m) m.textContent = lmT('appTitle');
-    if(s) s.textContent = lmT('appTitleSub');
+    if(m) m.textContent = t('appTitle');
+    if(s) s.textContent = t('appTitleSub');
   });
 }
 
@@ -6754,7 +6754,7 @@ let lmState = lmLoadState();
 function lmSaveState() { try { localStorage.setItem('mlstate', JSON.stringify(lmState)); } catch(e) {} lmSaveStateToDB(lmState); }
 
 // Load saved language
-try { const sl = localStorage.getItem('mllang'); if(sl && LANGS[sl]) lmLang = sl; } catch(e) {}
+try { const sl = localStorage.getItem('applang'); if(sl && LANGS[sl]) appLang = sl; } catch(e) {}
 
 // ═══════════════════════════════
 //  CLOCK
@@ -6934,17 +6934,17 @@ function lmRenderHomeStats() {
     el.innerHTML = `
       <div style="display:flex;align-items:center;gap:5px;">
         <span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--text);">${filled}</span>
-        <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);">${lmT('statAvailable')}</span>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);">${t('statAvailable')}</span>
       </div>
       <div style="width:1px;height:16px;background:var(--border);"></div>
       <div style="display:flex;align-items:center;gap:5px;">
         <span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--accent);">${withPrice}</span>
-        <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);">${lmT('statForSale')}</span>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);">${t('statForSale')}</span>
       </div>
       <div style="width:1px;height:16px;background:var(--border);"></div>
       <div style="display:flex;align-items:center;gap:5px;">
         <span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--success);">${lmState.boxCount}</span>
-        <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);">${lmT('statBoxes')} / ${lmState.boxMax}</span>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);">${t('statBoxes')} / ${lmState.boxMax}</span>
       </div>`;
   }
   // Update return button state
@@ -6974,7 +6974,7 @@ function lmRenderGrid() {
       <div style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:${color}22;color:${color};border:1px solid ${color}55;">${actual}° <span style="opacity:.5;font-size:9px;">/ ${zone.setpoint}°</span></div>
       <div class="section-label">${zone.name}</div>
       <div class="section-line"></div>
-      <div style="font-size:10px;color:var(--text-faint);font-family:'Space Mono',monospace;">${freeCount} ${lmT('free')}</div>
+      <div style="font-size:10px;color:var(--text-faint);font-family:'Space Mono',monospace;">${freeCount} ${t('free')}</div>
     </div>`;
 
     const row = document.createElement('div');
@@ -6984,8 +6984,8 @@ function lmRenderGrid() {
       const hasContent = !!slot.desc;
       let cls = 'slot ';
       let statusLabel = '', statusClass = '';
-      if(!hasContent) { cls+='empty-slot'; statusLabel=lmT('slotEmpty'); statusClass='vide'; }
-      else { cls+='available'; statusLabel=lmT('slotFree'); statusClass='libre'; }
+      if(!hasContent) { cls+='empty-slot'; statusLabel=t('slotEmpty'); statusClass='vide'; }
+      else { cls+='available'; statusLabel=t('slotFree'); statusClass='libre'; }
 
       const delay = (slotIndex * 0.12) % 3;
       const descPreview = slot.desc ? slot.desc.substring(0,28)+(slot.desc.length>28?'…':'') : '';
@@ -7036,21 +7036,21 @@ function lmOpenSlot(id) {
   lmSelectedSlotId = id;
   const zone = lmState.zones[slot.zone];
   const color = lmZoneColor(zone);
-  const priceStr = (slot.price > 0) ? slot.price.toFixed(2) + ' $' : lmT('modalFree');
+  const priceStr = (slot.price > 0) ? slot.price.toFixed(2) + ' $' : t('modalFree');
 
-  document.getElementById('modal-title').textContent = lmT('modalAvail');
+  document.getElementById('modal-title').textContent = t('modalAvail');
   document.getElementById('modal-slot-num').textContent = `#${slot.id}`;
 
   let body = `<div class="modal-desc">${slot.desc}</div>
     <div class="modal-info-row">
-      <div class="modal-info-label">${lmT('modalPrice')}</div>
+      <div class="modal-info-label">${t('modalPrice')}</div>
       <div class="modal-info-val" style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;color:var(--accent);letter-spacing:.04em;">${priceStr}</div>
     </div>`;
 
   document.getElementById('modal-body').innerHTML = body;
 
-  let footer = `<button class="btn" onclick="lmCloseModal()">${lmT('modalClose')}</button>`;
-  footer += '<button class="btn accent" onclick="lmStartPurchase(' + slot.id + ')"' + ' style="font-size:15px;padding:8px 20px;">' + lmT('modalBuy') + ' — ' + priceStr + ' ›</button>';
+  let footer = `<button class="btn" onclick="lmCloseModal()">${t('modalClose')}</button>`;
+  footer += '<button class="btn accent" onclick="lmStartPurchase(' + slot.id + ')"' + ' style="font-size:15px;padding:8px 20px;">' + t('modalBuy') + ' — ' + priceStr + ' ›</button>';
 
   document.getElementById('modal-footer').innerHTML = footer;
   document.getElementById('slot-modal').classList.add('active');
@@ -7070,15 +7070,15 @@ function lmStartPurchaseKiosk(id) {
   lmCloseModal();
   lmSelectedSlotId = id;
   lmNameBuffer = '';
-  document.querySelector('#name-modal .modal-title').textContent = lmT('nameTitle');
-  document.querySelector('#name-modal .confirm-msg').textContent = lmT('namePrompt');
+  document.querySelector('#name-modal .modal-title').textContent = t('nameTitle');
+  document.querySelector('#name-modal .confirm-msg').textContent = t('namePrompt');
 
   // Populate purchase summary
   const slot = lmState.slots.find(s=>s.id===id);
   if(slot) {
     const zone = lmState.zones[slot.zone];
     const color = lmZoneColor(zone);
-    const priceStr = slot.price > 0 ? slot.price.toFixed(2) + ' $' : lmT('free') || 'Gratuit';
+    const priceStr = slot.price > 0 ? slot.price.toFixed(2) + ' $' : t('free') || 'Gratuit';
     const el = {
       desc:  document.getElementById('ps-desc'),
       price: document.getElementById('ps-price'),
@@ -7140,7 +7140,7 @@ function lmConfirmKioskReservation() {
   window.gantryQueue = window.gantryQueue || [];
   window.gantryQueue.push({ slotId: slotId, xFrac: xFrac, desc: slotDesc, price: price });
 
-  lmShowSuccess(lmT('successMsg', buyer), '#' + slotId + ' — ' + zoneName + ' — ' + priceStr);
+  lmShowSuccess(t('successMsg', buyer), '#' + slotId + ' — ' + zoneName + ' — ' + priceStr);
   trackFeature('lunch_machine', 'slot_reserved', { slot_id: slotId, zone: zoneName, price: price, user_type: isDemo ? 'demo' : 'resident' });
 }
 
@@ -7208,7 +7208,7 @@ function lmCheckPin() {
     // Accès admin géré par PointeEst
     navigateTo('admin'); adminTab('lunch');
   } else {
-    document.getElementById('pin-error').textContent = lmT('pinError');
+    document.getElementById('pin-error').textContent = t('pinError');
     lmPinBuffer = '';
     document.getElementById('pin-display').textContent = '____';
   }
@@ -7482,7 +7482,7 @@ function lmReturnBox() {
       if(washPanel) washPanel.style.display = 'none';
       if(btnWrap) btnWrap.style.display = '';
       if(retBtn) retBtn.disabled = (lmState.boxCount >= lmState.boxMax);
-      lmShowSuccess(lmT('returnBoxSuccess'), lmState.boxCount + ' / ' + lmState.boxMax + ' ' + lmT('statBoxes'));
+      lmShowSuccess(t('returnBoxSuccess'), lmState.boxCount + ' / ' + lmState.boxMax + ' ' + t('statBoxes'));
     }
   }, 1000);
 }
@@ -7516,7 +7516,7 @@ function lmCancelReservation() {
   slot.reserved=false; slot.reservedBy='';
   lmSaveState(); lmRenderAdminCases(); lmFlashSave();
 }
-function lmFlashSave() { lmShowSuccess(lmT('savedMsg'),''); }
+function lmFlashSave() { lmShowSuccess(t('savedMsg'),''); }
 
 function lmRenderAdminTemps() {
   const el = document.getElementById('lm-temp-admin-rows'); el.innerHTML='';
@@ -7525,7 +7525,7 @@ function lmRenderAdminTemps() {
   // ── Section 1 : plages de couleur globales ──
   el.innerHTML += `
     <div style="margin-bottom:16px;background:var(--bg);border:1px solid var(--border-active);padding:10px;">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;">${lmT('adminRangesTitle')}</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;">${t('adminRangesTitle')}</div>
       ${LM_COLOR_BANDS.map(function(b){
         return '<div class="admin-row" style="margin-bottom:6px;">'
           + '<div style="width:9px;height:9px;border-radius:50%;background:'+b.hex+';flex-shrink:0;box-shadow:0 0 5px '+b.hex+'88;"></div>'
@@ -7554,7 +7554,7 @@ function lmRenderAdminTemps() {
         <div class="admin-label" style="width:80px;font-size:11px;">Consigne cible</div>
         <input class="admin-input" type="number" id="setpoint-${id}" value="${z.setpoint}" min="-30" max="200" step="0.5" style="width:58px;">
         <div class="admin-unit">°C</div>
-        <div class="admin-label" style="width:80px;margin-left:8px;font-size:11px;">${lmT('adminTempActual')}</div>
+        <div class="admin-label" style="width:80px;margin-left:8px;font-size:11px;">${t('adminTempActual')}</div>
         <input class="admin-input" type="number" id="actual-${id}" value="${(z.actual??z.setpoint).toFixed(1)}" min="-30" max="200" step="0.1" style="width:58px;">
         <div class="admin-unit">°C</div>
       </div>
@@ -7651,20 +7651,20 @@ function lmRenderAdminStatus() {
   let html=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
     <div style="background:var(--bg);border:1px solid var(--border);padding:10px;text-align:center;">
       <div style="font-family:'Space Mono',monospace;font-size:22px;color:var(--accent)">${filled}</div>
-      <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">${lmT('adminFilled')}</div>
+      <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">${t('adminFilled')}</div>
     </div>
     <div style="background:var(--bg);border:1px solid var(--border);padding:10px;text-align:center;">
       <div style="font-family:'Space Mono',monospace;font-size:22px;color:var(--success)">${withPrice}</div>
-      <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">${lmT('adminWithPrice')}</div>
+      <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">${t('adminWithPrice')}</div>
     </div>
     <div style="background:var(--bg);border:1px solid var(--border);padding:10px;text-align:center;">
       <div style="font-family:'Space Mono',monospace;font-size:22px;color:var(--text-faint)">${empty}</div>
-      <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">${lmT('adminEmpty')}</div>
+      <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">${t('adminEmpty')}</div>
     </div>
   </div>`;
-  html+=`<div class="admin-section-title" style="margin-top:0;">${lmT('adminForSaleTitle')}</div>`;
+  html+=`<div class="admin-section-title" style="margin-top:0;">${t('adminForSaleTitle')}</div>`;
   const active=lmState.slots.filter(s=>s.desc);
-  if(!active.length) html+=`<div style="color:var(--text-faint);font-size:12px;">${lmT('adminNone')}</div>`;
+  if(!active.length) html+=`<div style="color:var(--text-faint);font-size:12px;">${t('adminNone')}</div>`;
   else active.forEach(slot => {
     const color = lmZoneColor(lmState.zones[slot.zone]??{});
     const priceStr = slot.price > 0 ? slot.price.toFixed(2)+' $' : '—';
@@ -8175,7 +8175,7 @@ async function lmConfirmPurchase() {
   lmRenderMachineSlots();
   window.gantryQueue = window.gantryQueue || [];
   window.gantryQueue.push({ slotId, xFrac, desc: slotDesc, price });
-  lmShowSuccess(lmT('successMsg', buyer), '#' + slotId + ' — ' + zoneName + ' — ' + priceStr);
+  lmShowSuccess(t('successMsg', buyer), '#' + slotId + ' — ' + zoneName + ' — ' + priceStr);
 }
 
 async function onLunchPageShow() {
@@ -8541,8 +8541,8 @@ function bbRenderPost(p, isOwner, isAdmin) {
   const name = (isDemo && p.profiles?.full_name) ? anonName(p.profiles?.id || p.profiles?.full_name) : rawName;
   const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
   const date = new Date(p.created_at);
-  const locale = lmLang === 'fr' ? 'fr-CA' : lmLang === 'es' ? 'es-ES' : 'en-CA';
-  const timeSep = lmLang === 'es' ? ' a las ' : lmLang === 'en' ? ' at ' : ' à ';
+  const locale = appLang === 'fr' ? 'fr-CA' : appLang === 'es' ? 'es-ES' : 'en-CA';
+  const timeSep = appLang === 'es' ? ' a las ' : appLang === 'en' ? ' at ' : ' à ';
   const dateStr = pt('bbPostedOn') + ' ' + date.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
     + timeSep + date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   const canDelete = isOwner || isAdmin;
