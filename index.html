@@ -3605,6 +3605,7 @@ async function loginDemo() {
     { created_at: new Date(Date.now() - 18*86400000).toISOString(), description: 'Réservation Terrasse', amount: -8.00, balance_after: 4.00 },
     { created_at: new Date(Date.now() - 21*86400000).toISOString(), description: 'Crédit par administrateur — Paiement mensuel', amount: 100.00, balance_after: 12.00 },
   ];
+  await loadNetworkData();
   showApp();
   toast('Mode démo activé — consultation uniquement', 'info');
   if (window._gaConsent === 'granted') gtag('set', 'user_properties', { user_type: 'demo' });
@@ -3757,7 +3758,40 @@ async function loadAppModules() {
 
 // ── RÉSEAU INTER-BÂTIMENTS ───────────────────────────────────────────────────
 async function loadNetworkData() {
-  if (isDemo) return;
+  if (isDemo) {
+    // Données réseau fictives pour la démo
+    window.networkData.network = { id: 'demo-net', name: 'Réseau Pointe-Est' };
+    window.networkData.sharedSpaces = [
+      {
+        id: 'demo-space-1', name: 'Toit-terrasse panoramique',
+        location: 'Immeuble B — 8e étage', capacity: 30,
+        description: 'Vue à 360° sur le fleuve',
+        space_pricing: [{ price_per_slot: 4.00 }],
+        _network: true, _memberName: 'Co-housing Fleuve Bleu',
+        _memberUrl: '', _memberKey: '', _memberClientId: 'demo-b',
+        _priorityHours: 24
+      },
+      {
+        id: 'demo-space-2', name: 'Studio de yoga & méditation',
+        location: 'Immeuble C — Rez-de-jardin', capacity: 15,
+        description: 'Plancher de bois, miroirs, équipements inclus',
+        space_pricing: [{ price_per_slot: 2.50 }],
+        _network: true, _memberName: 'Habitat Solidaire',
+        _memberUrl: '', _memberKey: '', _memberClientId: 'demo-c',
+        _priorityHours: 12
+      },
+      {
+        id: 'demo-space-3', name: 'Atelier de fabrication',
+        location: 'Immeuble D — Sous-sol', capacity: 10,
+        description: 'Outils électriques, établis, imprimante 3D',
+        space_pricing: [{ price_per_slot: 6.00 }],
+        _network: true, _memberName: 'Coopérative Artisans Est',
+        _memberUrl: '', _memberKey: '', _memberClientId: 'demo-d',
+        _priorityHours: 48
+      }
+    ];
+    return;
+  }
   try {
     const domain = window.location.hostname;
     // 1. Trouver le client correspondant à ce domaine
@@ -3782,9 +3816,9 @@ async function loadNetworkData() {
     window.networkData.myClientId = clientId;
     window.networkData.myPriority = activeNet.priority;
 
-    // 3. Charger tous les membres du réseau (sauf soi-même)
+    // 3. Charger tous les membres du réseau (inclus soi-même pour ressources croisées)
     const membRes = await fetch(
-      CENTRAL_URL + '/rest/v1/network_members?network_id=eq.' + activeNet.network_id + '&client_id=neq.' + clientId + '&select=client_id,supabase_url,anon_key,priority,clients(name)',
+      CENTRAL_URL + '/rest/v1/network_members?network_id=eq.' + activeNet.network_id + '&select=client_id,supabase_url,anon_key,priority,clients(name)',
       { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
     );
     const members = await membRes.json();
@@ -4418,10 +4452,15 @@ function renderSpaces(spaces) {
 function renderNetworkSpaces() {
   const sharedSpaces = window.networkData.sharedSpaces || [];
   if (!sharedSpaces.length) return '';
+  // En démo, ajouter un badge d'indication
+  const demoNotice = isDemo
+    ? '<div style="font-size:11px;color:var(--accent);background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2);border-radius:4px;padding:4px 10px;display:inline-block;margin-bottom:10px;">Mode démo — données fictives pour illustration</div>'
+    : '';
   const networkName = window.networkData.network?.name || 'Réseau';
   const header = '<div style="margin:24px 0 12px;padding-top:20px;border-top:1px solid var(--border);">'
     + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:2px;">🔗 ' + networkName + '</div>'
     + '<div style="font-size:12px;color:var(--text3)">Ressources partagées par les bâtiments du réseau</div>'
+    + demoNotice
     + '</div>';
   const cards = sharedSpaces.map(s => {
     const price = s.space_pricing?.[0]?.price_per_slot || 0;
@@ -4441,7 +4480,7 @@ function renderNetworkSpaces() {
       + '<div class="card-actions">'
       + (!isDemo
           ? '<button class="btn btn-secondary btn-sm net-book-space" data-sid="' + s.id + '" data-sname="' + escHtml(s.name).replace(/"/g,'') + '" data-url="' + s._memberUrl + '" data-key="' + s._memberKey + '" data-cid="' + s._memberClientId + '">' + pt('Réserver') + '</button>'
-          : '')
+          : '<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Connexion requise pour réserver">🔒 Connexion requise</button>')
       + '</div>'
       + '</div>';
   }).join('');
