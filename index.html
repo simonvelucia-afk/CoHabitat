@@ -4009,8 +4009,11 @@ async function openKiosk(machineId) {
   try {
     const { data: { session } } = await sb.auth.getSession();
     const tok = session?.access_token;
-    console.log('[openKiosk] token length:', tok?.length, 'machine:', machineId);
-    const url = LM_KIOSK_BASE + '?machine=' + machineId + (tok ? '&chtoken=' + encodeURIComponent(tok) : '');
+    const uid = session?.user?.id || '';
+    console.log('[openKiosk] token length:', tok?.length, 'uid:', uid, 'machine:', machineId);
+    const url = LM_KIOSK_BASE + '?machine=' + machineId
+      + (tok ? '&chtoken=' + encodeURIComponent(tok) : '')
+      + (uid ? '&chuid=' + uid : '');
     window.open(url, '_blank');
   } catch(e) {
     console.error('[openKiosk]', e);
