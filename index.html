@@ -1583,7 +1583,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
         <div style="font-size:4rem;">🍱</div>
         <div style="font-family:var(--font-serif);font-size:1.8rem;color:var(--text);">Machine Lunch</div>
         <div style="font-size:0.95rem;color:var(--text2);max-width:380px;line-height:1.6;">Sélectionnez une machine pour accéder au kiosque interactif.</div>
-        <div id="lunch-machines-btns" style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:360px;">
+        <div id="lunch-machines-btns" style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:400px;">
           <div style="color:var(--text3);font-size:13px;">Chargement…</div>
         </div>
       </div>
@@ -3722,6 +3722,7 @@ function navigateTo(page) {
     case 'profile': loadProfilePage(); break;
     case 'admin': loadAdmin(); break;
     case 'lunch': onLunchPageShow(); break;
+    default: if(_lunchQueuePoll) { clearInterval(_lunchQueuePoll); _lunchQueuePoll = null; } break;
   }
   trackFeature('navigation', 'page_view', {
     cohabitat_page: page,
@@ -3741,20 +3742,38 @@ const LM_KIOSK_BASE = 'https://simonvelucia-afk.github.io/LunchMachine/';
 const LM_CENTRAL_URL  = 'https://bpxscgrbxjscicpnheep.supabase.co';
 const LM_CENTRAL_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJweHNjZ3JieGpzY2ljcG5oZWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzOTYxNzIsImV4cCI6MjA5MDk3MjE3Mn0._M6HHhCwKuuqAzicDZzJp7ul0M3KpDBBDb6ImDWWcLo';
 
+// ── LUNCH QUEUE ─────────────────────────────────────────────────────────────
+const LUNCH_QUEUE_POLL = 6000; // ms
+let _lunchQueuePoll = null;
+let _lunchMyEntry   = null;  // mon entrée dans la queue
+
+async function lmFetch(path, opts) {
+  const res = await fetch(LM_CENTRAL_URL + '/rest/v1/' + path, {
+    ...opts,
+    headers: {
+      'apikey': LM_CENTRAL_ANON,
+      'Authorization': 'Bearer ' + LM_CENTRAL_ANON,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      ...(opts && opts.headers)
+    }
+  });
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('json') ? res.json() : null;
+}
+
 async function onLunchPageShow() {
   const container = document.getElementById('lunch-machines-btns');
   if (!container) return;
   container.innerHTML = '<div style="color:var(--text3);font-size:13px;">Chargement…</div>';
 
   try {
-    // Lire le building_id depuis system_settings (fallback: montrer toutes les machines actives)
     let buildingFilter = null;
     try {
       const { data } = await sb.from('system_settings').select('value').eq('key', 'building_id').maybeSingle();
       if (data?.value) buildingFilter = data.value;
     } catch(e) {}
 
-    // Charger les machines depuis modulimo-central
     const query = buildingFilter
       ? `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&building_id=eq.${buildingFilter}&select=id,name,building_id&order=name`
       : `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&select=id,name,building_id&order=name`;
@@ -3769,26 +3788,208 @@ async function onLunchPageShow() {
       return;
     }
 
-    // Afficher un bouton par machine
-    container.innerHTML = machines.map(m => `
-      <button onclick="openLunchKiosk('${m.id}')"
-        style="background:var(--surface);border:1px solid var(--border);color:var(--text);
-               padding:16px 24px;border-radius:10px;font-size:1rem;font-weight:500;
-               cursor:pointer;font-family:var(--font-sans);display:flex;align-items:center;
-               justify-content:space-between;gap:12px;transition:border-color .2s,background .2s;width:100%;"
-        onmouseover="this.style.borderColor='var(--accent)';this.style.background='rgba(200,169,110,0.07)'"
-        onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'">
-        <span style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:1.3rem;">🖥</span>
-          <span>${m.name}</span>
-        </span>
-        <span style="color:var(--accent);font-size:1.1rem;">›</span>
-      </button>
-    `).join('');
+    container.innerHTML = '';
+    for (const m of machines) {
+      const card = document.createElement('div');
+      card.id = 'lunch-card-' + m.id;
+      card.style.cssText = 'width:100%;';
+      container.appendChild(card);
+      await renderMachineCard(m, card);
+    }
+
+    // Démarrer le polling pour les mises à jour
+    if(_lunchQueuePoll) clearInterval(_lunchQueuePoll);
+    _lunchQueuePoll = setInterval(async function() {
+      const cards = container.querySelectorAll('[data-machine-id]');
+      for(const c of cards) {
+        const mid = c.dataset.machineId;
+        const m = machines.find(x => x.id === mid);
+        if(m) await renderMachineCard(m, c);
+      }
+    }, LUNCH_QUEUE_POLL);
 
   } catch(err) {
-    container.innerHTML = `<div style="color:var(--accent3);font-size:13px;">Erreur: ${err.message}</div>`;
+    container.innerHTML = `<div style="color:var(--accent3,#e07060);font-size:13px;">Erreur: ${err.message}</div>`;
   }
+}
+
+async function renderMachineCard(machine, el) {
+  // Charger la queue de cette machine
+  let queue = [];
+  try {
+    queue = await lmFetch('lunch_queue?machine_id=eq.' + machine.id + '&order=joined_at&select=*') || [];
+    // Nettoyer visuellement les expirés
+    queue = queue.filter(function(e) { return new Date(e.expires_at || 9e15) > new Date(); });
+  } catch(e) {}
+
+  const active  = queue.find(function(e) { return e.status === 'active'; });
+  const waiting = queue.filter(function(e) { return e.status === 'waiting'; });
+  const myUserId = currentUser?.id;
+  const myEntry  = queue.find(function(e) { return e.user_id === myUserId; });
+  _lunchMyEntry = myEntry || null;
+
+  const isFree   = !active;
+  const iAmActive  = active && active.user_id === myUserId;
+  const iAmWaiting = myEntry && myEntry.status === 'waiting';
+  const myPos    = iAmWaiting ? waiting.findIndex(function(e){ return e.user_id === myUserId; }) + 1 : 0;
+
+  // Couleur statut
+  var statusColor = isFree ? '#7eb8a0' : '#e07060';
+  var statusLabel = isFree ? '✓ Libre' : ('En cours — ' + (active?.full_name?.split(' ')[0] || '…'));
+
+  el.dataset.machineId = machine.id;
+  el.innerHTML = `
+    <div style="background:var(--surface,#1a1a1a);border:1px solid ${iAmActive ? 'var(--accent,#c8a96e)' : 'var(--border,#333)'};border-radius:10px;overflow:hidden;width:100%;transition:border-color .2s;">
+
+      <!-- En-tête machine -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border,#333);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.3rem;">🖥</span>
+          <div>
+            <div style="font-weight:600;font-size:1rem;color:var(--text,#e8e6df);">${machine.name}</div>
+            <div style="font-size:11px;color:${statusColor};font-weight:600;margin-top:1px;">${statusLabel}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${waiting.length > 0 ? `<span style="background:rgba(200,169,110,.12);border:1px solid rgba(200,169,110,.25);color:var(--accent,#c8a96e);font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;">${waiting.length} en attente</span>` : ''}
+          <div style="width:8px;height:8px;border-radius:50%;background:${statusColor};"></div>
+        </div>
+      </div>
+
+      <!-- Corps -->
+      <div style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
+
+        ${iAmActive ? `
+        <!-- Je suis actif -->
+        <div style="background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--accent,#c8a96e);font-weight:600;">
+          ✓ Vous êtes actuellement actif sur cette machine.
+          ${waiting.length > 0 ? `<div style="margin-top:4px;font-size:12px;color:var(--text2,#9a9890);font-weight:400;">${waiting.length} personne${waiting.length>1?'s':''} attend${waiting.length>1?'ent':''} après vous.</div>` : ''}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <a href="${LM_KIOSK_BASE}?machine=${machine.id}" target="_blank"
+            style="flex:1;background:var(--accent,#c8a96e);color:#0f0f0f;border:none;border-radius:6px;padding:10px;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:var(--font-sans,system-ui);text-align:center;text-decoration:none;display:block;">
+            Accéder au kiosque →
+          </a>
+          <button onclick="lunchQueueLeave('${machine.id}')"
+            style="background:rgba(224,112,96,.12);color:#e07060;border:1px solid rgba(224,112,96,.3);border-radius:6px;padding:10px 14px;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:var(--font-sans,system-ui);">
+            J'ai terminé
+          </button>
+        </div>
+
+        ` : iAmWaiting ? `
+        <!-- Je suis en attente -->
+        <div style="background:rgba(79,163,232,.07);border:1px solid rgba(79,163,232,.2);border-radius:8px;padding:12px 14px;">
+          <div style="font-size:13px;color:#4fa3e8;font-weight:600;margin-bottom:4px;">⏳ Vous êtes en file d'attente</div>
+          <div style="font-size:2rem;font-weight:700;color:var(--text,#e8e6df);line-height:1;">
+            #${myPos} <span style="font-size:1rem;font-weight:400;color:var(--text2,#9a9890);">sur ${waiting.length}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text2,#9a9890);margin-top:4px;">Vous serez notifié quand ce sera votre tour.</div>
+        </div>
+        <button onclick="lunchQueueLeave('${machine.id}')"
+          style="background:rgba(224,112,96,.08);color:#e07060;border:1px solid rgba(224,112,96,.25);border-radius:6px;padding:8px;font-size:0.85rem;font-weight:500;cursor:pointer;font-family:var(--font-sans,system-ui);width:100%;">
+          Quitter la file
+        </button>
+
+        ` : `
+        <!-- Pas dans la file -->
+        ${isFree ? `
+          <a href="${LM_KIOSK_BASE}?machine=${machine.id}" target="_blank"
+            onclick="lunchQueueJoin('${machine.id}', event)"
+            style="width:100%;background:var(--accent,#c8a96e);color:#0f0f0f;border:none;border-radius:6px;padding:11px;font-size:0.95rem;font-weight:600;cursor:pointer;font-family:var(--font-sans,system-ui);text-align:center;text-decoration:none;display:block;">
+            Accéder au kiosque →
+          </a>
+        ` : `
+          <button onclick="lunchQueueJoin('${machine.id}', null)"
+            style="width:100%;background:var(--surface2,#242424);color:var(--text,#e8e6df);border:1px solid var(--border,#333);border-radius:6px;padding:11px;font-size:0.95rem;font-weight:500;cursor:pointer;font-family:var(--font-sans,system-ui);">
+            Rejoindre la file d'attente (${waiting.length + 1}${waiting.length === 0 ? 'er' : 'e'} position)
+          </button>
+        `}
+        `}
+
+        <!-- File visible -->
+        ${queue.length > 0 ? `
+        <div style="border-top:1px solid var(--border,#333);padding-top:10px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3,#5a5856);margin-bottom:6px;">File d'attente</div>
+          ${queue.map(function(e, i) {
+            const isMe = e.user_id === myUserId;
+            const isAct = e.status === 'active';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);">
+              <div style="width:20px;height:20px;border-radius:50%;background:${isAct ? 'rgba(126,184,160,.2)' : 'rgba(255,255,255,.06)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${isAct ? '#7eb8a0' : 'var(--text3,#5a5856)'};">${isAct ? '✓' : i}</div>
+              <div style="flex:1;font-size:12px;color:${isMe ? 'var(--accent,#c8a96e)' : 'var(--text2,#9a9890)'};">${isMe ? 'Vous' : (e.full_name?.split(' ')[0] || '—')} ${e.unit ? '<span style="color:var(--text3,#5a5856)">· Unité ' + e.unit + '</span>' : ''}</div>
+              <div style="font-size:10px;color:${isAct ? '#7eb8a0' : 'var(--text3,#5a5856)'};">${isAct ? 'Actif' : 'Attend'}</div>
+            </div>`;
+          }).join('')}
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+
+async function lunchQueueJoin(machineId, event) {
+  if(!currentUser || !currentProfile) { toast && toast('Connexion requise', 'error'); return; }
+  try {
+    const queue = await lmFetch('lunch_queue?machine_id=eq.' + machineId + '&order=joined_at&select=*') || [];
+    const validQueue = queue.filter(function(e) { return new Date(e.expires_at || 9e15) > new Date(); });
+    const active = validQueue.find(function(e) { return e.status === 'active'; });
+    const alreadyIn = validQueue.find(function(e) { return e.user_id === currentUser.id; });
+    if(alreadyIn) return; // déjà dans la file
+
+    const status  = !active ? 'active' : 'waiting';
+    const expires = new Date(Date.now() + 10 * 60000).toISOString();
+    await lmFetch('lunch_queue', {
+      method: 'POST',
+      body: JSON.stringify({
+        machine_id: machineId,
+        user_id:    currentUser.id,
+        full_name:  currentProfile.full_name || '',
+        unit:       currentProfile.unit || '',
+        joined_at:  new Date().toISOString(),
+        status:     status,
+        expires_at: expires
+      })
+    });
+    // Si machine libre → ouvrir le kiosque directement
+    if(status === 'active' && event) {
+      // le lien <a> s'ouvre naturellement
+    } else if(status === 'waiting' && event) {
+      event.preventDefault(); // ne pas ouvrir le kiosque
+    }
+    // Rafraîchir la carte
+    const container = document.getElementById('lunch-machines-btns');
+    if(container) {
+      const card = container.querySelector('[data-machine-id="' + machineId + '"]');
+      if(card) await renderMachineCard({ id: machineId, name: card.querySelector('[style*="font-weight:600"]')?.textContent || machineId }, card);
+    }
+  } catch(err) { console.error('lunchQueueJoin:', err); }
+}
+
+async function lunchQueueLeave(machineId) {
+  if(!currentUser) return;
+  try {
+    const myEntry = await lmFetch(
+      'lunch_queue?machine_id=eq.' + machineId + '&user_id=eq.' + currentUser.id + '&select=id,status',
+    ) || [];
+    for(const e of myEntry) {
+      await lmFetch('lunch_queue?id=eq.' + e.id, { method: 'DELETE' });
+      if(e.status === 'active') {
+        // Promouvoir le suivant
+        const waiting = await lmFetch(
+          'lunch_queue?machine_id=eq.' + machineId + '&status=eq.waiting&order=joined_at&limit=1&select=id'
+        ) || [];
+        if(waiting.length) {
+          await lmFetch('lunch_queue?id=eq.' + waiting[0].id, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'active', expires_at: new Date(Date.now() + 10*60000).toISOString() })
+          });
+        }
+      }
+    }
+    // Rafraîchir
+    const container = document.getElementById('lunch-machines-btns');
+    if(container) {
+      const card = container.querySelector('[data-machine-id="' + machineId + '"]');
+      if(card) await renderMachineCard({ id: machineId, name: '' }, card);
+    }
+  } catch(err) { console.error('lunchQueueLeave:', err); }
 }
 
 function openLunchKiosk(machineId) {
