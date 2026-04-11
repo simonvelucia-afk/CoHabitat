@@ -88,7 +88,7 @@ function trackStep(feature, step, details = {}) {
 </script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=Space+Mono&display=swap" rel="stylesheet">
 <style>
 /* ===== VARIABLES & RESET ===== */
 :root {
@@ -3606,6 +3606,17 @@ function setLang(l) {
   try { ptApply(); } catch(e) {}
   try { trackFeature('platform', 'language_select', { language: l }); } catch(e) {}
 }
+
+function updateClock() {
+  const el = document.getElementById('nav-clock');
+  if (!el) return;
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  el.textContent = h + ':' + m;
+}
+updateClock();
+setInterval(updateClock, 10000);
 
 function buildNav() {
   const tabs = document.getElementById('nav-tabs');
