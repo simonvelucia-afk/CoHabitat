@@ -3758,6 +3758,7 @@ async function lmFetch(path, opts) {
       ...(opts && opts.headers)
     }
   });
+  if(!res.ok) return null; // table absente ou erreur — retourner null silencieusement
   const ct = res.headers.get('content-type') || '';
   return ct.includes('json') ? res.json() : null;
 }
@@ -3817,11 +3818,15 @@ async function renderMachineCard(machine, el) {
   // Charger la queue de cette machine
   let queue = [];
   try {
-    queue = await lmFetch('lunch_queue?machine_id=eq.' + machine.id + '&order=joined_at&select=*') || [];
+    const raw = await lmFetch('lunch_queue?machine_id=eq.' + machine.id + '&order=joined_at&select=*');
+    // Défense : s'assurer que c'est bien un tableau
+    queue = Array.isArray(raw) ? raw : [];
     // Nettoyer visuellement les expirés
     queue = queue.filter(function(e) { return new Date(e.expires_at || 9e15) > new Date(); });
-  } catch(e) {}
-
+  } catch(e) {
+    // Table peut ne pas exister encore — continuer sans queue
+    queue = [];
+  }
   const active  = queue.find(function(e) { return e.status === 'active'; });
   const waiting = queue.filter(function(e) { return e.status === 'waiting'; });
   const myUserId = currentUser?.id;
@@ -3925,9 +3930,10 @@ async function renderMachineCard(machine, el) {
 }
 
 async function lunchQueueJoin(machineId, event) {
-  if(!currentUser || !currentProfile) { toast && toast('Connexion requise', 'error'); return; }
+  if(!currentUser || !currentProfile) { typeof toast === 'function' && toast('Connexion requise', 'error'); return; }
   try {
-    const queue = await lmFetch('lunch_queue?machine_id=eq.' + machineId + '&order=joined_at&select=*') || [];
+    const raw = await lmFetch('lunch_queue?machine_id=eq.' + machineId + '&order=joined_at&select=*');
+    const queue = Array.isArray(raw) ? raw : [];
     const validQueue = queue.filter(function(e) { return new Date(e.expires_at || 9e15) > new Date(); });
     const active = validQueue.find(function(e) { return e.status === 'active'; });
     const alreadyIn = validQueue.find(function(e) { return e.user_id === currentUser.id; });
@@ -3965,16 +3971,17 @@ async function lunchQueueJoin(machineId, event) {
 async function lunchQueueLeave(machineId) {
   if(!currentUser) return;
   try {
-    const myEntry = await lmFetch(
-      'lunch_queue?machine_id=eq.' + machineId + '&user_id=eq.' + currentUser.id + '&select=id,status',
-    ) || [];
+    const raw = await lmFetch(
+      'lunch_queue?machine_id=eq.' + machineId + '&user_id=eq.' + currentUser.id + '&select=id,status'
+    );
+    const myEntry = Array.isArray(raw) ? raw : [];
     for(const e of myEntry) {
       await lmFetch('lunch_queue?id=eq.' + e.id, { method: 'DELETE' });
       if(e.status === 'active') {
-        // Promouvoir le suivant
-        const waiting = await lmFetch(
+        const rawW = await lmFetch(
           'lunch_queue?machine_id=eq.' + machineId + '&status=eq.waiting&order=joined_at&limit=1&select=id'
-        ) || [];
+        );
+        const waiting = Array.isArray(rawW) ? rawW : [];
         if(waiting.length) {
           await lmFetch('lunch_queue?id=eq.' + waiting[0].id, {
             method: 'PATCH',
