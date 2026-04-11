@@ -3729,17 +3729,13 @@ function pageName(page) {
 const LM_KIOSK_BASE = 'https://simonvelucia-afk.github.io/LunchMachine/';
 
 async function onLunchPageShow() {
-  // Afficher le statut de la machine
   let machineId = 'pointe-est-1';
   try {
-    const { data } = await sb.from('system_settings').select('value').eq('key', 'lunch_machine_id').single();
+    const { data } = await sb.from('system_settings').select('value').eq('key', 'lunch_machine_id').maybeSingle();
     if (data?.value) machineId = data.value;
   } catch(e) {}
-
   const statusEl = document.getElementById('lunch-machine-status');
   if (statusEl) statusEl.textContent = 'Machine : ' + machineId;
-
-  // Stocker pour openLunchKiosk
   window._lunchMachineId = machineId;
 }
 
@@ -6686,8 +6682,8 @@ async function _doAutoLogout() {
 // Auto-logout quand l'onglet est masqué (fermé, changé d'onglet, app minimisée)
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && currentUser && !isDemo) {
-    // Délai court : si l'utilisateur revient dans les 10s on annule
-    _autoLogoutTimer = setTimeout(_doAutoLogout, 10 * 1000);
+    // Délai de 30 minutes avant déconnexion automatique
+    _autoLogoutTimer = setTimeout(_doAutoLogout, 30 * 60 * 1000);
   } else if (document.visibilityState === 'visible') {
     _resetAutoLogout();
   }
