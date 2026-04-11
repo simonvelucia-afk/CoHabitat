@@ -3823,17 +3823,6 @@ async function onLunchPageShow() {
 }
 
 async function renderMachineCard(machine, el) {
-  // URL kiosque avec token auto-login
-  const kioskUrl = await (async function() {
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      const tok = session?.access_token;
-      return LM_KIOSK_BASE + '?machine=' + machine.id + (tok ? '&chtoken=' + encodeURIComponent(tok) : '');
-    } catch(e) {
-      return LM_KIOSK_BASE + '?machine=' + machine.id;
-    }
-  })();
-
   // Charger la queue de cette machine
   let queue = [];
   try {
@@ -3890,10 +3879,10 @@ async function renderMachineCard(machine, el) {
           ${waiting.length > 0 ? `<div style="margin-top:4px;font-size:12px;color:var(--text2,#9a9890);font-weight:400;">${waiting.length} personne${waiting.length>1?'s':''} attend${waiting.length>1?'ent':''} après vous.</div>` : ''}
         </div>
         <div style="display:flex;gap:8px;">
-          <a href="${kioskUrl}" target="_blank"
-            style="flex:1;background:var(--accent,#c8a96e);color:#0f0f0f;border:none;border-radius:6px;padding:10px;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:var(--font-sans,system-ui);text-align:center;text-decoration:none;display:block;">
+          <button onclick="openKiosk('${machine.id}')"
+            style="flex:1;background:var(--accent,#c8a96e);color:#0f0f0f;border:none;border-radius:6px;padding:10px;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:var(--font-sans,system-ui);text-align:center;">
             Accéder au kiosque →
-          </a>
+          </button>
           <button onclick="lunchQueueLeave('${machine.id}')"
             style="background:rgba(224,112,96,.12);color:#e07060;border:1px solid rgba(224,112,96,.3);border-radius:6px;padding:10px 14px;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:var(--font-sans,system-ui);">
             J'ai terminé
@@ -3917,11 +3906,10 @@ async function renderMachineCard(machine, el) {
         ` : `
         <!-- Pas dans la file -->
         ${isFree ? `
-          <a href="${kioskUrl}" target="_blank"
-            onclick="lunchQueueJoin('${machine.id}', event)"
-            style="width:100%;background:var(--accent,#c8a96e);color:#0f0f0f;border:none;border-radius:6px;padding:11px;font-size:0.95rem;font-weight:600;cursor:pointer;font-family:var(--font-sans,system-ui);text-align:center;text-decoration:none;display:block;">
+          <button onclick="lunchQueueJoinAndOpen('${machine.id}')"
+            style="width:100%;background:var(--accent,#c8a96e);color:#0f0f0f;border:none;border-radius:6px;padding:11px;font-size:0.95rem;font-weight:600;cursor:pointer;font-family:var(--font-sans,system-ui);">
             Accéder au kiosque →
-          </a>
+          </button>
         ` : `
           <button onclick="lunchQueueJoin('${machine.id}', null)"
             style="width:100%;background:var(--surface2,#242424);color:var(--text,#e8e6df);border:1px solid var(--border,#333);border-radius:6px;padding:11px;font-size:0.95rem;font-weight:500;cursor:pointer;font-family:var(--font-sans,system-ui);">
@@ -4016,9 +4004,28 @@ async function lunchQueueLeave(machineId) {
   } catch(err) { console.error('lunchQueueLeave:', err); }
 }
 
+// Ouvre le kiosque avec le token frais au moment du clic
+async function openKiosk(machineId) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const tok = session?.access_token;
+    console.log('[openKiosk] token length:', tok?.length, 'machine:', machineId);
+    const url = LM_KIOSK_BASE + '?machine=' + machineId + (tok ? '&chtoken=' + encodeURIComponent(tok) : '');
+    window.open(url, '_blank');
+  } catch(e) {
+    console.error('[openKiosk]', e);
+    window.open(LM_KIOSK_BASE + '?machine=' + machineId, '_blank');
+  }
+}
+
+// Rejoindre la file ET ouvrir le kiosque (machine libre)
+async function lunchQueueJoinAndOpen(machineId) {
+  await lunchQueueJoin(machineId, null);
+  await openKiosk(machineId);
+}
+
 function openLunchKiosk(machineId) {
-  const id = machineId || 'pointe-est-1';
-  window.open(LM_KIOSK_BASE + '?machine=' + id, '_blank');
+  openKiosk(machineId || 'pointe-est-1');
 }
 
 // ==========================================
