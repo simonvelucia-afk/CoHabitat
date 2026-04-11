@@ -3823,6 +3823,17 @@ async function onLunchPageShow() {
 }
 
 async function renderMachineCard(machine, el) {
+  // URL kiosque avec token auto-login
+  const kioskUrl = await (async function() {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const tok = session?.access_token;
+      return LM_KIOSK_BASE + '?machine=' + machine.id + (tok ? '&chtoken=' + encodeURIComponent(tok) : '');
+    } catch(e) {
+      return LM_KIOSK_BASE + '?machine=' + machine.id;
+    }
+  })();
+
   // Charger la queue de cette machine
   let queue = [];
   try {
@@ -3879,7 +3890,7 @@ async function renderMachineCard(machine, el) {
           ${waiting.length > 0 ? `<div style="margin-top:4px;font-size:12px;color:var(--text2,#9a9890);font-weight:400;">${waiting.length} personne${waiting.length>1?'s':''} attend${waiting.length>1?'ent':''} après vous.</div>` : ''}
         </div>
         <div style="display:flex;gap:8px;">
-          <a href="${LM_KIOSK_BASE}?machine=${machine.id}" target="_blank"
+          <a href="${kioskUrl}" target="_blank"
             style="flex:1;background:var(--accent,#c8a96e);color:#0f0f0f;border:none;border-radius:6px;padding:10px;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:var(--font-sans,system-ui);text-align:center;text-decoration:none;display:block;">
             Accéder au kiosque →
           </a>
@@ -3906,7 +3917,7 @@ async function renderMachineCard(machine, el) {
         ` : `
         <!-- Pas dans la file -->
         ${isFree ? `
-          <a href="${LM_KIOSK_BASE}?machine=${machine.id}" target="_blank"
+          <a href="${kioskUrl}" target="_blank"
             onclick="lunchQueueJoin('${machine.id}', event)"
             style="width:100%;background:var(--accent,#c8a96e);color:#0f0f0f;border:none;border-radius:6px;padding:11px;font-size:0.95rem;font-weight:600;cursor:pointer;font-family:var(--font-sans,system-ui);text-align:center;text-decoration:none;display:block;">
             Accéder au kiosque →
