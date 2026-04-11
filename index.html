@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CoHabitat — Gestion des ressources communes</title>
-<!-- v26 — Machine Lunch online : achat web, pickup PIN, admin confirme en place -->
+<!-- v11 — Machine Lunch online : Plusieurs machine onglet lunch -->
 <script>
 // Intercepter le hash Supabase AVANT l'init du SDK
 (function() {
@@ -1579,15 +1579,13 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 
     <!-- ==================== LUNCH MACHINE ==================== -->
     <div id="page-lunch" class="page" style="padding:0;max-width:none;height:calc(100vh - 60px);background:var(--bg);">
-      <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:20px;">
+      <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:20px;padding:40px 20px;width:100%;max-width:600px;margin:0 auto;">
         <div style="font-size:4rem;">🍱</div>
         <div style="font-family:var(--font-serif);font-size:1.8rem;color:var(--text);">Machine Lunch</div>
-        <div style="font-size:0.95rem;color:var(--text2);max-width:380px;line-height:1.6;">Accédez au kiosque interactif pour consulter les cases disponibles et passer votre commande.</div>
-        <div id="lunch-machine-status" style="font-family:monospace;font-size:12px;color:var(--text3);"></div>
-        <button onclick="openLunchKiosk()" style="background:var(--accent);color:#0f0f0f;border:none;padding:14px 32px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;font-family:var(--font-sans);display:flex;align-items:center;gap:10px;">
-          🖥 Ouvrir le kiosque
-        </button>
-        <div style="font-size:0.8rem;color:var(--text3);">S'ouvre dans un nouvel onglet</div>
+        <div style="font-size:0.95rem;color:var(--text2);max-width:380px;line-height:1.6;">Sélectionnez une machine pour accéder au kiosque interactif.</div>
+        <div id="lunch-machines-btns" style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:360px;">
+          <div style="color:var(--text3);font-size:13px;">Chargement…</div>
+        </div>
       </div>
     </div>
   </main>
@@ -3729,22 +3727,62 @@ function pageName(page) {
 //  LUNCH MACHINE — iframe responsive
 // ═══════════════════════════════════════════════
 const LM_KIOSK_BASE = 'https://simonvelucia-afk.github.io/LunchMachine/';
+const LM_CENTRAL_URL  = 'https://bpxscgrbxjscicpnheep.supabase.co';
+const LM_CENTRAL_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJweHNjZ3JieGpzY2ljcG5oZWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzOTYxNzIsImV4cCI6MjA5MDk3MjE3Mn0._M6HHhCwKuuqAzicDZzJp7ul0M3KpDBBDb6ImDWWcLo';
 
 async function onLunchPageShow() {
-  let machineId = 'pointe-est-1';
+  const container = document.getElementById('lunch-machines-btns');
+  if (!container) return;
+  container.innerHTML = '<div style="color:var(--text3);font-size:13px;">Chargement…</div>';
+
   try {
-    const { data } = await sb.from('system_settings').select('value').eq('key', 'lunch_machine_id').maybeSingle();
-    if (data?.value) machineId = data.value;
-  } catch(e) {}
-  const statusEl = document.getElementById('lunch-machine-status');
-  if (statusEl) statusEl.textContent = 'Machine : ' + machineId;
-  window._lunchMachineId = machineId;
+    // Lire le building_id depuis system_settings (fallback: montrer toutes les machines actives)
+    let buildingFilter = null;
+    try {
+      const { data } = await sb.from('system_settings').select('value').eq('key', 'building_id').maybeSingle();
+      if (data?.value) buildingFilter = data.value;
+    } catch(e) {}
+
+    // Charger les machines depuis modulimo-central
+    const query = buildingFilter
+      ? `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&building_id=eq.${buildingFilter}&select=id,name,building_id&order=name`
+      : `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&select=id,name,building_id&order=name`;
+
+    const res = await fetch(query, {
+      headers: { 'apikey': LM_CENTRAL_ANON, 'Authorization': 'Bearer ' + LM_CENTRAL_ANON }
+    });
+    const machines = await res.json();
+
+    if (!machines || !machines.length) {
+      container.innerHTML = '<div style="color:var(--text3);font-size:13px;">Aucune machine disponible.</div>';
+      return;
+    }
+
+    // Afficher un bouton par machine
+    container.innerHTML = machines.map(m => `
+      <button onclick="openLunchKiosk('${m.id}')"
+        style="background:var(--surface);border:1px solid var(--border);color:var(--text);
+               padding:16px 24px;border-radius:10px;font-size:1rem;font-weight:500;
+               cursor:pointer;font-family:var(--font-sans);display:flex;align-items:center;
+               justify-content:space-between;gap:12px;transition:border-color .2s,background .2s;width:100%;"
+        onmouseover="this.style.borderColor='var(--accent)';this.style.background='rgba(200,169,110,0.07)'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'">
+        <span style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.3rem;">🖥</span>
+          <span>${m.name}</span>
+        </span>
+        <span style="color:var(--accent);font-size:1.1rem;">›</span>
+      </button>
+    `).join('');
+
+  } catch(err) {
+    container.innerHTML = `<div style="color:var(--accent3);font-size:13px;">Erreur: ${err.message}</div>`;
+  }
 }
 
-function openLunchKiosk() {
-  const machineId = window._lunchMachineId || 'pointe-est-1';
-  const url = LM_KIOSK_BASE + '?machine=' + machineId;
-  window.open(url, '_blank');
+function openLunchKiosk(machineId) {
+  const id = machineId || 'pointe-est-1';
+  window.open(LM_KIOSK_BASE + '?machine=' + id, '_blank');
 }
 
 // ==========================================
