@@ -1117,7 +1117,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   <div style="text-align:center;margin-bottom:24px;">
     <button onclick="document.getElementById('landing').style.display='none';document.getElementById('login-page').style.display='flex';" style="background:none;border:1px solid var(--border);color:var(--text2);font-size:.85rem;padding:8px 18px;border-radius:6px;cursor:pointer;font-family:var(--font-sans);">← Retour à la connexion</button>
   </div>
-  <div class="landing-contact">
+  <div class="landing-contact" id="landing-contact-section">
     <h3>Prêt à moderniser votre co-housing ?</h3>
     <p>Contactez-nous pour une démonstration gratuite ou pour discuter de vos besoins spécifiques.</p>
     <button id="landing-contact-btn" style="display:inline-block;background:var(--accent);color:#0f0f0f;padding:11px 28px;border-radius:6px;font-weight:600;font-size:.9rem;border:none;cursor:pointer;font-family:var(--font-sans);">contribution&#64;modulimo.com</button>
@@ -2332,7 +2332,7 @@ async function loadLandingPlans() {
         + '<div class="plan-price">' + price + '</div>'
         + '<div class="plan-units">' + units + '</div>'
         + '<ul class="plan-features">' + featHtml + '</ul>'
-        + '<button class="plan-cta ' + ctaClass + '" onclick="document.getElementById(\'landing\').style.display=\'none\';document.getElementById(\'login-page\').style.display=\'flex\';">Nous contacter</button>'
+        + '<button class="plan-cta ' + ctaClass + '" onclick="document.getElementById(\'landing-contact-section\').scrollIntoView({behavior:\'smooth\'})">Nous contacter</button>'
         + '</div>';
     }).join('');
   } catch(e) {
