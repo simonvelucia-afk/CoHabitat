@@ -1545,14 +1545,17 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       <!-- Machine Lunch -->
 
     <!-- ==================== LUNCH MACHINE ==================== -->
-    <div id="page-lunch" class="page" style="padding:0;max-width:none;height:calc(100vh - 60px);overflow:hidden;">
-      <iframe
-        id="lm-iframe"
-        src=""
-        style="width:100%;height:100%;border:none;display:block;"
-        allow="camera; microphone"
-        title="Machine Lunch"
-      ></iframe>
+    <div id="page-lunch" class="page" style="padding:0;max-width:none;display:flex;align-items:center;justify-content:center;height:calc(100vh - 60px);background:var(--bg);">
+      <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:20px;">
+        <div style="font-size:4rem;">🍱</div>
+        <div style="font-family:var(--font-serif);font-size:1.8rem;color:var(--text);">Machine Lunch</div>
+        <div style="font-size:0.95rem;color:var(--text2);max-width:380px;line-height:1.6;">Accédez au kiosque interactif pour consulter les cases disponibles et passer votre commande.</div>
+        <div id="lunch-machine-status" style="font-family:monospace;font-size:12px;color:var(--text3);"></div>
+        <button onclick="openLunchKiosk()" style="background:var(--accent);color:#0f0f0f;border:none;padding:14px 32px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;font-family:var(--font-sans);display:flex;align-items:center;gap:10px;">
+          🖥 Ouvrir le kiosque
+        </button>
+        <div style="font-size:0.8rem;color:var(--text3);">S'ouvre dans un nouvel onglet</div>
+      </div>
     </div>
   </main>
 </div>
@@ -3027,6 +3030,237 @@ function showLogin() {
   }
 }
 
+// ═══════════════════════════════════════════════
+//  PORTAL TRANSLATIONS
+// ═══════════════════════════════════════════════
+//  PORTAL TRANSLATIONS
+// ═══════════════════════════════════════════════
+const PT = {
+  fr: {
+    // Dashboard
+    'Solde disponible': 'Solde disponible',
+    'Unité résidentielle': 'Unité résidentielle',
+    'Mes réservations récentes': 'Mes réservations récentes',
+    'Réservations d\'espaces': 'Réservations d\'espaces',
+    'Covoiturages': 'Covoiturages',
+    'Solde': 'Solde',
+    'Trajets publiés': 'Trajets publiés',
+    'Aucune réservation pour le moment': 'Aucune réservation pour le moment',
+    'En mode démo, les réservations ne sont pas enregistrées à votre compte.': 'En mode démo, les réservations ne sont pas enregistrées à votre compte.',
+    'Type': 'Type', 'Ressource': 'Ressource', 'Date': 'Date', 'Coût': 'Coût', 'Statut': 'Statut',
+    'Espace': 'Espace', 'Trajet': 'Trajet',
+    // Status
+    'Confirmée': 'Confirmée', 'En attente': 'En attente', 'Annulée': 'Annulée',
+    'Terminée': 'Terminée', 'Acceptée': 'Acceptée', 'Refusée': 'Refusée',
+    // Spaces
+    'Espaces communs': 'Espaces communs',
+    'Réservez par tranches de 15 minutes': 'Réservez par tranches de 15 minutes',
+    'Rechercher un espace…': 'Rechercher un espace…',
+    'Disponible': 'Disponible',
+    'personnes': 'personnes',
+    '/ 15 min': '/ 15 min',
+    'Réserver': 'Réserver',
+    'Aucun espace disponible': 'Aucun espace disponible',
+    'Chargement…': 'Chargement…',
+    // Trips
+    'Auto-partage & Véhicules': 'Auto-partage & Véhicules',
+    'Véhicules disponibles et réservation de trajets': 'Véhicules disponibles et réservation de trajets',
+    '+ Publier un trajet': '+ Publier un trajet',
+    'Trajets disponibles': 'Trajets disponibles',
+    'Demandes passagers': 'Demandes passagers',
+    'Mes trajets': 'Mes trajets',
+    'En tant que chauffeur': 'En tant que chauffeur',
+    // Transactions
+    'Historique des transactions': 'Historique des transactions',
+    'Description': 'Description', 'Montant': 'Montant', 'Solde après': 'Solde après',
+    // Admin
+    'Administration': 'Administration',
+    'Locataires': 'Locataires', 'Espaces': 'Espaces', 'Véhicules': 'Véhicules',
+    'Paiements': 'Paiements', 'Paramètres': 'Paramètres', 'Logs': 'Logs',
+    '+ Ajouter un locataire': '+ Ajouter un locataire',
+    '+ Ajouter un espace': '+ Ajouter un espace',
+    '+ Ajouter un véhicule': '+ Ajouter un véhicule',
+    'Nom': 'Nom', 'Unité': 'Unité', 'Rôle': 'Rôle', 'Chauffeur': 'Chauffeur',
+    'Actions': 'Actions', 'Capacité': 'Capacité', 'Lieu': 'Lieu',
+    'Prix/15min': 'Prix/15min', 'Modèle': 'Modèle', 'Plaque': 'Plaque',
+    'Places': 'Places', 'Prix/min': 'Prix/min', 'Prix/km': 'Prix/km', 'Dispo': 'Dispo',
+    // Babillard
+    'bbTitle': '📌 Babillard',
+    'bbSubtitle': 'Messages et annonces de la communauté',
+    'bbNewLabel': 'Nouveau message',
+    'bbPlaceholder': 'Partagez une annonce, une question ou un avis avec vos voisins…',
+    'bbPublish': 'Publier',
+    'bbPostedOn': 'Publié le',
+    'bbDeleteTitle': 'Supprimer',
+    'bbLoading': 'Chargement…',
+    'bbEmpty': 'Aucun message pour le moment. Soyez le premier à publier !',
+    'bbError': 'Erreur de chargement. Vérifiez que la table <code>bulletin_board</code> existe dans Supabase.',
+    'bbDemoUnavail': 'Indisponible en mode démo',
+    'bbErrEmpty': 'Le message ne peut pas être vide.',
+    'bbErrTooLong': 'Message trop long (max 2000 caractères).',
+    'bbErrPost': 'Erreur lors de la publication : ',
+    'bbPosted': 'Message publié !',
+    'bbConfirmDelete': 'Supprimer ce message ?',
+    'bbErrDelete': 'Erreur : ',
+    'bbAuthor': 'Locataire',
+  },
+  en: {
+    'Solde disponible': 'Available balance',
+    'Unité résidentielle': 'Residential unit',
+    'Mes réservations récentes': 'My recent bookings',
+    'Réservations d\'espaces': 'Space bookings',
+    'Covoiturages': 'Carpools',
+    'Solde': 'Balance',
+    'Trajets publiés': 'Published trips',
+    'Aucune réservation pour le moment': 'No bookings yet',
+    'En mode démo, les réservations ne sont pas enregistrées à votre compte.': 'In demo mode, bookings are not saved to your account.',
+    'Type': 'Type', 'Ressource': 'Resource', 'Date': 'Date', 'Coût': 'Cost', 'Statut': 'Status',
+    'Espace': 'Space', 'Trajet': 'Trip',
+    'Confirmée': 'Confirmed', 'En attente': 'Pending', 'Annulée': 'Cancelled',
+    'Terminée': 'Completed', 'Acceptée': 'Accepted', 'Refusée': 'Rejected',
+    'Espaces communs': 'Common spaces',
+    'Réservez par tranches de 15 minutes': 'Book in 15-minute increments',
+    'Rechercher un espace…': 'Search a space…',
+    'Disponible': 'Available',
+    'personnes': 'people',
+    '/ 15 min': '/ 15 min',
+    'Réserver': 'Book',
+    'Aucun espace disponible': 'No spaces available',
+    'Chargement…': 'Loading…',
+    'Auto-partage & Véhicules': 'Carpooling & Vehicles',
+    'Véhicules disponibles et réservation de trajets': 'Available vehicles and trip booking',
+    '+ Publier un trajet': '+ Post a trip',
+    'Trajets disponibles': 'Available trips',
+    'Demandes passagers': 'Passenger requests',
+    'Mes trajets': 'My trips',
+    'En tant que chauffeur': 'As driver',
+    'Historique des transactions': 'Transaction history',
+    'Description': 'Description', 'Montant': 'Amount', 'Solde après': 'Balance after',
+    'Administration': 'Administration',
+    'Locataires': 'Tenants', 'Espaces': 'Spaces', 'Véhicules': 'Vehicles',
+    'Paiements': 'Payments', 'Paramètres': 'Settings', 'Logs': 'Logs',
+    '+ Ajouter un locataire': '+ Add tenant',
+    '+ Ajouter un espace': '+ Add space',
+    '+ Ajouter un véhicule': '+ Add vehicle',
+    'Nom': 'Name', 'Unité': 'Unit', 'Rôle': 'Role', 'Chauffeur': 'Driver',
+    'Actions': 'Actions', 'Capacité': 'Capacity', 'Lieu': 'Location',
+    'Prix/15min': 'Price/15min', 'Modèle': 'Model', 'Plaque': 'Plate',
+    'Places': 'Seats', 'Prix/min': 'Price/min', 'Prix/km': 'Price/km', 'Dispo': 'Avail.',
+    // Bulletin board
+    'bbTitle': '📌 Bulletin board',
+    'bbSubtitle': 'Community messages and announcements',
+    'bbNewLabel': 'New message',
+    'bbPlaceholder': 'Share an announcement, question or opinion with your neighbours…',
+    'bbPublish': 'Post',
+    'bbPostedOn': 'Posted on',
+    'bbDeleteTitle': 'Delete',
+    'bbLoading': 'Loading…',
+    'bbEmpty': 'No messages yet. Be the first to post!',
+    'bbError': 'Load error. Make sure the <code>bulletin_board</code> table exists in Supabase.',
+    'bbDemoUnavail': 'Unavailable in demo mode',
+    'bbErrEmpty': 'Message cannot be empty.',
+    'bbErrTooLong': 'Message too long (max 2000 characters).',
+    'bbErrPost': 'Error posting: ',
+    'bbPosted': 'Message posted!',
+    'bbConfirmDelete': 'Delete this message?',
+    'bbErrDelete': 'Error: ',
+    'bbAuthor': 'Tenant',
+  },
+  es: {
+    'Solde disponible': 'Saldo disponible',
+    'Unité résidentielle': 'Unidad residencial',
+    'Mes réservations récentes': 'Mis reservas recientes',
+    'Réservations d\'espaces': 'Reservas de espacios',
+    'Covoiturages': 'Viajes compartidos',
+    'Solde': 'Saldo',
+    'Trajets publiés': 'Viajes publicados',
+    'Aucune réservation pour le moment': 'Sin reservas por el momento',
+    'En mode démo, les réservations ne sont pas enregistrées à votre compte.': 'En modo demo, las reservas no se guardan en su cuenta.',
+    'Type': 'Tipo', 'Ressource': 'Recurso', 'Date': 'Fecha', 'Coût': 'Costo', 'Statut': 'Estado',
+    'Espace': 'Espacio', 'Trajet': 'Viaje',
+    'Confirmée': 'Confirmada', 'En attente': 'Pendiente', 'Annulée': 'Cancelada',
+    'Terminée': 'Completada', 'Acceptée': 'Aceptada', 'Refusée': 'Rechazada',
+    'Espaces communs': 'Espacios comunes',
+    'Réservez par tranches de 15 minutes': 'Reserve en intervalos de 15 minutos',
+    'Rechercher un espace…': 'Buscar un espacio…',
+    'Disponible': 'Disponible',
+    'personnes': 'personas',
+    '/ 15 min': '/ 15 min',
+    'Réserver': 'Reservar',
+    'Aucun espace disponible': 'No hay espacios disponibles',
+    'Chargement…': 'Cargando…',
+    'Auto-partage & Véhicules': 'Coche compartido & Vehículos',
+    'Véhicules disponibles et réservation de trajets': 'Vehículos disponibles y reserva de viajes',
+    '+ Publier un trajet': '+ Publicar un viaje',
+    'Trajets disponibles': 'Viajes disponibles',
+    'Demandes passagers': 'Solicitudes de pasajeros',
+    'Mes trajets': 'Mis viajes',
+    'En tant que chauffeur': 'Como conductor',
+    'Historique des transactions': 'Historial de transacciones',
+    'Description': 'Descripción', 'Montant': 'Monto', 'Solde après': 'Saldo después',
+    'Administration': 'Administración',
+    'Locataires': 'Inquilinos', 'Espaces': 'Espacios', 'Véhicules': 'Vehículos',
+    'Paiements': 'Pagos', 'Paramètres': 'Configuración', 'Logs': 'Registros',
+    '+ Ajouter un locataire': '+ Agregar inquilino',
+    '+ Ajouter un espace': '+ Agregar espacio',
+    '+ Ajouter un véhicule': '+ Agregar vehículo',
+    'Nom': 'Nombre', 'Unité': 'Unidad', 'Rôle': 'Rol', 'Chauffeur': 'Conductor',
+    'Actions': 'Acciones', 'Capacité': 'Capacidad', 'Lieu': 'Lugar',
+    'Prix/15min': 'Precio/15min', 'Modèle': 'Modelo', 'Plaque': 'Placa',
+    'Places': 'Asientos', 'Prix/min': 'Precio/min', 'Prix/km': 'Precio/km', 'Dispo': 'Dispon.',
+    // Tablón de anuncios
+    'bbTitle': '📌 Tablón',
+    'bbSubtitle': 'Mensajes y anuncios de la comunidad',
+    'bbNewLabel': 'Nuevo mensaje',
+    'bbPlaceholder': 'Comparte un anuncio, pregunta u opinión con tus vecinos…',
+    'bbPublish': 'Publicar',
+    'bbPostedOn': 'Publicado el',
+    'bbDeleteTitle': 'Eliminar',
+    'bbLoading': 'Cargando…',
+    'bbEmpty': 'Sin mensajes por el momento. ¡Sé el primero en publicar!',
+    'bbError': 'Error de carga. Verifica que la tabla <code>bulletin_board</code> exista en Supabase.',
+    'bbDemoUnavail': 'No disponible en modo demo',
+    'bbErrEmpty': 'El mensaje no puede estar vacío.',
+    'bbErrTooLong': 'Mensaje demasiado largo (máx 2000 caracteres).',
+    'bbErrPost': 'Error al publicar: ',
+    'bbPosted': '¡Mensaje publicado!',
+    'bbConfirmDelete': '¿Eliminar este mensaje?',
+    'bbErrDelete': 'Error: ',
+    'bbAuthor': 'Inquilino',
+  }
+};
+
+function pt(key) {
+  return (PT[appLang] || PT['fr'])[key] || (PT['fr'][key] || key);
+}
+
+function ptApply() {
+  // Translate all static elements with data-pt attribute
+  document.querySelectorAll('[data-pt]').forEach(el => {
+    el.textContent = pt(el.dataset.pt);
+  });
+  // Update search placeholder
+  const spacesSearch = document.getElementById('spaces-search');
+  if (spacesSearch) spacesSearch.placeholder = pt('Rechercher un espace…');
+  const bbTa = document.getElementById('bb-new-message');
+  if (bbTa) bbTa.placeholder = pt('bbPlaceholder');
+  // Re-render current active page
+  const activePage = document.querySelector('.page.active');
+  if (activePage && typeof navigateTo === 'function') {
+    const map = {
+      'page-dashboard': 'dashboard',
+      'page-spaces': 'spaces',
+      'page-trips': 'trips',
+      'page-transactions': 'transactions',
+      'page-profile': 'profile',
+      'page-admin': 'admin',
+    };
+    const page = map[activePage.id];
+    if (page) navigateTo(page);
+  }
+}
+
+
 function showApp() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -3458,35 +3692,24 @@ function pageName(page) {
 const LM_KIOSK_BASE = 'https://simonvelucia-afk.github.io/LunchMachine/';
 
 async function onLunchPageShow() {
-  const iframe = document.getElementById('lm-iframe');
-  if (!iframe) return;
-
-  // Déterminer le machine_id depuis system_settings ou fallback
+  // Afficher le statut de la machine
   let machineId = 'pointe-est-1';
   try {
-    const { data } = await sb
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'lunch_machine_id')
-      .single();
+    const { data } = await sb.from('system_settings').select('value').eq('key', 'lunch_machine_id').single();
     if (data?.value) machineId = data.value;
   } catch(e) {}
 
+  const statusEl = document.getElementById('lunch-machine-status');
+  if (statusEl) statusEl.textContent = 'Machine : ' + machineId;
+
+  // Stocker pour openLunchKiosk
+  window._lunchMachineId = machineId;
+}
+
+function openLunchKiosk() {
+  const machineId = window._lunchMachineId || 'pointe-est-1';
   const url = LM_KIOSK_BASE + '?machine=' + machineId;
-
-  // Ne recharger l'iframe que si l'URL a changé
-  if (iframe.src !== url) {
-    iframe.src = url;
-  }
-
-  // Ajuster la hauteur dynamiquement
-  function fitIframe() {
-    const nav = document.querySelector('.nav-bar, nav, .topbar');
-    const navH = nav ? nav.offsetHeight : 60;
-    iframe.style.height = (window.innerHeight - navH) + 'px';
-  }
-  fitIframe();
-  window.addEventListener('resize', fitIframe);
+  window.open(url, '_blank');
 }
 
 // ==========================================
