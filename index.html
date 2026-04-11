@@ -3745,7 +3745,8 @@ const LM_CENTRAL_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 // ── LUNCH QUEUE ─────────────────────────────────────────────────────────────
 const LUNCH_QUEUE_POLL = 6000; // ms
 let _lunchQueuePoll = null;
-let _lunchMyEntry   = null;  // mon entrée dans la queue
+let _lunchMyEntry   = null;
+let _lunchMachines  = [];  // cache des machines pour le rafraîchissement
 
 async function lmFetch(path, opts, userToken) {
   const authToken = userToken || LM_CENTRAL_ANON;
@@ -3798,6 +3799,7 @@ async function onLunchPageShow() {
     }
 
     container.innerHTML = '';
+    _lunchMachines = machines;
     for (const m of machines) {
       const card = document.createElement('div');
       card.id = 'lunch-card-' + m.id;
@@ -3809,11 +3811,9 @@ async function onLunchPageShow() {
     // Démarrer le polling pour les mises à jour
     if(_lunchQueuePoll) clearInterval(_lunchQueuePoll);
     _lunchQueuePoll = setInterval(async function() {
-      const cards = container.querySelectorAll('[data-machine-id]');
-      for(const c of cards) {
-        const mid = c.dataset.machineId;
-        const m = machines.find(x => x.id === mid);
-        if(m) await renderMachineCard(m, c);
+      for(const m of _lunchMachines) {
+        const card = document.getElementById('lunch-card-' + m.id);
+        if(card) await renderMachineCard(m, card);
       }
     }, LUNCH_QUEUE_POLL);
 
@@ -3979,12 +3979,10 @@ async function lunchQueueJoin(machineId, event) {
       event.preventDefault();
       event.stopPropagation();
     }
-    // Rafraîchir la carte
-    const container = document.getElementById('lunch-machines-btns');
-    if(container) {
-      const card = container.querySelector('[data-machine-id="' + machineId + '"]');
-      if(card) await renderMachineCard({ id: machineId, name: card.querySelector('div[style*="font-weight:600"]')?.textContent || machineId }, card);
-    }
+    // Rafraîchir la carte immédiatement
+    const card = document.getElementById('lunch-card-' + machineId);
+    const mObj = _lunchMachines.find(function(x){ return x.id === machineId; }) || { id: machineId, name: machineId };
+    if(card) await renderMachineCard(mObj, card);
   } catch(err) { console.error('lunchQueueJoin:', err); }
 }
 
@@ -4012,11 +4010,9 @@ async function lunchQueueLeave(machineId) {
       }
     }
     // Rafraîchir
-    const container = document.getElementById('lunch-machines-btns');
-    if(container) {
-      const card = container.querySelector('[data-machine-id="' + machineId + '"]');
-      if(card) await renderMachineCard({ id: machineId, name: card.querySelector('div[style*="font-weight:600"]')?.textContent || machineId }, card);
-    }
+    const card = document.getElementById('lunch-card-' + machineId);
+    const mObj = _lunchMachines.find(function(x){ return x.id === machineId; }) || { id: machineId, name: machineId };
+    if(card) await renderMachineCard(mObj, card);
   } catch(err) { console.error('lunchQueueLeave:', err); }
 }
 
