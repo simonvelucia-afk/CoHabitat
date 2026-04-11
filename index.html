@@ -3676,7 +3676,10 @@ function navigateTo(page) {
   if (page === 'trips' && !window.appModules.trips) { toast('Module Auto-partage non activé', 'info'); return; }
   if (page === 'lunch' && !window.appModules.lunch) { toast('Module Machine Lunch non activé', 'info'); return; }
   closeMobileMenu();
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => {
+    p.classList.remove('active');
+    p.style.display = ''; // reset inline display
+  });
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   // Ajuster layout pour page lunch
   const mainEl = document.getElementById('main');
@@ -3685,9 +3688,12 @@ function navigateTo(page) {
     else { mainEl.style.cssText = ''; }
   }
 
-
   const pageEl = document.getElementById(`page-${page}`);
-  if (pageEl) pageEl.classList.add('active');
+  if (pageEl) {
+    pageEl.classList.add('active');
+    // Pour page-lunch, forcer display:flex explicitement
+    if (page === 'lunch') { pageEl.style.display = 'flex'; }
+  }
 
   // Highlight nav tab
   document.querySelectorAll('.nav-tab').forEach(t => {
