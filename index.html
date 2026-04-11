@@ -2307,6 +2307,8 @@ async function loadLandingPlans() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Restaurer la langue sauvegardée
+  try { const sl = localStorage.getItem('applang'); if(sl && LANGS[sl]) appLang = sl; } catch(e) {}
   // Créer les champs de login dynamiquement dès le départ
   showLogin();
   // Set today's date as default
@@ -3063,6 +3065,281 @@ function showApp() {
   }
 
   navigateTo('dashboard');
+}
+
+// ═══════════════════════════════
+//  I18N — Traductions
+// ═══════════════════════════════
+const LANGS = {
+  fr: {
+    code:'fr', flag:'🇫🇷', label:'FR',
+    // Nav tabs
+    navDashboard: 'Tableau de bord',
+    navConditions: 'Conditions',
+    navBabillard: '📌 Babillard',
+    navSpaces: 'Espaces',
+    navTrips: 'Auto-partage',
+    navLunch: '🍱 Lunch',
+    navTransactions: 'Transactions',
+    navAdmin: 'Admin',
+    navProfile: 'Profil',
+    // Topbar
+    admin: 'ADMIN',
+    appTitle: 'Machine',
+    appTitleSub: 'LUNCH',
+    back: '← Retour',
+    cancel: '← Annuler',
+    quit: '✕ Quitter',
+    // Home
+    homeTitle: 'Votre <span>repas</span><br>vous attend.',
+    homeSubtitle: 'Sélectionnez une action pour accéder<br>aux cases réfrigérées et tempérées.',
+    statAvailable: 'Disponibles',
+    statForSale: 'En vente',
+    statBoxes: 'Boîtes',
+    btnReturn: 'Retourner une boîte',
+    returnBoxSuccess: 'Boîte retournée — merci !',
+    statForSale: 'En vente',
+    statEmpty: 'Vides',
+    btnBuy: 'Acheter une case',
+    btnBuySub: 'Sélectionner et confirmer',
+    // Grid
+    buyHint: '🍱  Mode Achat — sélectionnez une case disponible',
+    free: 'libre(s)',
+    slotFree: 'Libre',
+    slotReserved: 'Réservée',
+    slotEmpty: 'Vide',
+    // Modal
+    modalAvail: 'Disponible',
+    modalSection: 'Section',
+    modalPrice: 'Prix',
+    modalFree: 'Gratuit',
+    modalClose: 'Annuler',
+    modalBuy: 'Acheter',
+    modalViewed: 'Consulté ✓',
+    // Name modal
+    nameTitle: "Confirmer l'achat",
+    namePrompt: "Entrez votre nom pour confirmer l'achat :",
+    nameCancelBtn: 'Annuler',
+    nameConfirmBtn: 'Confirmer ✓',
+    // Success
+    successMsg: (name) => `Bon appétit, ${name} !`,
+    savedMsg: 'Sauvegardé ✓',
+    // Pin
+    pinTitle: 'Code administrateur',
+    pinError: 'Code incorrect',
+    // Admin nav
+    navCases: 'Cases',
+    navTemps: 'Températures',
+    navConfig: 'Configuration',
+    navStatus: 'Statuts',
+    // Admin cases
+    adminCasesTitle: 'Gestion des cases',
+    adminCaseSelected: 'Case sélectionnée',
+    adminDescLabel: 'Description du contenu :',
+    adminPriceLabel: 'Prix :',
+    adminPriceSub: "Prix affiché\nà l'achat",
+    adminSave: 'Sauvegarder',
+    adminClear: 'Vider la case',
+    adminCancel: 'Annuler réservation',
+    // Admin temps
+    adminTempsTitle: 'Températures des sections',
+    adminRangesTitle: 'Plages de couleur — communes aux 2 zones',
+    adminActual: 'actuel:',
+    adminSetpoint: 'Consigne',
+    adminTempActual: 'Temp. actuelle',
+    adminApply: 'Appliquer',
+    // Admin config
+    adminConfigTitle: 'Configuration des sections',
+    adminConfigApply: 'Appliquer & Reconfigurer',
+    adminSecurity: 'Sécurité',
+    adminPinLabel: 'Code PIN admin',
+    adminPinChange: 'Changer',
+    // Admin status
+    adminStatusTitle: "Vue d'ensemble",
+    adminFilled: 'Cases remplies',
+    adminWithPrice: 'Avec prix',
+    adminEmpty: 'Vides',
+    adminForSaleTitle: 'Cases disponibles à la vente',
+    adminNone: 'Aucune case remplie.',
+    // Temp strip
+    casesCount: (a,b) => `${a}/${b}`,
+  },
+  en: {
+    code: "en', flag: '🇬🇧', label: 'EN",
+    // Nav tabs
+    navDashboard: 'Dashboard',
+    navConditions: 'Terms',
+    navBabillard: '📌 Bulletin board',
+    navSpaces: 'Spaces',
+    navTrips: 'Carpooling',
+    navLunch: '🍱 Lunch',
+    navTransactions: 'Transactions',
+    navAdmin: 'Admin',
+    navProfile: 'Profile',
+    admin: 'ADMIN',
+    appTitle: 'Lunch',
+    appTitleSub: 'MACHINE',
+    back: '← Back',
+    cancel: '← Cancel',
+    quit: '✕ Exit',
+    homeTitle: 'Your <span>meal</span><br>is waiting.',
+    homeSubtitle: 'Select an action to access<br>the refrigerated and warm compartments.',
+    statAvailable: 'Available',
+    statForSale: 'For Sale',
+    statBoxes: 'Boxes',
+    btnReturn: 'Return a box',
+    returnBoxSuccess: 'Box returned — thank you!',
+    statForSale: 'For Sale',
+    statEmpty: 'Empty',
+    btnBuy: 'Buy a slot',
+    btnBuySub: 'Select and confirm',
+    buyHint: '🍱  Purchase Mode — select an available slot',
+    free: 'available',
+    slotFree: 'Available',
+    slotReserved: 'Reserved',
+    slotEmpty: 'Empty',
+    modalAvail: 'Available',
+    modalSection: 'Section',
+    modalPrice: 'Price',
+    modalFree: 'Free',
+    modalClose: 'Cancel',
+    modalBuy: 'Buy',
+    modalViewed: 'Viewed ✓',
+    nameTitle: 'Confirm purchase',
+    namePrompt: 'Enter your name to confirm the purchase:',
+    nameCancelBtn: 'Cancel',
+    nameConfirmBtn: 'Confirm ✓',
+    successMsg: (name) => `Enjoy your meal, ${name}!`,
+    savedMsg: 'Saved ✓',
+    pinTitle: 'Admin code',
+    pinError: 'Incorrect code',
+    navCases: 'Slots',
+    navTemps: 'Temperatures',
+    navConfig: 'Config',
+    navStatus: 'Status',
+    adminCasesTitle: 'Slot Management',
+    adminCaseSelected: 'Selected slot',
+    adminDescLabel: 'Content description:',
+    adminPriceLabel: 'Price:',
+    adminPriceSub: 'Displayed price\nat checkout',
+    adminSave: 'Save',
+    adminClear: 'Clear slot',
+    adminCancel: 'Cancel reservation',
+    adminTempsTitle: 'Section temperatures',
+    adminRangesTitle: 'Color ranges — shared by both zones',
+    adminActual: 'current:',
+    adminSetpoint: 'Setpoint',
+    adminTempActual: 'Actual temp.',
+    adminApply: 'Apply',
+    adminConfigTitle: 'Section configuration',
+    adminConfigApply: 'Apply & Reconfigure',
+    adminSecurity: 'Security',
+    adminPinLabel: 'Admin PIN',
+    adminPinChange: 'Change',
+    adminStatusTitle: 'Overview',
+    adminFilled: 'Filled slots',
+    adminWithPrice: 'With price',
+    adminEmpty: 'Empty',
+    adminForSaleTitle: 'Slots available for purchase',
+    adminNone: 'No slots filled.',
+    casesCount: (a,b) => `${a}/${b}`,
+  },
+  es: {
+    code: "es', flag: '🇪🇸', label: 'ES",
+    // Nav tabs
+    navDashboard: 'Tablero',
+    navConditions: 'Condiciones',
+    navBabillard: '📌 Tablón',
+    navSpaces: 'Espacios',
+    navTrips: 'Coche compartido',
+    navLunch: '🍱 Comida',
+    navTransactions: 'Transacciones',
+    navAdmin: 'Admin',
+    navProfile: 'Perfil',
+    admin: 'ADMIN',
+    appTitle: 'Máquina',
+    appTitleSub: 'COMIDA',
+    back: '← Volver',
+    cancel: '← Cancelar',
+    quit: '✕ Salir',
+    homeTitle: 'Tu <span>comida</span><br>te espera.',
+    homeSubtitle: 'Selecciona una acción para acceder<br>a los compartimentos refrigerados.',
+    statAvailable: 'Disponibles',
+    statForSale: 'En venta',
+    statBoxes: 'Cajas',
+    btnReturn: 'Devolver una caja',
+    returnBoxSuccess: 'Caja devuelta — gracias!',
+    statEmpty: 'Vacíos',
+    btnBuy: 'Comprar un cajón',
+    btnBuySub: 'Seleccionar y confirmar',
+    buyHint: '🍱  Modo Compra — selecciona un cajón disponible',
+    free: 'disponible(s)',
+    slotFree: 'Disponible',
+    slotReserved: 'Reservado',
+    slotEmpty: 'Vacío',
+    modalAvail: 'Disponible',
+    modalSection: 'Sección',
+    modalPrice: 'Precio',
+    modalFree: 'Gratis',
+    modalClose: 'Cancelar',
+    modalBuy: 'Comprar',
+    modalViewed: 'Visto ✓',
+    nameTitle: 'Confirmar compra',
+    namePrompt: 'Ingresa tu nombre para confirmar la compra:',
+    nameCancelBtn: 'Cancelar',
+    nameConfirmBtn: 'Confirmar ✓',
+    successMsg: (name) => `¡Buen provecho, ${name}!`,
+    savedMsg: 'Guardado ✓',
+    pinTitle: 'Código de administrador',
+    pinError: 'Código incorrecto',
+    navCases: 'Cajones',
+    navTemps: 'Temperaturas',
+    navConfig: 'Configuración',
+    navStatus: 'Estado',
+    adminCasesTitle: 'Gestión de cajones',
+    adminCaseSelected: 'Cajón seleccionado',
+    adminDescLabel: 'Descripción del contenido:',
+    adminPriceLabel: 'Precio:',
+    adminPriceSub: 'Precio mostrado\nen la compra',
+    adminSave: 'Guardar',
+    adminClear: 'Vaciar cajón',
+    adminCancel: 'Cancelar reserva',
+    adminTempsTitle: 'Temperaturas de secciones',
+    adminRangesTitle: 'Rangos de color — comunes a las 2 zonas',
+    adminActual: 'actual:',
+    adminSetpoint: 'Consigna',
+    adminTempActual: 'Temp. actual',
+    adminApply: 'Aplicar',
+    adminConfigTitle: 'Configuración de secciones',
+    adminConfigApply: 'Aplicar y reconfigurar',
+    adminSecurity: 'Seguridad',
+    adminPinLabel: 'PIN de admin',
+    adminPinChange: 'Cambiar',
+    adminStatusTitle: 'Resumen',
+    adminFilled: 'Cajones llenos',
+    adminWithPrice: 'Con precio',
+    adminEmpty: 'Vacíos',
+    adminForSaleTitle: 'Cajones disponibles para la venta',
+    adminNone: 'Ningún cajón lleno.',
+    casesCount: (a,b) => `${a}/${b}`,
+  },
+};
+
+let appLang = 'fr';
+function t(key, ...args) {
+  const v = LANGS[appLang][key];
+  return typeof v === 'function' ? v(...args) : (v ?? LANGS['fr'][key] ?? key);
+}
+
+function setLang(l) {
+  appLang = l;
+  try { localStorage.setItem('applang', l); } catch(e) {}
+  document.querySelectorAll('.nav-lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === l);
+  });
+  buildNav();
+  try { ptApply(); } catch(e) {}
+  try { trackFeature('platform', 'language_select', { language: l }); } catch(e) {}
 }
 
 function buildNav() {
