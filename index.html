@@ -3762,7 +3762,11 @@ async function cohFetch(path, opts) {
       ...(opts && opts.headers)
     }
   });
-  if(!res.ok) return null;
+  if(!res.ok) {
+    const txt = await res.text();
+    console.warn('[cohFetch] ' + res.status + ' on ' + path + ':', txt.substring(0, 200));
+    return null;
+  }
   const ct = res.headers.get('content-type') || '';
   return ct.includes('json') ? res.json() : null;
 }
@@ -4025,10 +4029,12 @@ async function lunchQueueLeave(machineId) {
 async function openKiosk(machineId) {
   try {
     if(!currentUser || !currentProfile) {
+      console.warn('[openKiosk] pas de currentUser/currentProfile');
       window.open(LM_KIOSK_BASE + '?machine=' + machineId, '_blank');
       return;
     }
-    // Créer une session temporaire dans Modulimo Central (expire dans 2 min)
+    console.log('[openKiosk] user:', currentProfile.full_name, 'machine:', machineId);
+    // Créer une session temporaire dans CoHabitat Supabase (expire dans 2 min)
     const expires = new Date(Date.now() + 2 * 60000).toISOString();
     const rows = await cohFetch('lunch_sessions', {
       method: 'POST',
@@ -4042,9 +4048,11 @@ async function openKiosk(machineId) {
         expires_at:    expires
       })
     });
+    console.log('[openKiosk] rows:', JSON.stringify(rows));
     const sessionId = Array.isArray(rows) && rows[0]?.id;
-    console.log('[openKiosk] session créée:', sessionId);
+    console.log('[openKiosk] sessionId:', sessionId);
     const url = LM_KIOSK_BASE + '?machine=' + machineId + (sessionId ? '&chsession=' + sessionId : '');
+    console.log('[openKiosk] url:', url.substring(0, 120));
     window.open(url, '_blank');
   } catch(e) {
     console.error('[openKiosk]', e);
