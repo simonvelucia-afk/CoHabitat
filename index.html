@@ -2395,18 +2395,21 @@ async function initApp() {
   try {
     const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
     if (error || !data) {
-      // Try to create profile
+      // Nouveau résident — créer le profil
       const { error: insertError } = await sb.from('profiles').insert({
         id: currentUser.id,
         email: currentUser.email || '',
         full_name: currentUser.user_metadata?.full_name
           || currentUser.email?.split('@')[0]
           || 'Utilisateur',
-        role: 'tenant'
+        role: 'tenant',
+        is_active: false  // En attente d'approbation
       });
       // Fetch again
       const { data: data2 } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
       currentProfile = data2;
+      // Sync vers Modulimo Central (fire-and-forget)
+      syncNewResidentToCentral(currentUser.id, currentUser.email, currentUser.user_metadata?.full_name);
     } else {
       currentProfile = data;
     }
@@ -2415,7 +2418,6 @@ async function initApp() {
   }
 
   if (!currentProfile) {
-    // Fallback profile in memory
     currentProfile = {
       id: currentUser.id,
       email: currentUser.email || '',
@@ -2430,6 +2432,54 @@ async function initApp() {
   trackFeature('platform', 'resident_login');
   await Promise.all([loadResourceAccess(), loadAppModules(), loadNetworkData()]);
   showApp();
+}
+
+// Créer un client dans Modulimo Central quand un nouveau résident s'inscrit
+async function syncNewResidentToCentral(userId, email, fullName) {
+  try {
+    // Trouver le client propriétaire de cet immeuble via la licence
+    const domain = window.location.hostname;
+    const licRes = await fetch(
+      CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(domain) + '&select=client_id&limit=1',
+      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+    );
+    const licData = await licRes.json();
+    const ownerClientId = licData?.[0]?.client_id || null;
+
+    // Vérifier si ce résident a déjà un client dans Central
+    const checkRes = await fetch(
+      CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + userId + '&select=id&limit=1',
+      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+    );
+    const existing = await checkRes.json();
+    if (existing && existing.length > 0) return; // Déjà existant
+
+    // Créer le client en attente
+    await fetch(CENTRAL_URL + '/rest/v1/clients', {
+      method: 'POST',
+      headers: {
+        apikey: CENTRAL_KEY,
+        Authorization: 'Bearer ' + CENTRAL_KEY,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      },
+      body: JSON.stringify({
+        name: fullName || email?.split('@')[0] || 'Nouveau résident',
+        client_type: 'local',
+        contact_email: email || '',
+        contact_name: fullName || '',
+        cohabitat_user_id: userId,
+        cohabitat_email: email || '',
+        owner_client_id: ownerClientId,
+        pending_approval: true,
+        is_active: false,
+        created_at: new Date().toISOString()
+      })
+    });
+    console.log('[syncCentral] Résident créé dans Modulimo Central');
+  } catch(e) {
+    console.warn('[syncCentral] Erreur (non bloquant):', e.message);
+  }
 }
 
 // ==========================================
@@ -6412,24 +6462,24 @@ async function loadTenants() {
 
   let html = '';
 
-  // Section "En attente d'approbation"
+  // Section "En attente d'approbation" — lecture seule, approbation par Modulimo Central
   if (pending.length > 0) {
-    html += `<tr><td colspan="7" style="padding:10px 12px;background:rgba(224,112,96,.08);border-bottom:1px solid rgba(224,112,96,.2);">
-      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent3);">
-        ⏳ En attente d'approbation (${pending.length})
+    html += `<tr><td colspan="7" style="padding:10px 12px;background:rgba(200,169,110,.08);border-bottom:1px solid rgba(200,169,110,.2);">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent2);">
+        ⏳ En attente d'approbation Modulimo (${pending.length})
       </span>
+      <span style="font-size:11px;color:var(--text3);margin-left:8px;">L'activation est gérée par Modulimo Central.</span>
     </td></tr>`;
     pending.forEach(t => {
       const displayName = isDemo ? anonName(t.id) : escHtml(t.full_name || t.email || '—');
-      html += `<tr style="background:rgba(224,112,96,.04);">
-        <td>${displayName} <span class="badge badge-gray" style="font-size:0.7rem;">Inactif</span></td>
+      html += `<tr style="background:rgba(200,169,110,.03);opacity:0.7;">
+        <td>${displayName} <span class="badge badge-gray" style="font-size:0.7rem;">En attente</span></td>
         <td>${t.unit || '—'}</td>
         <td><span class="badge badge-gray">${t.role}</span></td>
         <td>—</td>
         <td><span class="badge badge-gray">Aucun</span></td>
         <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
         <td class="td-actions">
-          <button class="btn btn-success btn-sm" onclick="approveTenant('${t.id}')">✓ Approuver</button>
           <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Modifier</button>
         </td>
       </tr>`;
@@ -6459,6 +6509,8 @@ async function loadTenants() {
       <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
       <td class="td-actions">
         ${t.role !== 'principal_admin' ? `<button class="btn btn-warning btn-sm" onclick="quickToggleTenant('${t.id}', false)">🔒 Suspendre</button>` : ''}
+        ${t.role === 'tenant' ? `<button class="btn btn-secondary btn-sm" onclick="quickSetRole('${t.id}', 'admin')" title="Promouvoir admin ressources">👑 Admin</button>` : ''}
+        ${t.role === 'admin' ? `<button class="btn btn-secondary btn-sm" onclick="quickSetRole('${t.id}', 'tenant')" title="Retirer admin ressources">↓ Locataire</button>` : ''}
         ${planBtn}${accessBtn}
         <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Modifier</button>
       </td>
@@ -6467,19 +6519,6 @@ async function loadTenants() {
 
   document.getElementById('tenants-tbody').innerHTML = html;
 }
-
-async function approveTenant(userId) {
-  const { error } = await sb.from('profiles').update({
-    is_active: true,
-    status_changed_at: new Date().toISOString(),
-    status_changed_by: currentProfile.id
-  }).eq('id', userId);
-  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
-  toast('Résident approuvé', 'success');
-  loadTenants();
-}
-
-
 
 // ── GESTION DES ACCÈS PAR RESSOURCE ─────────────────────────────────────────
 let accessManagerUserId = null;
@@ -6596,6 +6635,23 @@ async function quickToggleTenant(id, activate) {
   }).eq('id', id);
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
   toast(activate ? '🔓 Compte réactivé' : '🔒 Compte suspendu', 'success');
+  loadTenants();
+}
+
+async function quickSetRole(id, role) {
+  const labels = { admin: 'administrateur des ressources', tenant: 'locataire' };
+  const t = tenantsCache.find(x => x.id === id);
+  if(!t) return;
+  const { error } = await sb.rpc('admin_update_profile', {
+    p_user_id: id,
+    p_full_name: t.full_name,
+    p_unit: t.unit,
+    p_role: role,
+    p_is_approved_driver: t.is_approved_driver,
+    p_is_active: t.is_active !== false
+  });
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast((role === 'admin' ? '👑 Promu ' : '↓ Rétrogradé ') + labels[role], 'success');
   loadTenants();
 }
 
