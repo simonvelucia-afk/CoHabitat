@@ -4004,16 +4004,30 @@ async function lunchQueueLeave(machineId) {
   } catch(err) { console.error('lunchQueueLeave:', err); }
 }
 
-// Ouvre le kiosque avec le token frais au moment du clic
+// Ouvre le kiosque en déposant d'abord une session dans Modulimo Central
 async function openKiosk(machineId) {
   try {
-    const { data: { session } } = await sb.auth.getSession();
-    const tok = session?.access_token;
-    const uid = session?.user?.id || '';
-    console.log('[openKiosk] token length:', tok?.length, 'uid:', uid, 'machine:', machineId);
-    const url = LM_KIOSK_BASE + '?machine=' + machineId
-      + (tok ? '&chtoken=' + encodeURIComponent(tok) : '')
-      + (uid ? '&chuid=' + uid : '');
+    if(!currentUser || !currentProfile) {
+      window.open(LM_KIOSK_BASE + '?machine=' + machineId, '_blank');
+      return;
+    }
+    // Créer une session temporaire dans Modulimo Central (expire dans 2 min)
+    const expires = new Date(Date.now() + 2 * 60000).toISOString();
+    const rows = await lmFetch('lunch_sessions', {
+      method: 'POST',
+      body: JSON.stringify({
+        machine_id:    machineId,
+        user_id:       currentUser.id,
+        full_name:     currentProfile.full_name || '',
+        unit:          currentProfile.unit || '',
+        role:          currentProfile.role || 'tenant',
+        resident_plan: currentProfile.resident_plan || 'local',
+        expires_at:    expires
+      })
+    });
+    const sessionId = Array.isArray(rows) && rows[0]?.id;
+    console.log('[openKiosk] session créée:', sessionId);
+    const url = LM_KIOSK_BASE + '?machine=' + machineId + (sessionId ? '&chsession=' + sessionId : '');
     window.open(url, '_blank');
   } catch(e) {
     console.error('[openKiosk]', e);
