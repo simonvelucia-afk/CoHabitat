@@ -2320,7 +2320,11 @@ async function loadLandingPlans() {
     grid.innerHTML = plans.map(function(p) {
       const feats = (p.plan_features || []).sort(function(a,b){ return a.sort_order - b.sort_order; });
       const price = p.price_monthly ? p.price_monthly + ' $<span> / mois</span>' : '<span style="font-size:1.1rem">Sur devis</span>';
-      const units = p.max_units ? 'Jusqu\'à ' + p.max_units + ' unités résidentielles' : 'Unités illimitées · réseau multi-bâtiments';
+      const units = p.max_units ? 'Jusqu\'à ' + p.max_units + ' unités résidentielles'
+        : p.code === 'resident_local' ? 'Accès aux ressources de votre bâtiment'
+        : p.code === 'resident_network' ? 'Accès aux ressources de tout le réseau'
+        : p.code === 'proprietaire' ? 'Gestion complète de votre immeuble'
+        : 'Unités illimitées';
       const ctaClass = p.featured ? 'primary' : 'secondary';
       const featHtml = feats.map(function(f) {
         return '<li class="' + (f.included ? '' : 'off') + '">' + f.label + '</li>';
