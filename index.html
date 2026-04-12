@@ -3749,6 +3749,24 @@ let _lunchQueuePoll = null;
 let _lunchMyEntry   = null;
 let _lunchMachines  = [];  // cache des machines pour le rafraîchissement
 
+// Fetch vers CoHabitat propre (lunch_queue, lunch_sessions — dans ce Supabase)
+async function cohFetch(path, opts) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    ...opts,
+    cache: 'no-store',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      ...(opts && opts.headers)
+    }
+  });
+  if(!res.ok) return null;
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('json') ? res.json() : null;
+}
+
 async function lmFetch(path, opts, userToken) {
   const authToken = userToken || LM_CENTRAL_ANON;
   const res = await fetch(LM_CENTRAL_URL + '/rest/v1/' + path, {
@@ -3827,7 +3845,7 @@ async function renderMachineCard(machine, el) {
   // Charger la queue de cette machine
   let queue = [];
   try {
-    const raw = await lmFetch('lunch_queue?machine_id=eq.' + machine.id + '&order=joined_at&select=*');
+    const raw = await cohFetch('lunch_queue?machine_id=eq.' + machine.id + '&order=joined_at&select=*');
     // Défense : s'assurer que c'est bien un tableau
     queue = Array.isArray(raw) ? raw : [];
     // Nettoyer visuellement les expirés
@@ -3941,7 +3959,7 @@ async function lunchQueueJoin(machineId, event) {
   if(!currentUser || !currentProfile) { typeof toast === 'function' && toast('Connexion requise', 'error'); return; }
   try {
     const token = await getLmToken();
-    const raw = await lmFetch('lunch_queue?machine_id=eq.' + machineId + '&order=joined_at&select=*', {}, token);
+    const raw = await cohFetch('lunch_queue?machine_id=eq.' + machineId + '&order=joined_at&select=*', {});
     const queue = Array.isArray(raw) ? raw : [];
     const validQueue = queue.filter(function(e) { return new Date(e.expires_at || 9e15) > new Date(); });
     const active = validQueue.find(function(e) { return e.status === 'active'; });
@@ -3950,7 +3968,7 @@ async function lunchQueueJoin(machineId, event) {
 
     const status  = !active ? 'active' : 'waiting';
     const expires = new Date(Date.now() + 10 * 60000).toISOString();
-    await lmFetch('lunch_queue', {
+    await cohFetch('lunch_queue', {
       method: 'POST',
       body: JSON.stringify({
         machine_id: machineId,
@@ -3979,19 +3997,17 @@ async function lunchQueueLeave(machineId) {
   if(!currentUser) return;
   try {
     const token = await getLmToken();
-    const raw = await lmFetch(
-      'lunch_queue?machine_id=eq.' + machineId + '&user_id=eq.' + currentUser.id + '&select=id,status', {}, token
-    );
+    const raw = await cohFetch(
+      'lunch_queue?machine_id=eq.' + machineId + '&user_id=eq.' + currentUser.id + '&select=id,status', {});
     const myEntry = Array.isArray(raw) ? raw : [];
     for(const e of myEntry) {
-      await lmFetch('lunch_queue?id=eq.' + e.id, { method: 'DELETE' }, token);
+      await cohFetch('lunch_queue?id=eq.' + e.id, { method: 'DELETE' });
       if(e.status === 'active') {
-        const rawW = await lmFetch(
-          'lunch_queue?machine_id=eq.' + machineId + '&status=eq.waiting&order=joined_at&limit=1&select=id', {}, token
-        );
+        const rawW = await cohFetch(
+          'lunch_queue?machine_id=eq.' + machineId + '&status=eq.waiting&order=joined_at&limit=1&select=id', {});
         const waiting = Array.isArray(rawW) ? rawW : [];
         if(waiting.length) {
-          await lmFetch('lunch_queue?id=eq.' + waiting[0].id, {
+          await cohFetch('lunch_queue?id=eq.' + waiting[0].id, {
             method: 'PATCH',
             body: JSON.stringify({ status: 'active', expires_at: new Date(Date.now() + 10*60000).toISOString() })
           }, token);
@@ -4014,7 +4030,7 @@ async function openKiosk(machineId) {
     }
     // Créer une session temporaire dans Modulimo Central (expire dans 2 min)
     const expires = new Date(Date.now() + 2 * 60000).toISOString();
-    const rows = await lmFetch('lunch_sessions', {
+    const rows = await cohFetch('lunch_sessions', {
       method: 'POST',
       body: JSON.stringify({
         machine_id:    machineId,
