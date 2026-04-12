@@ -2593,11 +2593,33 @@ async function authSubmit() {
 
   try {
     if (authMode === 'register') {
-      const { error } = await sb.auth.signUp({
+      const { data: signUpData, error } = await sb.auth.signUp({
         email, password,
         options: { data: { full_name: name || email } }
       });
       if (error) throw error;
+      // Créer le client dans Modulimo Central (inactif par défaut, en attente d'activation)
+      const selectedPlan = document.getElementById('register-plan')?.value || 'resident_local';
+      const clientType = selectedPlan === 'resident_network' ? 'network' : 'local';
+      try {
+        await fetch(CENTRAL_URL + '/rest/v1/clients', {
+          method: 'POST',
+          headers: {
+            apikey: CENTRAL_KEY,
+            Authorization: 'Bearer ' + CENTRAL_KEY,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal'
+          },
+          body: JSON.stringify({
+            name: name || email,
+            contact_email: email,
+            client_type: clientType,
+            is_active: false,
+            cohabitat_modules: { spaces: true, trips: false, lunch: false },
+            notes: 'Inscrit via CoHabitat — ' + window.location.hostname + ' — Forfait: ' + selectedPlan
+          })
+        });
+      } catch(e) { /* silencieux — ne pas bloquer l'inscription */ }
       errorBox.style.background = 'rgba(126,184,160,0.12)';
       errorBox.style.borderColor = 'rgba(126,184,160,0.3)';
       errorBox.style.color = 'var(--accent2)';
@@ -2785,11 +2807,7 @@ async function loadAppModules() {
   // 2. Vérifier la licence centrale (définit l'enveloppe max)
   const licence = await checkLicence();
 
-  // 3. Résultat = intersection licence centrale ET préférences locales
-  window.appModules.trips = (licence?.modules?.trips !== false) && localTrips;
-  window.appModules.lunch = (licence?.modules?.lunch !== false) && localLunch;
-
-  // 4. Si licence invalide ou expirée — bloquer l'app
+  // 3. Si licence invalide ou expirée — bloquer l'app
   if (licence === null) {
     document.body.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0f0f0f;font-family:system-ui;text-align:center;padding:40px;">
@@ -2801,6 +2819,63 @@ async function loadAppModules() {
         </div>
       </div>`;
     throw new Error('Licence invalide');
+  }
+
+  // 4. Vérifier que le client Central est actif (accès CoHabitat autorisé)
+  const clientActive = await checkClientActive(currentUser?.email);
+  if (clientActive === false) {
+    document.body.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0f0f0f;font-family:system-ui;text-align:center;padding:40px;">
+        <div>
+          <div style="font-size:2rem;margin-bottom:16px;">⏳</div>
+          <div style="font-size:1.2rem;font-weight:600;color:#c8a96e;margin-bottom:8px;">Compte en attente d'activation</div>
+          <div style="color:#9a9890;font-size:14px;margin-bottom:20px;">Votre accès CoHabitat est en cours de traitement.<br>Vous recevrez une confirmation par courriel sous peu.</div>
+          <a href="mailto:contribution@modulimo.com" style="color:#4fa3e8;font-size:13px;">contribution@modulimo.com</a>
+          <br><br><button onclick="location.reload()" style="margin-top:8px;padding:8px 20px;background:#1a1a1a;border:1px solid #333;color:#e8e6df;border-radius:6px;cursor:pointer;font-size:13px;">Actualiser</button>
+        </div>
+      </div>`;
+    throw new Error('Client inactif');
+  }
+
+  // 5. Charger les modules autorisés pour ce client Central
+  const clientMods = await loadClientModules(currentUser?.email);
+
+  // 6. Résultat = intersection licence centrale ET modules client ET préférences locales
+  window.appModules.trips = (licence?.modules?.trips !== false) && localTrips && (clientMods?.trips !== false);
+  window.appModules.lunch = (licence?.modules?.lunch !== false) && localLunch && (clientMods?.lunch !== false);
+}
+
+// Vérifie si le client Central correspondant à cet email est actif
+async function checkClientActive(email) {
+  if (!email) return true; // pas d'email = mode non bloquant
+  try {
+    const res = await fetch(
+      CENTRAL_URL + '/rest/v1/clients?contact_email=eq.' + encodeURIComponent(email) + '&select=is_active',
+      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+    );
+    if (!res.ok) return true; // erreur réseau = fail open
+    const data = await res.json();
+    if (!data.length) return true; // client non trouvé = pas encore créé, laisser passer
+    return data[0].is_active === true;
+  } catch(e) {
+    return true; // fail open
+  }
+}
+
+// Charge les modules CoHabitat autorisés pour ce client Central
+async function loadClientModules(email) {
+  if (!email) return null;
+  try {
+    const res = await fetch(
+      CENTRAL_URL + '/rest/v1/clients?contact_email=eq.' + encodeURIComponent(email) + '&select=cohabitat_modules',
+      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.length) return null;
+    return data[0].cohabitat_modules || null;
+  } catch(e) {
+    return null;
   }
 }
 
