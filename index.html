@@ -2023,8 +2023,11 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 <div class="modal-overlay" id="modal-add-tenant">
   <div class="modal">
     <div class="modal-header">
-      <h3>Ajouter / Modifier un locataire</h3>
+      <h3 id="tenant-modal-title">Ajouter / Modifier un locataire</h3>
       <button class="modal-close" onclick="closeModal('modal-add-tenant')">×</button>
+    </div>
+    <div id="tenant-invite-section" style="display:none;background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--text2);line-height:1.5;">
+      📧 Un courriel d'invitation sera envoyé au résident. Il devra créer son mot de passe pour accéder à CoHabitat.
     </div>
     <div class="form-group">
       <label>Nom complet</label>
@@ -2064,9 +2067,10 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       <label>Crédit initial (crédits)</label>
       <input type="number" id="tenant-balance" placeholder="0" min="0" value="0">
     </div>
+    <div id="tenant-invite-status" style="font-size:12px;min-height:16px;margin-bottom:8px;"></div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-add-tenant')">Annuler</button>
-      <button class="btn btn-primary" onclick="saveTenant()">Enregistrer</button>
+      <button class="btn btn-primary" id="tenant-save-btn" onclick="saveTenant()">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -6402,38 +6406,80 @@ function exportStatsCSV() {
 async function loadTenants() {
   const { data } = await sb.from('profiles').select('*').neq('role', 'demo').order('full_name');
   tenantsCache = data || [];
-  document.getElementById('tenants-tbody').innerHTML = tenantsCache.map(t => {
+
+  const pending = tenantsCache.filter(t => t.is_active === false);
+  const active  = tenantsCache.filter(t => t.is_active !== false);
+
+  let html = '';
+
+  // Section "En attente d'approbation"
+  if (pending.length > 0) {
+    html += `<tr><td colspan="7" style="padding:10px 12px;background:rgba(224,112,96,.08);border-bottom:1px solid rgba(224,112,96,.2);">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent3);">
+        ⏳ En attente d'approbation (${pending.length})
+      </span>
+    </td></tr>`;
+    pending.forEach(t => {
+      const displayName = isDemo ? anonName(t.id) : escHtml(t.full_name || t.email || '—');
+      html += `<tr style="background:rgba(224,112,96,.04);">
+        <td>${displayName} <span class="badge badge-gray" style="font-size:0.7rem;">Inactif</span></td>
+        <td>${t.unit || '—'}</td>
+        <td><span class="badge badge-gray">${t.role}</span></td>
+        <td>—</td>
+        <td><span class="badge badge-gray">Aucun</span></td>
+        <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
+        <td class="td-actions">
+          <button class="btn btn-success btn-sm" onclick="approveTenant('${t.id}')">✓ Approuver</button>
+          <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Modifier</button>
+        </td>
+      </tr>`;
+    });
+    html += `<tr><td colspan="7" style="height:8px;"></td></tr>`;
+  }
+
+  // Locataires actifs
+  html += active.map(t => {
     const displayName = isDemo ? anonName(t.id) : escHtml(t.full_name);
     const displayUnit = isDemo ? (t.unit ? anonUnit(t.id) : '—') : (t.unit || '—');
     const tid = t.id;
-    const planBtn = '<button class="btn btn-info btn-sm" onclick="openPlanManagerById(\u0027' + tid + '\u0027)">&#128230; Forfait</button>';
-    const accessBtn = '<button class="btn btn-info btn-sm" onclick="openAccessManagerById(\u0027' + tid + '\u0027)">&#128273; Acc&egrave;s</button>';
+    const planBtn = '<button class="btn btn-info btn-sm" onclick="openPlanManagerById(\'' + tid + '\')">&#128230; Forfait</button>';
+    const accessBtn = '<button class="btn btn-info btn-sm" onclick="openAccessManagerById(\'' + tid + '\')">&#128273; Acc&egrave;s</button>';
     return `
-    <tr style="${t.is_active === false ? 'opacity:0.5' : ''}">
-      <td>${displayName}${t.is_active === false ? ' <span class="badge badge-gray" style="font-size:0.7rem;margin-left:4px">Inactif</span>' : ''}</td>
+    <tr>
+      <td>${displayName}</td>
       <td>${displayUnit}</td>
       <td><span class="badge badge-gray">${t.role}</span></td>
       <td>${t.is_approved_driver ? '<span class="badge badge-green">✓ Chauffeur</span>' : '—'}</td>
-      <td>
-        ${t.resident_plan && t.resident_plan !== 'none'
-          ? '<span class="badge ' + (t.resident_plan === 'network' ? 'badge-green' : 'badge-yellow') + '">'
-            + (t.resident_plan === 'network' ? '🔗 Réseau' : '🏠 Local')
-            + (t.resident_plan_until ? ' — ' + new Date(t.resident_plan_until).toLocaleDateString('fr-CA') : '')
-            + '</span>'
-          : '<span class="badge badge-gray">Aucun</span>'}
-      </td>
+      <td>${t.resident_plan && t.resident_plan !== 'none'
+        ? '<span class="badge ' + (t.resident_plan === 'network' ? 'badge-green' : 'badge-yellow') + '">'
+          + (t.resident_plan === 'network' ? '🔗 Réseau' : '🏠 Local')
+          + (t.resident_plan_until ? ' — ' + new Date(t.resident_plan_until).toLocaleDateString('fr-CA') : '')
+          + '</span>'
+        : '<span class="badge badge-gray">Aucun</span>'}</td>
       <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
       <td class="td-actions">
-        ${t.role !== 'principal_admin' ? `<button class="btn ${t.is_active === false ? 'btn-success' : 'btn-warning'} btn-sm" onclick="quickToggleTenant('${t.id}', ${t.is_active === false})">${t.is_active === false ? '🔓 Réactiver' : '🔒 Suspendre'}</button>` : ''}
-        ${planBtn}
-        ${accessBtn}
+        ${t.role !== 'principal_admin' ? `<button class="btn btn-warning btn-sm" onclick="quickToggleTenant('${t.id}', false)">🔒 Suspendre</button>` : ''}
+        ${planBtn}${accessBtn}
         <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Modifier</button>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text3)">Aucun locataire</td></tr>';
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3)">Aucun locataire actif</td></tr>';
 
-
+  document.getElementById('tenants-tbody').innerHTML = html;
 }
+
+async function approveTenant(userId) {
+  const { error } = await sb.from('profiles').update({
+    is_active: true,
+    status_changed_at: new Date().toISOString(),
+    status_changed_by: currentProfile.id
+  }).eq('id', userId);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Résident approuvé', 'success');
+  loadTenants();
+}
+
+
 
 // ── GESTION DES ACCÈS PAR RESSOURCE ─────────────────────────────────────────
 let accessManagerUserId = null;
@@ -6555,6 +6601,10 @@ async function quickToggleTenant(id, activate) {
 
 function openAddTenant() {
   editingId = null;
+  document.getElementById('tenant-modal-title').textContent = 'Inviter un résident';
+  document.getElementById('tenant-save-btn').textContent = '📧 Envoyer l\'invitation';
+  document.getElementById('tenant-invite-section').style.display = '';
+  document.getElementById('tenant-invite-status').textContent = '';
   document.getElementById('tenant-name').value = '';
   document.getElementById('tenant-email').value = '';
   document.getElementById('tenant-unit').value = '';
@@ -6567,12 +6617,16 @@ function openAddTenant() {
 
 function editTenant(id) {
   editingId = id;
+  document.getElementById('tenant-modal-title').textContent = 'Modifier un locataire';
+  document.getElementById('tenant-save-btn').textContent = 'Enregistrer';
+  document.getElementById('tenant-invite-section').style.display = 'none';
+  document.getElementById('tenant-invite-status').textContent = '';
   const t = tenantsCache.find(x => x.id === id);
   if (!t) return;
-  document.getElementById('tenant-name').value = t.full_name;
-  document.getElementById('tenant-email').value = t.email;
+  document.getElementById('tenant-name').value = t.full_name || '';
+  document.getElementById('tenant-email').value = t.email || '';
   document.getElementById('tenant-unit').value = t.unit || '';
-  document.getElementById('tenant-role').value = t.role;
+  document.getElementById('tenant-role').value = t.role || 'tenant';
   document.getElementById('tenant-driver').checked = t.is_approved_driver;
   document.getElementById('tenant-active').checked = t.is_active !== false;
   document.getElementById('tenant-balance').value = t.virtual_balance || 0;
@@ -6580,18 +6634,19 @@ function editTenant(id) {
 }
 
 async function saveTenant() {
-  const name = document.getElementById('tenant-name').value.trim();
-  const email = document.getElementById('tenant-email').value.trim();
-  const unit = document.getElementById('tenant-unit').value.trim();
-  const role = document.getElementById('tenant-role').value;
-  const driver = document.getElementById('tenant-driver').checked;
-  const active = document.getElementById('tenant-active').checked;
+  const name    = document.getElementById('tenant-name').value.trim();
+  const email   = document.getElementById('tenant-email').value.trim();
+  const unit    = document.getElementById('tenant-unit').value.trim();
+  const role    = document.getElementById('tenant-role').value;
+  const driver  = document.getElementById('tenant-driver').checked;
+  const active  = document.getElementById('tenant-active').checked;
   const balance = parseFloat(document.getElementById('tenant-balance').value) || 0;
+  const statusEl = document.getElementById('tenant-invite-status');
 
   if (editingId) {
+    // Mode édition
     const prev = tenantsCache.find(x => x.id === editingId);
     const statusChanged = prev && (prev.is_active !== false) !== active;
-
     const { error } = await sb.rpc('admin_update_profile', {
       p_user_id: editingId,
       p_full_name: name,
@@ -6601,22 +6656,62 @@ async function saveTenant() {
       p_is_active: active
     });
     if (error) { toast('Erreur: ' + error.message, 'error'); return; }
-
     if (statusChanged) {
       await sb.from('profiles').update({
         status_changed_at: new Date().toISOString(),
         status_changed_by: currentProfile.id
       }).eq('id', editingId);
     }
-
     const { error: balErr } = await sb.rpc('admin_set_balance', { p_user_id: editingId, p_balance: balance });
     if (balErr) { toast('Infos sauvegardées mais erreur solde: ' + balErr.message, 'error'); return; }
     toast('Locataire mis à jour', 'success');
+    closeModal('modal-add-tenant');
+    loadTenants();
   } else {
-    toast('Pour ajouter un locataire, il doit s\'inscrire via la page de connexion. Vous pouvez ensuite modifier son profil.', 'info');
+    // Mode invitation par courriel
+    if (!email) { toast('Courriel requis', 'error'); return; }
+    if (!name)  { toast('Nom requis', 'error'); return; }
+    if (statusEl) { statusEl.style.color = 'var(--text2)'; statusEl.textContent = '⏳ Envoi en cours…'; }
+    const btn = document.getElementById('tenant-save-btn');
+    if (btn) btn.disabled = true;
+    try {
+      // Créer le compte via signUp — Supabase enverra l'email de confirmation
+      const { error: signErr } = await sb.auth.signUp({
+        email,
+        password: Math.random().toString(36).slice(2,10) + 'A1!',
+        options: {
+          data: { full_name: name },
+          emailRedirectTo: window.location.origin + window.location.pathname
+        }
+      });
+      if (signErr && !signErr.message.toLowerCase().includes('already registered')) {
+        throw new Error(signErr.message);
+      }
+      // Pré-remplir le profil si disponible
+      try {
+        const { data: newProf } = await sb.from('profiles').select('id').eq('email', email).maybeSingle();
+        if (newProf) {
+          await sb.rpc('admin_update_profile', {
+            p_user_id: newProf.id,
+            p_full_name: name,
+            p_unit: unit,
+            p_role: role,
+            p_is_approved_driver: driver,
+            p_is_active: active
+          });
+          if (balance > 0) await sb.rpc('admin_set_balance', { p_user_id: newProf.id, p_balance: balance });
+        }
+      } catch(e) {}
+      if (statusEl) { statusEl.style.color = 'var(--accent4,#5de88c)'; statusEl.textContent = '✓ Invitation envoyée à ' + email; }
+      toast('Invitation envoyée à ' + email, 'success');
+      setTimeout(() => { closeModal('modal-add-tenant'); loadTenants(); }, 1800);
+    } catch(err) {
+      if (statusEl) { statusEl.style.color = 'var(--accent3,#e07060)'; statusEl.textContent = '✗ ' + err.message; }
+      toast('Erreur: ' + err.message, 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
-  closeModal('modal-add-tenant');
-  loadTenants();
 }
 
 // --- Admin Spaces ---
