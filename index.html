@@ -496,7 +496,7 @@ td {
   vertical-align: middle;
 }
 tr:hover td { background: rgba(255,255,255,0.02); }
-.td-actions { display: flex; gap: 6px; }
+.td-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 
 /* ===== MODAL ===== */
 .modal-overlay {
@@ -6834,11 +6834,12 @@ async function loadTenants() {
     const displayName = isDemo ? anonName(t.id) : escHtml(t.full_name);
     const displayUnit = isDemo ? (t.unit ? anonUnit(t.id) : '—') : (t.unit || '—');
     const tid = t.id;
-    const planBtn = '<button class="btn btn-info btn-sm" onclick="openPlanManagerById(\'' + tid + '\')">&#128230; Forfait</button>';
-    const accessBtn = '<button class="btn btn-info btn-sm" onclick="openAccessManagerById(\'' + tid + '\')">&#128273; Acc&egrave;s</button>';
+    const roleIcon = t.role === 'principal_admin' ? '<span title="Principal Admin" style="margin-right:6px;font-size:1rem;">⭐</span>'
+                   : t.role === 'admin'           ? '<span title="Admin" style="margin-right:6px;font-size:1rem;">👑</span>'
+                   :                                '<span title="Locataire" style="margin-right:6px;font-size:1rem;">👤</span>';
     return `
     <tr>
-      <td>${displayName}</td>
+      <td style="white-space:nowrap;">${roleIcon}${displayName}</td>
       <td>${displayUnit}</td>
       <td><span class="badge badge-gray">${t.role}</span></td>
       <td>${t.is_approved_driver ? '<span class="badge badge-green">✓ Chauffeur</span>' : '—'}</td>
@@ -6849,12 +6850,11 @@ async function loadTenants() {
           + '</span>'
         : '<span class="badge badge-gray">Aucun</span>'}</td>
       <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
-      <td class="td-actions">
-        ${t.role !== 'principal_admin' ? `<button class="btn btn-warning btn-sm" onclick="quickToggleTenant('${t.id}', false)">🔒 Suspendre</button>` : ''}
-        ${t.role === 'tenant' ? `<button class="btn btn-secondary btn-sm" onclick="quickSetRole('${t.id}', 'admin')" title="Promouvoir admin ressources">👑 Admin</button>` : ''}
-        ${t.role === 'admin' ? `<button class="btn btn-secondary btn-sm" onclick="quickSetRole('${t.id}', 'tenant')" title="Retirer admin ressources">↓ Locataire</button>` : ''}
-        ${planBtn}${accessBtn}
-        <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Modifier</button>
+      <td class="td-actions" style="flex-wrap:wrap;">
+        ${t.role !== 'principal_admin' ? `<button class="btn btn-warning btn-sm" onclick="quickToggleTenant('${tid}', false)">🔒 Suspendre</button>` : ''}
+        <button class="btn btn-info btn-sm" onclick="(function(){var t=tenantsCache.find(function(x){return x.id==='${tid}';});if(t)openPlanManager(t.id,t.full_name,t.resident_plan||'none',t.resident_plan_until||'');})()">📦 Forfait</button>
+        <button class="btn btn-info btn-sm" onclick="(function(){var t=tenantsCache.find(function(x){return x.id==='${tid}';});if(t)openAccessManager(t.id,t.full_name);})()">🗝 Accès</button>
+        <button class="btn btn-secondary btn-sm" onclick="editTenant('${tid}')">✏️ Modifier</button>
       </td>
     </tr>`;
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3)">Aucun locataire actif</td></tr>';
