@@ -6852,9 +6852,9 @@ async function loadTenants() {
       <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
       <td class="td-actions" style="flex-wrap:wrap;">
         ${t.role !== 'principal_admin' ? `<button class="btn btn-warning btn-sm" onclick="quickToggleTenant('${tid}', false)">🔒 Suspendre</button>` : ''}
-        <button class="btn btn-info btn-sm" onclick="(function(){var t=tenantsCache.find(function(x){return x.id==='${tid}';});if(t)openPlanManager(t.id,t.full_name,t.resident_plan||'none',t.resident_plan_until||'');})()">📦 Forfait</button>
-        <button class="btn btn-info btn-sm" onclick="(function(){var t=tenantsCache.find(function(x){return x.id==='${tid}';});if(t)openAccessManager(t.id,t.full_name);})()">🗝 Accès</button>
-        <button class="btn btn-secondary btn-sm" onclick="editTenant('${tid}')">✏️ Modifier</button>
+        <button class="btn btn-info btn-sm" onclick="openPlanManagerById('${tid}')">📦 Forfait</button>
+        <button class="btn btn-info btn-sm" onclick="openAccessManagerById('${tid}')">🗝 Accès</button>
+        ${t.role !== 'principal_admin' || currentProfile?.role === 'principal_admin' ? `<button class="btn btn-secondary btn-sm" onclick="editTenant('${tid}')">✏️ Modifier</button>` : ''}
       </td>
     </tr>`;
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3)">Aucun locataire actif</td></tr>';
@@ -7021,6 +7021,11 @@ function editTenant(id) {
   document.getElementById('tenant-invite-status').textContent = '';
   const t = tenantsCache.find(x => x.id === id);
   if (!t) return;
+  // Un admin ne peut pas modifier le principal_admin
+  if (t.role === 'principal_admin' && currentProfile?.role !== 'principal_admin') {
+    toast('⛔ Accès refusé — seul le principal admin peut modifier ce compte.', 'error');
+    return;
+  }
   document.getElementById('tenant-name').value = t.full_name || '';
   document.getElementById('tenant-email').value = t.email || '';
   document.getElementById('tenant-unit').value = t.unit || '';
@@ -7044,6 +7049,10 @@ async function saveTenant() {
   if (editingId) {
     // Mode édition
     const prev = tenantsCache.find(x => x.id === editingId);
+    // Double protection : un admin ne peut pas modifier le principal_admin
+    if (prev?.role === 'principal_admin' && currentProfile?.role !== 'principal_admin') {
+      toast('⛔ Accès refusé.', 'error'); return;
+    }
     const statusChanged = prev && (prev.is_active !== false) !== active;
     const { error } = await sb.rpc('admin_update_profile', {
       p_user_id: editingId,
