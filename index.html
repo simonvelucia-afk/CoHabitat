@@ -2138,6 +2138,8 @@ tr:hover td { background: rgba(255,255,255,0.02); }
         <option value="48">48h</option>
       </select>
       <small style="color:var(--text3);font-size:0.75rem;">Les résidents locaux ont la priorité pendant cette période avant le créneau.</small>
+      <label style="margin-top:10px;display:block;">Prix réseau par 15 min (crédits) <span style="color:var(--text3);font-size:0.8rem;">— laisser vide = même prix que local</span></label>
+      <input type="number" id="space-network-price" placeholder="0.00" min="0" step="0.01">
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-add-space')">Annuler</button>
@@ -2224,6 +2226,16 @@ tr:hover td { background: rgba(255,255,255,0.02); }
         <option value="48">48h</option>
       </select>
       <small style="color:var(--text3);font-size:0.75rem;">Les résidents locaux ont la priorité pendant cette période avant le créneau.</small>
+      <div class="form-row" style="margin-top:10px;">
+        <div class="form-group">
+          <label>Prix réseau /min <span style="color:var(--text3);font-size:0.8rem;">— vide = local</span></label>
+          <input type="number" id="veh-network-price-min" placeholder="0.00" min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>Prix réseau /km <span style="color:var(--text3);font-size:0.8rem;">— vide = local</span></label>
+          <input type="number" id="veh-network-price-km" placeholder="0.00" min="0" step="0.01">
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-add-vehicle')">Annuler</button>
@@ -7179,6 +7191,7 @@ function openAddSpace() {
   document.getElementById('space-available').checked = true;
   document.getElementById('space-network-shared').checked = false;
   document.getElementById('space-priority-hours').value = '24';
+  document.getElementById('space-network-price').value = '';
   document.getElementById('space-priority-group').style.display = 'none';
   document.getElementById('space-network-shared').onchange = function() {
     document.getElementById('space-priority-group').style.display = this.checked ? '' : 'none';
@@ -7199,6 +7212,7 @@ async function editSpace(id) {
   document.getElementById('space-available').checked = s.is_available;
   document.getElementById('space-network-shared').checked = s.is_network_shared || false;
   document.getElementById('space-priority-hours').value = s.network_priority_hours || 24;
+  document.getElementById('space-network-price').value = s.network_price_per_slot || '';
   document.getElementById('space-priority-group').style.display = s.is_network_shared ? '' : 'none';
   document.getElementById('space-network-shared').onchange = function() {
     document.getElementById('space-priority-group').style.display = this.checked ? '' : 'none';
@@ -7215,14 +7229,15 @@ async function saveSpace() {
   const available = document.getElementById('space-available').checked;
   const networkShared = document.getElementById('space-network-shared').checked;
   const priorityHours = parseInt(document.getElementById('space-priority-hours').value) || 24;
+  const networkPrice = document.getElementById('space-network-price').value !== '' ? parseFloat(document.getElementById('space-network-price').value) : null;
 
   if (!name) { toast('Nom requis', 'error'); return; }
 
   let spaceId = editingId;
   if (editingId) {
-    await sb.from('common_spaces').update({ name, description: desc, capacity, location, is_available: available, is_network_shared: networkShared, network_priority_hours: networkShared ? priorityHours : null }).eq('id', editingId);
+    await sb.from('common_spaces').update({ name, description: desc, capacity, location, is_available: available, is_network_shared: networkShared, network_priority_hours: networkShared ? priorityHours : null, network_price_per_slot: networkShared ? networkPrice : null }).eq('id', editingId);
   } else {
-    const { data } = await sb.from('common_spaces').insert({ name, description: desc, capacity, location, is_available: available, is_network_shared: networkShared, network_priority_hours: networkShared ? priorityHours : null, created_by: currentProfile.id }).select().single();
+    const { data } = await sb.from('common_spaces').insert({ name, description: desc, capacity, location, is_available: available, is_network_shared: networkShared, network_priority_hours: networkShared ? priorityHours : null, network_price_per_slot: networkShared ? networkPrice : null, created_by: currentProfile.id }).select().single();
     spaceId = data?.id;
   }
   // Update pricing
@@ -7272,6 +7287,8 @@ function openAddVehicle() {
   document.getElementById('veh-available').checked = true;
   document.getElementById('veh-network-shared').checked = false;
   document.getElementById('veh-priority-hours').value = '24';
+  document.getElementById('veh-network-price-min').value = '';
+  document.getElementById('veh-network-price-km').value = '';
   document.getElementById('veh-priority-group').style.display = 'none';
   document.getElementById('veh-network-shared').onchange = function() {
     document.getElementById('veh-priority-group').style.display = this.checked ? '' : 'none';
@@ -7297,6 +7314,8 @@ async function editVehicle(id) {
   document.getElementById('veh-available').checked = v.is_available;
   document.getElementById('veh-network-shared').checked = v.is_network_shared || false;
   document.getElementById('veh-priority-hours').value = v.network_priority_hours || 24;
+  document.getElementById('veh-network-price-min').value = v.network_price_per_minute || '';
+  document.getElementById('veh-network-price-km').value = v.network_price_per_km || '';
   document.getElementById('veh-priority-group').style.display = v.is_network_shared ? '' : 'none';
   document.getElementById('veh-network-shared').onchange = function() {
     document.getElementById('veh-priority-group').style.display = this.checked ? '' : 'none';
@@ -7318,10 +7337,12 @@ async function saveVehicle() {
   const available = document.getElementById('veh-available').checked;
   const networkShared = document.getElementById('veh-network-shared').checked;
   const priorityHours = parseInt(document.getElementById('veh-priority-hours').value) || 24;
+  const networkPriceMin = document.getElementById('veh-network-price-min').value !== '' ? parseFloat(document.getElementById('veh-network-price-min').value) : null;
+  const networkPriceKm = document.getElementById('veh-network-price-km').value !== '' ? parseFloat(document.getElementById('veh-network-price-km').value) : null;
 
   if (!model || !plate) { toast('Modèle et plaque requis', 'error'); return; }
 
-  const vehicleFields = { model, license_plate: plate, seat_count: seats, cargo_capacity_m3: cargo, color, year, is_available: available, is_network_shared: networkShared, network_priority_hours: networkShared ? priorityHours : null };
+  const vehicleFields = { model, license_plate: plate, seat_count: seats, cargo_capacity_m3: cargo, color, year, is_available: available, is_network_shared: networkShared, network_priority_hours: networkShared ? priorityHours : null, network_price_per_minute: networkShared ? networkPriceMin : null, network_price_per_km: networkShared ? networkPriceKm : null };
 
   let vehicleId = editingId;
   if (editingId) {
