@@ -4398,8 +4398,8 @@ function toast(msg, type = 'info') {
 // ==========================================
 // MODAL HELPERS
 // ==========================================
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { const el = document.getElementById(id); el.style.display = 'flex'; el.classList.add('open'); }
+function closeModal(id) { const el = document.getElementById(id); el.style.display = 'none'; el.classList.remove('open'); }
 
 // Click outside to close
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
@@ -6799,37 +6799,12 @@ async function loadTenants() {
   const { data } = await sb.from('profiles').select('*').neq('role', 'demo').order('full_name');
   tenantsCache = data || [];
 
-  const pending = tenantsCache.filter(t => t.is_active === false);
-  const active  = tenantsCache.filter(t => t.is_active !== false);
+  const pending  = tenantsCache.filter(t => t.is_active === false);
+  const active   = tenantsCache.filter(t => t.is_active !== false);
 
   let html = '';
 
-  // Section "En attente d'approbation" — lecture seule, approbation par Modulimo Central
-  if (pending.length > 0) {
-    html += `<tr><td colspan="7" style="padding:10px 12px;background:rgba(200,169,110,.08);border-bottom:1px solid rgba(200,169,110,.2);">
-      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent2);">
-        ⏳ En attente d'approbation Modulimo (${pending.length})
-      </span>
-      <span style="font-size:11px;color:var(--text3);margin-left:8px;">L'activation est gérée par Modulimo Central.</span>
-    </td></tr>`;
-    pending.forEach(t => {
-      const displayName = isDemo ? anonName(t.id) : escHtml(t.full_name || t.email || '—');
-      html += `<tr style="background:rgba(200,169,110,.03);opacity:0.7;">
-        <td>${displayName} <span class="badge badge-gray" style="font-size:0.7rem;">En attente</span></td>
-        <td>${t.unit || '—'}</td>
-        <td><span class="badge badge-gray">${t.role}</span></td>
-        <td>—</td>
-        <td><span class="badge badge-gray">Aucun</span></td>
-        <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
-        <td class="td-actions">
-          <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">Modifier</button>
-        </td>
-      </tr>`;
-    });
-    html += `<tr><td colspan="7" style="height:8px;"></td></tr>`;
-  }
-
-  // Locataires actifs
+  // Locataires actifs en premier
   html += active.map(t => {
     const displayName = isDemo ? anonName(t.id) : escHtml(t.full_name);
     const displayUnit = isDemo ? (t.unit ? anonUnit(t.id) : '—') : (t.unit || '—');
@@ -6858,6 +6833,30 @@ async function loadTenants() {
       </td>
     </tr>`;
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3)">Aucun locataire actif</td></tr>';
+
+  // Inactifs/en attente en bas
+  if (pending.length > 0) {
+    html += `<tr><td colspan="7" style="padding:10px 12px;background:rgba(200,169,110,.08);border-top:2px solid rgba(200,169,110,.2);border-bottom:1px solid rgba(200,169,110,.2);">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent2);">
+        ⏳ Inactifs / En attente (${pending.length})
+      </span>
+      <span style="font-size:11px;color:var(--text3);margin-left:8px;">L'activation est gérée par Modulimo Central.</span>
+    </td></tr>`;
+    pending.forEach(t => {
+      const displayName = isDemo ? anonName(t.id) : escHtml(t.full_name || t.email || '—');
+      html += `<tr style="background:rgba(200,169,110,.03);opacity:0.7;">
+        <td>${displayName} <span class="badge badge-gray" style="font-size:0.7rem;">Inactif</span></td>
+        <td>${t.unit || '—'}</td>
+        <td><span class="badge badge-gray">${t.role}</span></td>
+        <td>—</td>
+        <td><span class="badge badge-gray">Aucun</span></td>
+        <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
+        <td class="td-actions">
+          <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">✏️ Modifier</button>
+        </td>
+      </tr>`;
+    });
+  }
 
   document.getElementById('tenants-tbody').innerHTML = html;
 }
