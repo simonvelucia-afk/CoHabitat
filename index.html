@@ -6827,7 +6827,6 @@ async function loadTenants() {
       <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
       <td class="td-actions" style="flex-wrap:wrap;">
         ${t.role !== 'principal_admin' ? `<button class="btn btn-warning btn-sm" onclick="quickToggleTenant('${tid}', false)">🔒 Suspendre</button>` : ''}
-        <button class="btn btn-info btn-sm" onclick="openPlanManagerById('${tid}')">📦 Forfait</button>
         <button class="btn btn-info btn-sm" onclick="openAccessManagerById('${tid}')">🗝 Accès</button>
         ${t.role !== 'principal_admin' || currentProfile?.role === 'principal_admin' ? `<button class="btn btn-secondary btn-sm" onclick="editTenant('${tid}')">✏️ Modifier</button>` : ''}
       </td>
