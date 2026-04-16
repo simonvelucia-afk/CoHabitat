@@ -2484,8 +2484,8 @@ async function initApp() {
   }
 
   // ── Vérification des contrats via Modulimo Central ───────────────────────
-  // Les admins principaux ne sont pas bloqués par les contrats
-  if (currentProfile.role !== 'principal_admin') {
+  // Les admins principaux et admins ne sont pas bloqués par les contrats
+  if (currentProfile.role !== 'principal_admin' && currentProfile.role !== 'admin') {
     const contractStatus = await checkContracts(currentUser.id);
     if (contractStatus.blocked) {
       await sb.auth.signOut();
@@ -6274,6 +6274,11 @@ function txLabel(type, description) {
 async function loadContractPage() {
   const el = document.getElementById('contract-content');
   if(!el) return;
+  // Mode démo — pas de contrat réel
+  if (isDemo || !currentUser) {
+    el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);"><div style="font-size:3rem;margin-bottom:16px;">📄</div><p>Le contrat n'est pas disponible en mode démo.</p></div>';
+    return;
+  }
   el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);">Chargement…</div>';
 
   const isOwner = currentProfile.role === 'principal_admin';
@@ -6856,9 +6861,10 @@ async function loadTenants() {
       cData.forEach(c => { if (c.cohabitat_user_id) centralClientMap[c.cohabitat_user_id] = c; });
     }
   } catch(e) {}
-  // Marquer comme "en attente" : pending_approval=true OU absent de Central
+  // Marquer comme "en attente" : tenant UNIQUEMENT, pending_approval=true OU absent de Central
   tenantsCache.forEach(t => {
     if (t.is_active === false) return; // déjà dans section inactive
+    if (t.role !== 'tenant') return;  // admins/principal_admin ne passent pas par Central
     const cc = centralClientMap[t.id];
     if (!cc || cc.pending_approval) centralPendingIds.add(t.id);
   });
@@ -6891,7 +6897,7 @@ async function loadTenants() {
         : '<span class="badge badge-gray">Aucun</span>'}</td>
       <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
       <td class="td-actions" style="flex-wrap:wrap;">
-        ${isCentralPending ? `<button class="btn btn-primary btn-sm" onclick="quickToggleTenant('${tid}', true)">🟢 Approuver</button>` : ''}
+        ${isCentralPending ? `<button class="btn btn-primary btn-sm" onclick="openApproveModal('${tid}')">🟢 Approuver</button>` : ''}
         ${t.role !== 'principal_admin' ? `<button class="btn btn-warning btn-sm" onclick="quickToggleTenant('${tid}', false)">🔒 Suspendre</button>` : ''}
         <button class="btn btn-info btn-sm" onclick="openAccessManagerById('${tid}')">🗝 Accès</button>
         ${t.role !== 'principal_admin' || currentProfile?.role === 'principal_admin' ? `<button class="btn btn-secondary btn-sm" onclick="editTenant('${tid}')">✏️ Modifier</button>` : ''}
@@ -6926,7 +6932,7 @@ async function loadTenants() {
         <td><span class="badge badge-gray">Aucun</span></td>
         <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
         <td class="td-actions">
-          <button class="btn btn-primary btn-sm" onclick="quickToggleTenant('${t.id}', true)">🟢 Activer</button>
+          <button class="btn btn-primary btn-sm" onclick="openApproveModal('${t.id}')">🟢 Approuver</button>
           <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">✏️ Modifier</button>
         </td>
       </tr>`;
@@ -7041,66 +7047,145 @@ async function savePlanManager() {
   loadTenants();
 }
 
+// Ouvrir le modal d'approbation avec choix du plan
+function openApproveModal(userId) {
+  const t = tenantsCache.find(x => x.id === userId);
+  if (!t) return;
+  document.getElementById('approve-modal-uid').value    = userId;
+  document.getElementById('approve-modal-name').textContent = t.full_name || t.email || userId;
+  document.getElementById('approve-modal-plan').value   = 'local';
+  openModal('modal-approve-resident');
+}
+
+async function submitApproveResident() {
+  const id   = document.getElementById('approve-modal-uid').value;
+  const plan = document.getElementById('approve-modal-plan').value;
+  const t    = tenantsCache.find(x => x.id === id);
+  if (!t) return;
+
+  const btn = document.getElementById('approve-modal-btn');
+  btn.disabled = true;
+  btn.textContent = 'Activation…';
+
+  try {
+    // 1. Activer le profil local + définir le plan
+    const planUntil = new Date();
+    planUntil.setFullYear(planUntil.getFullYear() + 1);
+    const { error } = await sb.from('profiles').update({
+      is_active: true,
+      resident_plan: plan,
+      resident_plan_until: planUntil.toISOString(),
+      status_changed_at: new Date().toISOString(),
+      status_changed_by: currentProfile.id
+    }).eq('id', id);
+    if (error) { toast('Erreur profil: ' + error.message, 'error'); return; }
+
+    // 2. Trouver owner_client_id via la licence du domaine
+    let ownerClientId = null;
+    try {
+      const licRes = await fetch(
+        CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(window.location.hostname) + '&select=client_id&limit=1',
+        { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      );
+      const licData = await licRes.json();
+      ownerClientId = licData?.[0]?.client_id || null;
+    } catch(e) {}
+
+    // 3. Créer ou patcher le client Central
+    let centralClientId = null;
+    const checkRes = await fetch(
+      CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id) + '&select=id&limit=1',
+      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+    );
+    const existing = checkRes.ok ? await checkRes.json() : [];
+    if (existing && existing.length > 0) {
+      centralClientId = existing[0].id;
+      await fetch(
+        CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id),
+        {
+          method: 'PATCH',
+          headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            pending_approval: false,
+            is_active: true,
+            owner_client_id: ownerClientId,
+            client_type: plan === 'network' ? 'network' : 'local',
+            updated_at: new Date().toISOString()
+          })
+        }
+      );
+    } else {
+      const postRes = await fetch(CENTRAL_URL + '/rest/v1/clients', {
+        method: 'POST',
+        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({
+          name: t.full_name || t.email || 'Résident',
+          client_type: plan === 'network' ? 'network' : 'local',
+          contact_email: t.email || '',
+          contact_name: t.full_name || '',
+          cohabitat_user_id: id,
+          cohabitat_email: t.email || '',
+          owner_client_id: ownerClientId,
+          pending_approval: false,
+          is_active: true,
+          created_at: new Date().toISOString()
+        })
+      });
+      const newClient = postRes.ok ? await postRes.json() : null;
+      centralClientId = newClient?.[0]?.id || null;
+    }
+
+    // 4. Créer le contrat Central
+    if (centralClientId) {
+      await fetch(CENTRAL_URL + '/rest/v1/contracts', {
+        method: 'POST',
+        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          client_id: centralClientId,
+          owner_client_id: ownerClientId,
+          type: 'resident',
+          plan: plan,
+          starts_at: new Date().toISOString().slice(0, 10),
+          status: 'active',
+          created_by: 'cohabitat_admin'
+        })
+      });
+    }
+
+    closeModal('modal-approve-resident');
+    toast('🟢 ' + (t.full_name || 'Résident') + ' approuvé — Forfait ' + (plan === 'network' ? 'Réseau' : 'Local'), 'success');
+    loadTenants();
+  } catch(e) {
+    toast('Erreur: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Approuver';
+  }
+}
+
 async function quickToggleTenant(id, activate) {
+  // activate=true ne doit plus être appelé directement — passe par openApproveModal
+  if (activate) { openApproveModal(id); return; }
   const t = tenantsCache.find(x => x.id === id);
   if (!t) return;
   const { error } = await sb.from('profiles').update({
-    is_active: activate,
+    is_active: false,
     status_changed_at: new Date().toISOString(),
     status_changed_by: currentProfile.id
   }).eq('id', id);
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
-  // Si activation : créer ou patcher le client dans Modulimo Central
-  if (activate) {
-    try {
-      // Trouver le owner_client_id via la licence de ce domaine
-      let ownerClientId = null;
-      try {
-        const licRes = await fetch(
-          CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(window.location.hostname) + '&select=client_id&limit=1',
-          { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
-        );
-        const licData = await licRes.json();
-        ownerClientId = licData?.[0]?.client_id || null;
-      } catch(e) {}
-      // Vérifier si le client Central existe déjà
-      const checkRes = await fetch(
-        CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id) + '&select=id&limit=1',
-        { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
-      );
-      const existing = checkRes.ok ? await checkRes.json() : [];
-      if (existing && existing.length > 0) {
-        // PATCH — effacer pending_approval
-        await fetch(
-          CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id),
-          {
-            method: 'PATCH',
-            headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-            body: JSON.stringify({ pending_approval: false, is_active: true })
-          }
-        );
-      } else {
-        // POST — créer le client approuvé
-        await fetch(CENTRAL_URL + '/rest/v1/clients', {
-          method: 'POST',
-          headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({
-            name: t.full_name || t.email || 'Résident',
-            client_type: 'local',
-            contact_email: t.email || '',
-            contact_name: t.full_name || '',
-            cohabitat_user_id: id,
-            cohabitat_email: t.email || '',
-            owner_client_id: ownerClientId,
-            pending_approval: false,
-            is_active: true,
-            created_at: new Date().toISOString()
-          })
-        });
+  // Désactiver aussi dans Central
+  try {
+    await fetch(
+      CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id),
+      {
+        method: 'PATCH',
+        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ is_active: false, updated_at: new Date().toISOString() })
       }
-    } catch(e) { /* silencieux */ }
-  }
-  toast(activate ? '🟢 Compte activé' : '🔒 Compte suspendu', 'success');
+    );
+  } catch(e) {}
+  toast('🔒 Compte suspendu', 'success');
   loadTenants();
 }
 
@@ -7851,6 +7936,34 @@ async function bbDeletePost(id) {
     <div id="dep-access-body" style="padding:16px 20px;overflow-y:auto;flex:1;"></div>
     <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;flex-shrink:0;">
       <button class="btn btn-secondary" onclick="closeModal('modal-dep-access');loadDependents();">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal approbation résident -->
+<div id="modal-approve-resident" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:400px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;">
+    <div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">🟢 Approuver le résident</span>
+      <button onclick="closeModal('modal-approve-resident')" style="background:none;border:none;color:var(--text2);font-size:1.2rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:20px;">
+      <input type="hidden" id="approve-modal-uid">
+      <p style="margin:0 0 16px;color:var(--text2);font-size:0.9rem;">Résident : <strong id="approve-modal-name" style="color:var(--text);"></strong></p>
+      <div class="form-group">
+        <label>Forfait à activer</label>
+        <select id="approve-modal-plan" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 14px;font-size:0.95rem;outline:none;">
+          <option value="local">🏠 Forfait Local — espaces du bâtiment</option>
+          <option value="network">🔗 Forfait Réseau — accès multi-bâtiments</option>
+        </select>
+      </div>
+      <div style="background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.2);border-radius:6px;padding:12px;font-size:0.82rem;color:var(--text2);line-height:1.5;">
+        Le forfait sera valide <strong style="color:var(--accent);">1 an</strong> à partir d'aujourd'hui. Un contrat sera créé dans Modulimo Central.
+      </div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-approve-resident')">Annuler</button>
+      <button id="approve-modal-btn" class="btn btn-primary" onclick="submitApproveResident()">Approuver</button>
     </div>
   </div>
 </div>
