@@ -2505,119 +2505,132 @@ async function initApp() {
 async function checkContracts(userId) {
   try {
     const domain = window.location.hostname;
+    const today  = new Date().toISOString().slice(0, 10);
 
-    // 1. Trouver le client Modulimo Central de ce résident
+    // ── 0. Licence de l'immeuble via le domaine — bloque TOUS les résidents si inactive
+    const licRes = await fetch(
+      CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(domain) + '&select=client_id,active,expires_at&limit=1',
+      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+    );
+    const lics = licRes.ok ? await licRes.json() : [];
+    const lic  = lics?.[0];
+
+    if (!lic || !lic.active) {
+      return {
+        blocked: true, type: 'owner_no_contract',
+        message: '🏢 La licence de votre immeuble avec Modulimo n\'est pas active. Contactez l\'administration de votre immeuble.'
+      };
+    }
+    if (lic.expires_at && lic.expires_at < today) {
+      return {
+        blocked: true, type: 'owner_expired',
+        message: '🏢 La licence de votre immeuble avec Modulimo a expir\u00e9. Contactez l\'administration de votre immeuble.'
+      };
+    }
+
+    // Contrat owner dans contracts (suspendu ou résilié)
+    const ownerClientId = lic.client_id;
+    if (ownerClientId) {
+      const ownRes = await fetch(
+        CENTRAL_URL + '/rest/v1/contracts?client_id=eq.' + ownerClientId + '&type=eq.owner&order=created_at.desc&limit=1&select=status,ends_at',
+        { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      );
+      const ownContracts = ownRes.ok ? await ownRes.json() : [];
+      const ownContract  = ownContracts?.[0];
+      if (ownContract) {
+        if (ownContract.status === 'suspended') {
+          return { blocked: true, type: 'owner_no_contract',
+            message: '🏢 Le contrat de votre immeuble avec Modulimo est suspendu. Contactez l\'administration de votre immeuble.' };
+        }
+        if (ownContract.status === 'terminated') {
+          return { blocked: true, type: 'owner_expired',
+            message: '🏢 Le contrat de votre immeuble avec Modulimo a \u00e9t\u00e9 r\u00e9sili\u00e9. Contactez l\'administration de votre immeuble.' };
+        }
+        if (ownContract.ends_at && ownContract.ends_at < today) {
+          return { blocked: true, type: 'owner_expired',
+            message: '🏢 Le contrat de votre immeuble avec Modulimo a expir\u00e9 le ' + new Date(ownContract.ends_at).toLocaleDateString('fr-CA') + '.' };
+        }
+      }
+    }
+
+    // ── 1. Client Central du résident
     const clientRes = await fetch(
       CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + userId + '&select=id,is_active,pending_approval,owner_client_id&limit=1',
       { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
     );
-    const clients = await clientRes.json();
-    const client = clients?.[0];
+    const clients = clientRes.ok ? await clientRes.json() : [];
+    const client  = clients?.[0];
 
-    // En attente d'approbation
-    if (!client || client.pending_approval) {
-      if (!client) {
-        // Absent de Central : vérifier le profil local
-        try {
-          const profRes = await fetch(
-            SUPABASE_URL + '/rest/v1/profiles?id=eq.' + userId + '&select=is_active,resident_plan,full_name,email&limit=1',
-            { headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY } }
-          );
-          const profs = profRes.ok ? await profRes.json() : [];
-          const prof = profs?.[0];
-          if (prof && prof.is_active !== false && prof.resident_plan && prof.resident_plan !== 'none') {
-            // Compte hérité actif avec forfait → syncer vers Central en arrière-plan puis laisser passer
-            syncNewResidentToCentral(userId, prof.email, prof.full_name, true);
-            return { blocked: false };
-          }
-        } catch(e) {}
-      }
+    // ── 2. Absent de Central
+    if (!client) {
+      try {
+        const profRes = await fetch(
+          SUPABASE_URL + '/rest/v1/profiles?id=eq.' + userId + '&select=is_active,resident_plan,full_name,email&limit=1',
+          { headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY } }
+        );
+        const profs = profRes.ok ? await profRes.json() : [];
+        const prof  = profs?.[0];
+        if (prof && prof.is_active !== false && prof.resident_plan && prof.resident_plan !== 'none') {
+          syncNewResidentToCentral(userId, prof.email, prof.full_name, true);
+          return { blocked: false };
+        }
+      } catch(e) {}
       return {
-        blocked: true,
-        type: 'pending',
-        message: '⏳ Votre compte est en attente d\'approbation par l\'administrateur Modulimo. Vous recevrez un courriel dès que votre accès sera activé.'
+        blocked: true, type: 'pending',
+        message: '\u23f3 Votre compte est en attente d\'approbation par l\'administrateur Modulimo. Vous recevrez un courriel d\u00e8s que votre acc\u00e8s sera activ\u00e9.'
       };
     }
 
-    // Client inactif
+    // ── 3. Pending / désactivé
+    if (client.pending_approval) {
+      return {
+        blocked: true, type: 'pending',
+        message: '\u23f3 Votre compte est en attente d\'approbation par l\'administrateur Modulimo. Vous recevrez un courriel d\u00e8s que votre acc\u00e8s sera activ\u00e9.'
+      };
+    }
     if (client.is_active === false) {
       return {
-        blocked: true,
-        type: 'inactive',
-        message: '🔒 Votre accès a été désactivé. Contactez votre administrateur d\'immeuble pour plus d\'information.'
+        blocked: true, type: 'inactive',
+        message: '\ud83d\udd12 Votre acc\u00e8s a \u00e9t\u00e9 d\u00e9sactiv\u00e9. Contactez votre administrateur d\'immeuble pour plus d\'information.'
       };
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-
-    // 2. Vérifier le contrat du résident
+    // ── 4. Contrat du résident
     const resContractRes = await fetch(
-      CENTRAL_URL + '/rest/v1/contracts?client_id=eq.' + client.id + '&type=eq.resident&select=id,status,starts_at,ends_at&order=created_at.desc&limit=1',
+      CENTRAL_URL + '/rest/v1/contracts?client_id=eq.' + client.id + '&type=eq.resident&order=created_at.desc&limit=1&select=id,status,starts_at,ends_at',
       { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
     );
-    const resContracts = await resContractRes.json();
-    const resContract = resContracts?.[0];
+    const resContracts = resContractRes.ok ? await resContractRes.json() : [];
+    const resContract  = resContracts?.[0];
 
     if (!resContract) {
       return { blocked: true, type: 'no_contract',
-        message: '📄 Aucun contrat actif trouvé pour votre compte. Contactez votre administrateur d\'immeuble.' };
+        message: '\ud83d\udcc4 Aucun contrat actif trouv\u00e9 pour votre compte. Contactez votre administrateur d\'immeuble.' };
     }
     if (resContract.status === 'suspended') {
       return { blocked: true, type: 'inactive',
-        message: '⏸ Votre contrat est temporairement suspendu. Contactez l\'administration de votre immeuble.' };
+        message: '\u23f8 Votre contrat est temporairement suspendu. Contactez l\'administration de votre immeuble.' };
     }
     if (resContract.status === 'terminated') {
       return { blocked: true, type: 'expired',
-        message: '📄 Votre contrat a été résilié. Contactez l\'administration de votre immeuble.' };
+        message: '\ud83d\udcc4 Votre contrat a \u00e9t\u00e9 r\u00e9sili\u00e9. Contactez l\'administration de votre immeuble.' };
     }
     if (resContract.ends_at && resContract.ends_at < today) {
-      return {
-        blocked: true,
-        type: 'expired',
-        message: '📅 Votre contrat de résident a expiré le ' + new Date(resContract.ends_at).toLocaleDateString('fr-CA') + '. Contactez votre administrateur pour le renouveler.'
-      };
+      return { blocked: true, type: 'expired',
+        message: '\ud83d\udcc5 Votre contrat de r\u00e9sident a expir\u00e9 le ' + new Date(resContract.ends_at).toLocaleDateString('fr-CA') + '. Contactez votre administrateur pour le renouveler.' };
     }
     if (resContract.starts_at && resContract.starts_at > today) {
-      return {
-        blocked: true,
-        type: 'not_started',
-        message: '📅 Votre contrat entre en vigueur le ' + new Date(resContract.starts_at).toLocaleDateString('fr-CA') + '.'
-      };
-    }
-
-    // 3. Vérifier le contrat du propriétaire de l'immeuble
-    if (client.owner_client_id) {
-      const ownContractRes = await fetch(
-        CENTRAL_URL + '/rest/v1/contracts?client_id=eq.' + client.owner_client_id + '&type=eq.owner&status=eq.active&select=id,starts_at,ends_at&limit=1',
-        { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
-      );
-      const ownContracts = await ownContractRes.json();
-      const ownContract = ownContracts?.[0];
-
-      if (!ownContract) {
-        return {
-          blocked: true,
-          type: 'owner_no_contract',
-          message: '🏢 Le contrat de votre immeuble avec Modulimo n\'est pas actif. Contactez l\'administration de votre immeuble.'
-        };
-      }
-      if (ownContract.ends_at && ownContract.ends_at < today) {
-        return {
-          blocked: true,
-          type: 'owner_expired',
-          message: '🏢 Le contrat de votre immeuble avec Modulimo a expiré. Contactez l\'administration de votre immeuble.'
-        };
-      }
+      return { blocked: true, type: 'not_started',
+        message: '\ud83d\udcc5 Votre contrat entre en vigueur le ' + new Date(resContract.starts_at).toLocaleDateString('fr-CA') + '.' };
     }
 
     return { blocked: false };
+
   } catch(e) {
-    // En cas d'erreur réseau, on laisse passer (fail open)
     console.warn('[checkContracts] Erreur (fail open):', e.message);
     return { blocked: false };
   }
 }
-
 function showContractError(message, type) {
   const errorBox = document.getElementById('auth-error');
   if (!errorBox) return;
@@ -6899,20 +6912,21 @@ async function loadTenants() {
       cData.forEach(c => { if (c.cohabitat_user_id) centralClientMap[c.cohabitat_user_id] = c; });
     }
   } catch(e) {}
-  // Marquer comme "en attente" : tenant UNIQUEMENT
-  // Critères : pending_approval=true dans Central
-  //            OU absent de Central ET pas encore de forfait actif (resident_plan null/none)
+  // Deux catégories de résidents sans lien Central complet :
+  // centralPendingIds  : nouveaux sans forfait → bouton 🟢 Approuver
+  // centralNotSyncedIds: ont un forfait mais absent/pending de Central → bouton 🔗 Sync Central
+  let centralNotSyncedIds = new Set();
   tenantsCache.forEach(t => {
-    if (t.is_active === false) return; // déjà dans section inactive
-    if (t.role !== 'tenant') return;  // admins ne passent pas par Central
+    if (t.is_active === false) return;
+    if (t.role !== 'tenant') return;
     const cc = centralClientMap[t.id];
     const hasPlan = t.resident_plan && t.resident_plan !== 'none';
-    if (cc) {
-      // Client Central existe : en attente seulement si pending_approval explicite
-      if (cc.pending_approval) centralPendingIds.add(t.id);
-    } else {
-      // Absent de Central : en attente seulement si pas encore de forfait assigné
-      if (!hasPlan) centralPendingIds.add(t.id);
+    if (!cc) {
+      if (hasPlan) centralNotSyncedIds.add(t.id); // actif avec forfait mais absent de Central
+      else         centralPendingIds.add(t.id);    // nouveau sans forfait
+    } else if (cc.pending_approval) {
+      if (hasPlan) centralNotSyncedIds.add(t.id); // pending mais forfait déjà assigné localement
+      else         centralPendingIds.add(t.id);
     }
   });
 
@@ -6929,10 +6943,11 @@ async function loadTenants() {
     const roleIcon = t.role === 'principal_admin' ? '<span title="Principal Admin" style="margin-right:6px;font-size:1rem;">⭐</span>'
                    : t.role === 'admin'           ? '<span title="Admin" style="margin-right:6px;font-size:1rem;">👑</span>'
                    :                                '<span title="Locataire" style="margin-right:6px;font-size:1rem;">👤</span>';
-    const isCentralPending = centralPendingIds.has(t.id);
+    const isCentralPending   = centralPendingIds.has(t.id);
+    const isCentralNotSynced = centralNotSyncedIds.has(t.id);
     return `
-    <tr${isCentralPending ? ' style="background:rgba(200,169,110,.06);"' : ''}>
-      <td style="white-space:nowrap;">${roleIcon}${displayName}${isCentralPending ? ' <span class="badge badge-yellow" style="font-size:0.7rem;">⏳ Approbation</span>' : ''}</td>
+    <tr${(isCentralPending || isCentralNotSynced) ? ' style="background:rgba(200,169,110,.04);"' : ''}>
+      <td style="white-space:nowrap;">${roleIcon}${displayName}${isCentralPending ? ' <span class="badge badge-yellow" style="font-size:0.7rem;">⏳ Approbation</span>' : isCentralNotSynced ? ' <span class="badge badge-gray" style="font-size:0.7rem;">⚠️ Non-sync</span>' : ''}</td>
       <td>${displayUnit}</td>
       <td><span class="badge badge-gray">${t.role}</span></td>
       <td>${t.is_approved_driver ? '<span class="badge badge-green">✓ Chauffeur</span>' : '—'}</td>
@@ -6944,7 +6959,8 @@ async function loadTenants() {
         : '<span class="badge badge-gray">Aucun</span>'}</td>
       <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
       <td class="td-actions" style="flex-wrap:wrap;">
-        ${isCentralPending ? `<button class="btn btn-primary btn-sm" onclick="openApproveModal('${tid}')">🟢 Approuver</button>` : ''}
+        ${isCentralPending   ? `<button class="btn btn-primary btn-sm" onclick="openApproveModal('${tid}')">🟢 Approuver</button>` : ''}
+        ${isCentralNotSynced ? `<button class="btn btn-info btn-sm" onclick="syncTenantToCentral('${tid}')">🔗 Sync Central</button>` : ''}
         ${t.role !== 'principal_admin' ? `<button class="btn btn-warning btn-sm" onclick="quickToggleTenant('${tid}', false)">🔒 Suspendre</button>` : ''}
         <button class="btn btn-info btn-sm" onclick="openAccessManagerById('${tid}')">🗝 Accès</button>
         ${t.role !== 'principal_admin' || currentProfile?.role === 'principal_admin' ? `<button class="btn btn-secondary btn-sm" onclick="editTenant('${tid}')">✏️ Modifier</button>` : ''}
@@ -6954,11 +6970,15 @@ async function loadTenants() {
 
   // Inactifs/en attente en bas
   // Résumé Central pending dans le header actifs si applicable
-  const centralPendingCount = [...centralPendingIds].filter(id => tenantsCache.find(t => t.id === id && t.is_active !== false)).length;
-  if (centralPendingCount > 0) {
+  const centralPendingCount   = centralPendingIds.size;
+  const centralNotSyncedCount = centralNotSyncedIds.size;
+  if (centralPendingCount > 0 || centralNotSyncedCount > 0) {
+    const parts = [];
+    if (centralPendingCount > 0)   parts.push(`⏳ ${centralPendingCount} en attente d'approbation`);
+    if (centralNotSyncedCount > 0) parts.push(`⚠️ ${centralNotSyncedCount} non-synchronisé(s) avec Central`);
     html = `<tr><td colspan="7" style="padding:8px 12px;background:rgba(200,169,110,.08);border-bottom:1px solid rgba(200,169,110,.2);">
       <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);">
-        ⏳ ${centralPendingCount} compte(s) en attente d'approbation Modulimo Central — voir badge ci-dessous
+        ${parts.join(' — ')}
       </span>
     </td></tr>` + html;
   }
@@ -7092,6 +7112,100 @@ async function savePlanManager() {
   toast('Forfait mis à jour', 'success');
   closeModal('modal-plan-manager');
   loadTenants();
+}
+
+// Synchroniser un résident existant (avec forfait local) vers Modulimo Central
+async function syncTenantToCentral(userId) {
+  const t = tenantsCache.find(x => x.id === userId);
+  if (!t) return;
+
+  const btn = document.querySelector(`button[onclick="syncTenantToCentral('${userId}')"]`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Sync…'; }
+
+  try {
+    // Trouver owner_client_id via la licence du domaine
+    let ownerClientId = null;
+    const licRes = await fetch(
+      CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(window.location.hostname) + '&select=client_id&limit=1',
+      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+    );
+    const licData = licRes.ok ? await licRes.json() : [];
+    ownerClientId = licData?.[0]?.client_id || null;
+
+    // Vérifier si client Central existe déjà (cas pending_approval)
+    const checkRes = await fetch(
+      CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(userId) + '&select=id&limit=1',
+      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+    );
+    const existing = checkRes.ok ? await checkRes.json() : [];
+
+    let centralClientId = null;
+    const plan = t.resident_plan || 'local';
+
+    if (existing && existing.length > 0) {
+      // Existe mais pending — activer
+      centralClientId = existing[0].id;
+      await fetch(
+        CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(userId),
+        {
+          method: 'PATCH',
+          headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            pending_approval: false,
+            is_active: true,
+            owner_client_id: ownerClientId,
+            client_type: plan === 'network' ? 'network' : 'local',
+            updated_at: new Date().toISOString()
+          })
+        }
+      );
+    } else {
+      // Créer le client Central directement actif
+      const postRes = await fetch(CENTRAL_URL + '/rest/v1/clients', {
+        method: 'POST',
+        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({
+          name: t.full_name || t.email || 'Résident',
+          client_type: plan === 'network' ? 'network' : 'local',
+          contact_email: t.email || '',
+          contact_name: t.full_name || '',
+          cohabitat_user_id: userId,
+          cohabitat_email: t.email || '',
+          owner_client_id: ownerClientId,
+          pending_approval: false,
+          is_active: true,
+          created_at: new Date().toISOString()
+        })
+      });
+      const newClient = postRes.ok ? await postRes.json() : null;
+      centralClientId = newClient?.[0]?.id || null;
+    }
+
+    // Créer le contrat Central
+    if (centralClientId) {
+      const planUntil = t.resident_plan_until || null;
+      await fetch(CENTRAL_URL + '/rest/v1/contracts', {
+        method: 'POST',
+        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          client_id: centralClientId,
+          owner_client_id: ownerClientId,
+          type: 'resident',
+          plan: plan,
+          starts_at: new Date().toISOString().slice(0, 10),
+          ends_at: planUntil ? planUntil.slice(0, 10) : null,
+          status: 'active',
+          created_by: 'cohabitat_admin_sync'
+        })
+      });
+    }
+
+    toast('🔗 ' + (t.full_name || 'Résident') + ' synchronisé avec Modulimo Central ✓', 'success');
+    loadTenants();
+  } catch(e) {
+    toast('Erreur sync: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '🔗 Sync Central'; }
+  }
 }
 
 // Ouvrir le modal d'approbation avec choix du plan
