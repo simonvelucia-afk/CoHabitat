@@ -7155,8 +7155,7 @@ async function syncTenantToCentral(userId) {
             pending_approval: false,
             is_active: true,
             owner_client_id: ownerClientId,
-            client_type: plan === 'network' ? 'network' : 'local',
-            updated_at: new Date().toISOString()
+            client_type: plan === 'network' ? 'network' : 'local'
           })
         }
       );
@@ -7181,8 +7180,7 @@ async function syncTenantToCentral(userId) {
           cohabitat_email: t.email || '',
           owner_client_id: ownerClientId,
           pending_approval: false,
-          is_active: true,
-          created_at: new Date().toISOString()
+          is_active: true
         })
       });
       if (!postRes.ok) {
@@ -7299,8 +7297,7 @@ async function submitApproveResident() {
             pending_approval: false,
             is_active: true,
             owner_client_id: ownerClientId,
-            client_type: plan === 'network' ? 'network' : 'local',
-            updated_at: new Date().toISOString()
+            client_type: plan === 'network' ? 'network' : 'local'
           })
         }
       );
