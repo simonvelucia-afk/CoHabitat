@@ -3254,6 +3254,7 @@ function showLogin() {
     inp.setAttribute('autocorrect', 'off');
     inp.setAttribute('autocapitalize', 'off');
     inp.setAttribute('spellcheck', 'false');
+    inp.style.cssText = 'width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 14px;outline:none;font-size:0.95rem;box-sizing:border-box;font-family:var(--font-sans);';
     inp.oninput = () => { document.getElementById('auth-error').style.display = 'none'; };
     // Quand l'email change (surtout via sélection dropdown), vider le mot de passe
     inp.addEventListener('change', () => {
