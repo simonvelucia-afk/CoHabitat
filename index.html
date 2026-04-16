@@ -6843,6 +6843,26 @@ async function loadTenants() {
   const { data } = await sb.from('profiles').select('*').neq('role', 'demo').order('full_name');
   tenantsCache = data || [];
 
+  // Récupérer TOUS les clients Central pour détecter: absent, pending_approval, ou inactif
+  let centralPendingIds = new Set(); // bloqués au login (absent OU pending_approval=true)
+  let centralClientMap  = {};        // cohabitat_user_id -> client row
+  try {
+    const cRes = await fetch(
+      CENTRAL_URL + '/rest/v1/clients?select=cohabitat_user_id,id,is_active,pending_approval',
+      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+    );
+    if (cRes.ok) {
+      const cData = await cRes.json();
+      cData.forEach(c => { if (c.cohabitat_user_id) centralClientMap[c.cohabitat_user_id] = c; });
+    }
+  } catch(e) {}
+  // Marquer comme "en attente" : pending_approval=true OU absent de Central
+  tenantsCache.forEach(t => {
+    if (t.is_active === false) return; // déjà dans section inactive
+    const cc = centralClientMap[t.id];
+    if (!cc || cc.pending_approval) centralPendingIds.add(t.id);
+  });
+
   const pending  = tenantsCache.filter(t => t.is_active === false);
   const active   = tenantsCache.filter(t => t.is_active !== false);
 
@@ -6856,9 +6876,10 @@ async function loadTenants() {
     const roleIcon = t.role === 'principal_admin' ? '<span title="Principal Admin" style="margin-right:6px;font-size:1rem;">⭐</span>'
                    : t.role === 'admin'           ? '<span title="Admin" style="margin-right:6px;font-size:1rem;">👑</span>'
                    :                                '<span title="Locataire" style="margin-right:6px;font-size:1rem;">👤</span>';
+    const isCentralPending = centralPendingIds.has(t.id);
     return `
-    <tr>
-      <td style="white-space:nowrap;">${roleIcon}${displayName}</td>
+    <tr${isCentralPending ? ' style="background:rgba(200,169,110,.06);"' : ''}>
+      <td style="white-space:nowrap;">${roleIcon}${displayName}${isCentralPending ? ' <span class="badge badge-yellow" style="font-size:0.7rem;">⏳ Approbation</span>' : ''}</td>
       <td>${displayUnit}</td>
       <td><span class="badge badge-gray">${t.role}</span></td>
       <td>${t.is_approved_driver ? '<span class="badge badge-green">✓ Chauffeur</span>' : '—'}</td>
@@ -6870,6 +6891,7 @@ async function loadTenants() {
         : '<span class="badge badge-gray">Aucun</span>'}</td>
       <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
       <td class="td-actions" style="flex-wrap:wrap;">
+        ${isCentralPending ? `<button class="btn btn-primary btn-sm" onclick="quickToggleTenant('${tid}', true)">🟢 Approuver</button>` : ''}
         ${t.role !== 'principal_admin' ? `<button class="btn btn-warning btn-sm" onclick="quickToggleTenant('${tid}', false)">🔒 Suspendre</button>` : ''}
         <button class="btn btn-info btn-sm" onclick="openAccessManagerById('${tid}')">🗝 Accès</button>
         ${t.role !== 'principal_admin' || currentProfile?.role === 'principal_admin' ? `<button class="btn btn-secondary btn-sm" onclick="editTenant('${tid}')">✏️ Modifier</button>` : ''}
@@ -6878,6 +6900,16 @@ async function loadTenants() {
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3)">Aucun locataire actif</td></tr>';
 
   // Inactifs/en attente en bas
+  // Résumé Central pending dans le header actifs si applicable
+  const centralPendingCount = [...centralPendingIds].filter(id => tenantsCache.find(t => t.id === id && t.is_active !== false)).length;
+  if (centralPendingCount > 0) {
+    html = `<tr><td colspan="7" style="padding:8px 12px;background:rgba(200,169,110,.08);border-bottom:1px solid rgba(200,169,110,.2);">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);">
+        ⏳ ${centralPendingCount} compte(s) en attente d'approbation Modulimo Central — voir badge ci-dessous
+      </span>
+    </td></tr>` + html;
+  }
+
   if (pending.length > 0) {
     html += `<tr><td colspan="7" style="padding:10px 12px;background:rgba(200,169,110,.08);border-top:2px solid rgba(200,169,110,.2);border-bottom:1px solid rgba(200,169,110,.2);">
       <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent2);">
@@ -7018,22 +7050,54 @@ async function quickToggleTenant(id, activate) {
     status_changed_by: currentProfile.id
   }).eq('id', id);
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
-  // Si activation : effacer pending_approval dans Modulimo Central
+  // Si activation : créer ou patcher le client dans Modulimo Central
   if (activate) {
     try {
-      await fetch(
-        CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id),
-        {
-          method: 'PATCH',
-          headers: {
-            apikey: CENTRAL_KEY,
-            Authorization: 'Bearer ' + CENTRAL_KEY,
-            'Content-Type': 'application/json',
-            Prefer: 'return=minimal'
-          },
-          body: JSON.stringify({ pending_approval: false, is_active: true })
-        }
+      // Trouver le owner_client_id via la licence de ce domaine
+      let ownerClientId = null;
+      try {
+        const licRes = await fetch(
+          CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(window.location.hostname) + '&select=client_id&limit=1',
+          { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+        );
+        const licData = await licRes.json();
+        ownerClientId = licData?.[0]?.client_id || null;
+      } catch(e) {}
+      // Vérifier si le client Central existe déjà
+      const checkRes = await fetch(
+        CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id) + '&select=id&limit=1',
+        { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
       );
+      const existing = checkRes.ok ? await checkRes.json() : [];
+      if (existing && existing.length > 0) {
+        // PATCH — effacer pending_approval
+        await fetch(
+          CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id),
+          {
+            method: 'PATCH',
+            headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify({ pending_approval: false, is_active: true })
+          }
+        );
+      } else {
+        // POST — créer le client approuvé
+        await fetch(CENTRAL_URL + '/rest/v1/clients', {
+          method: 'POST',
+          headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            name: t.full_name || t.email || 'Résident',
+            client_type: 'local',
+            contact_email: t.email || '',
+            contact_name: t.full_name || '',
+            cohabitat_user_id: id,
+            cohabitat_email: t.email || '',
+            owner_client_id: ownerClientId,
+            pending_approval: false,
+            is_active: true,
+            created_at: new Date().toISOString()
+          })
+        });
+      }
     } catch(e) { /* silencieux */ }
   }
   toast(activate ? '🟢 Compte activé' : '🔒 Compte suspendu', 'success');
