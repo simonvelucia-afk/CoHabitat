@@ -2517,17 +2517,17 @@ async function checkContracts(userId) {
     // En attente d'approbation
     if (!client || client.pending_approval) {
       if (!client) {
-        // Absent de Central : vérifier le profil local pour distinguer
-        // un compte hérité (is_active=true + forfait) d'un nouveau compte en attente
+        // Absent de Central : vérifier le profil local
         try {
           const profRes = await fetch(
-            SUPABASE_URL + '/rest/v1/profiles?id=eq.' + userId + '&select=is_active,resident_plan&limit=1',
+            SUPABASE_URL + '/rest/v1/profiles?id=eq.' + userId + '&select=is_active,resident_plan,full_name,email&limit=1',
             { headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY } }
           );
           const profs = profRes.ok ? await profRes.json() : [];
           const prof = profs?.[0];
-          // Compte hérité actif avec forfait → laisser passer
           if (prof && prof.is_active !== false && prof.resident_plan && prof.resident_plan !== 'none') {
+            // Compte hérité actif avec forfait → syncer vers Central en arrière-plan puis laisser passer
+            syncNewResidentToCentral(userId, prof.email, prof.full_name, true);
             return { blocked: false };
           }
         } catch(e) {}
@@ -2636,7 +2636,7 @@ function showContractError(message, type) {
 }
 
 // Créer un client dans Modulimo Central quand un nouveau résident s'inscrit
-async function syncNewResidentToCentral(userId, email, fullName) {
+async function syncNewResidentToCentral(userId, email, fullName, alreadyApproved = false) {
   try {
     // Trouver le client propriétaire de cet immeuble via la licence
     const domain = window.location.hostname;
@@ -2655,14 +2655,14 @@ async function syncNewResidentToCentral(userId, email, fullName) {
     const existing = await checkRes.json();
     if (existing && existing.length > 0) return; // Déjà existant
 
-    // Créer le client en attente
-    await fetch(CENTRAL_URL + '/rest/v1/clients', {
+    // Créer le client (en attente ou directement actif selon alreadyApproved)
+    const postRes = await fetch(CENTRAL_URL + '/rest/v1/clients', {
       method: 'POST',
       headers: {
         apikey: CENTRAL_KEY,
         Authorization: 'Bearer ' + CENTRAL_KEY,
         'Content-Type': 'application/json',
-        Prefer: 'return=minimal'
+        Prefer: 'return=representation'
       },
       body: JSON.stringify({
         name: fullName || email?.split('@')[0] || 'Nouveau résident',
@@ -2672,12 +2672,33 @@ async function syncNewResidentToCentral(userId, email, fullName) {
         cohabitat_user_id: userId,
         cohabitat_email: email || '',
         owner_client_id: ownerClientId,
-        pending_approval: true,
-        is_active: false,
+        pending_approval: !alreadyApproved,
+        is_active: alreadyApproved,
         created_at: new Date().toISOString()
       })
     });
-    console.log('[syncCentral] Résident créé dans Modulimo Central');
+
+    // Si compte hérité approuvé, créer aussi le contrat Central
+    if (alreadyApproved && postRes.ok) {
+      const newClient = await postRes.json();
+      const clientId = newClient?.[0]?.id;
+      if (clientId && ownerClientId) {
+        await fetch(CENTRAL_URL + '/rest/v1/contracts', {
+          method: 'POST',
+          headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            client_id: clientId,
+            owner_client_id: ownerClientId,
+            type: 'resident',
+            plan: 'local',
+            starts_at: new Date().toISOString().slice(0, 10),
+            status: 'active',
+            created_by: 'cohabitat_auto_sync'
+          })
+        });
+      }
+    }
+    console.log('[syncCentral] Résident créé dans Modulimo Central (approuvé=' + alreadyApproved + ')');
   } catch(e) {
     console.warn('[syncCentral] Erreur (non bloquant):', e.message);
   }
