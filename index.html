@@ -6883,7 +6883,6 @@ async function loadTenants() {
       <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent2);">
         ⏳ Inactifs / En attente (${pending.length})
       </span>
-      <span style="font-size:11px;color:var(--text3);margin-left:8px;">L'activation est gérée par Modulimo Central.</span>
     </td></tr>`;
     pending.forEach(t => {
       const displayName = isDemo ? anonName(t.id) : escHtml(t.full_name || t.email || '—');
@@ -6895,6 +6894,7 @@ async function loadTenants() {
         <td><span class="badge badge-gray">Aucun</span></td>
         <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
         <td class="td-actions">
+          <button class="btn btn-primary btn-sm" onclick="quickToggleTenant('${t.id}', true)">🟢 Activer</button>
           <button class="btn btn-secondary btn-sm" onclick="editTenant('${t.id}')">✏️ Modifier</button>
         </td>
       </tr>`;
@@ -7018,7 +7018,25 @@ async function quickToggleTenant(id, activate) {
     status_changed_by: currentProfile.id
   }).eq('id', id);
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
-  toast(activate ? '🔓 Compte réactivé' : '🔒 Compte suspendu', 'success');
+  // Si activation : effacer pending_approval dans Modulimo Central
+  if (activate) {
+    try {
+      await fetch(
+        CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id),
+        {
+          method: 'PATCH',
+          headers: {
+            apikey: CENTRAL_KEY,
+            Authorization: 'Bearer ' + CENTRAL_KEY,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal'
+          },
+          body: JSON.stringify({ pending_approval: false, is_active: true })
+        }
+      );
+    } catch(e) { /* silencieux */ }
+  }
+  toast(activate ? '🟢 Compte activé' : '🔒 Compte suspendu', 'success');
   loadTenants();
 }
 
