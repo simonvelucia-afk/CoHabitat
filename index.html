@@ -7142,10 +7142,11 @@ async function syncTenantToCentral(userId) {
     let centralClientId = null;
     const plan = t.resident_plan || 'local';
 
+    console.log('[syncToCentral] ownerClientId:', ownerClientId, '| existing:', existing);
     if (existing && existing.length > 0) {
       // Existe mais pending — activer
       centralClientId = existing[0].id;
-      await fetch(
+      const patchRes = await fetch(
         CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(userId),
         {
           method: 'PATCH',
@@ -7159,6 +7160,13 @@ async function syncTenantToCentral(userId) {
           })
         }
       );
+      if (!patchRes.ok) {
+        const errBody = await patchRes.text();
+        console.error('[syncToCentral] PATCH clients failed:', patchRes.status, errBody);
+        toast('Erreur Central PATCH (' + patchRes.status + '): ' + errBody.slice(0, 120), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = '🔗 Sync'; }
+        return;
+      }
     } else {
       // Créer le client Central directement actif
       const postRes = await fetch(CENTRAL_URL + '/rest/v1/clients', {
@@ -7177,14 +7185,22 @@ async function syncTenantToCentral(userId) {
           created_at: new Date().toISOString()
         })
       });
-      const newClient = postRes.ok ? await postRes.json() : null;
+      if (!postRes.ok) {
+        const errBody = await postRes.text();
+        console.error('[syncToCentral] POST clients failed:', postRes.status, errBody);
+        toast('Erreur Central (' + postRes.status + '): ' + errBody.slice(0, 120), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = '🔗 Sync'; }
+        return;
+      }
+      const newClient = await postRes.json();
       centralClientId = newClient?.[0]?.id || null;
+      console.log('[syncToCentral] Client créé:', centralClientId);
     }
 
     // Créer le contrat Central
     if (centralClientId) {
       const planUntil = t.resident_plan_until || null;
-      await fetch(CENTRAL_URL + '/rest/v1/contracts', {
+      const contRes = await fetch(CENTRAL_URL + '/rest/v1/contracts', {
         method: 'POST',
         headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({
@@ -7198,13 +7214,26 @@ async function syncTenantToCentral(userId) {
           created_by: 'cohabitat_admin_sync'
         })
       });
+      if (!contRes.ok) {
+        const errBody = await contRes.text();
+        console.warn('[syncToCentral] POST contracts failed:', contRes.status, errBody);
+        // Client créé mais contrat raté — toast partiel
+        toast('⚠️ Client créé dans Central mais erreur contrat (' + contRes.status + ')', 'error');
+        loadTenants();
+        return;
+      }
+    } else {
+      toast('⚠️ Sync: client Central créé mais ID non retourné', 'error');
+      loadTenants();
+      return;
     }
 
     toast('🔗 ' + (t.full_name || 'Résident') + ' synchronisé avec Modulimo Central ✓', 'success');
     loadTenants();
   } catch(e) {
+    console.error('[syncToCentral] Exception:', e);
     toast('Erreur sync: ' + e.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '🔗 Sync Central'; }
+    if (btn) { btn.disabled = false; btn.textContent = '🔗 Sync'; }
   }
 }
 
