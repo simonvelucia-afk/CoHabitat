@@ -6277,7 +6277,7 @@ async function loadContractPage() {
   if(!el) return;
   // Mode démo — pas de contrat réel
   if (isDemo || !currentUser) {
-    el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);"><div style="font-size:3rem;margin-bottom:16px;">📄</div><p>Le contrat n'est pas disponible en mode démo.</p></div>';
+    el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);"><div style="font-size:3rem;margin-bottom:16px;">📄</div><p>Contrat non disponible en mode d&#233;mo.</p></div>';
     return;
   }
   el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);">Chargement…</div>';
