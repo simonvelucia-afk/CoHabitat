@@ -2668,33 +2668,26 @@ async function syncNewResidentToCentral(userId, email, fullName, alreadyApproved
     const existing = await checkRes.json();
     if (existing && existing.length > 0) return; // Déjà existant
 
-    // Créer le client (en attente ou directement actif selon alreadyApproved)
-    const postRes = await fetch(CENTRAL_URL + '/rest/v1/clients', {
+    // Créer le client via RPC (bypass RLS)
+    const rpcRes = await fetch(CENTRAL_URL + '/rest/v1/rpc/create_resident_client', {
       method: 'POST',
-      headers: {
-        apikey: CENTRAL_KEY,
-        Authorization: 'Bearer ' + CENTRAL_KEY,
-        'Content-Type': 'application/json',
-        Prefer: 'return=representation'
-      },
+      headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: fullName || email?.split('@')[0] || 'Nouveau résident',
-        client_type: 'local',
-        contact_email: email || '',
-        contact_name: fullName || '',
-        cohabitat_user_id: userId,
-        cohabitat_email: email || '',
-        owner_client_id: ownerClientId,
-        pending_approval: !alreadyApproved,
-        is_active: alreadyApproved,
-        created_at: new Date().toISOString()
+        p_name:              fullName || email?.split('@')[0] || 'Nouveau résident',
+        p_client_type:       'local',
+        p_contact_email:     email || '',
+        p_contact_name:      fullName || '',
+        p_cohabitat_user_id: userId,
+        p_cohabitat_email:   email || '',
+        p_owner_client_id:   ownerClientId,
+        p_pending_approval:  !alreadyApproved,
+        p_is_active:         alreadyApproved
       })
     });
 
     // Si compte hérité approuvé, créer aussi le contrat Central
-    if (alreadyApproved && postRes.ok) {
-      const newClient = await postRes.json();
-      const clientId = newClient?.[0]?.id;
+    if (alreadyApproved && rpcRes.ok) {
+      const clientId = await rpcRes.json();
       if (clientId && ownerClientId) {
         await fetch(CENTRAL_URL + '/rest/v1/contracts', {
           method: 'POST',
@@ -7167,32 +7160,31 @@ async function syncTenantToCentral(userId) {
         return;
       }
     } else {
-      // Créer le client Central directement actif
-      const postRes = await fetch(CENTRAL_URL + '/rest/v1/clients', {
+      // Créer le client Central via RPC (bypass RLS)
+      const rpcRes = await fetch(CENTRAL_URL + '/rest/v1/rpc/create_resident_client', {
         method: 'POST',
-        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: t.full_name || t.email || 'Résident',
-          client_type: plan === 'network' ? 'network' : 'local',
-          contact_email: t.email || '',
-          contact_name: t.full_name || '',
-          cohabitat_user_id: userId,
-          cohabitat_email: t.email || '',
-          owner_client_id: ownerClientId,
-          pending_approval: false,
-          is_active: true
+          p_name:                t.full_name || t.email || 'Résident',
+          p_client_type:         plan === 'network' ? 'network' : 'local',
+          p_contact_email:       t.email || '',
+          p_contact_name:        t.full_name || '',
+          p_cohabitat_user_id:   userId,
+          p_cohabitat_email:     t.email || '',
+          p_owner_client_id:     ownerClientId,
+          p_pending_approval:    false,
+          p_is_active:           true
         })
       });
-      if (!postRes.ok) {
-        const errBody = await postRes.text();
-        console.error('[syncToCentral] POST clients failed:', postRes.status, errBody);
-        toast('Erreur Central (' + postRes.status + '): ' + errBody.slice(0, 120), 'error');
+      if (!rpcRes.ok) {
+        const errBody = await rpcRes.text();
+        console.error('[syncToCentral] RPC create_resident_client failed:', rpcRes.status, errBody);
+        toast('Erreur Central (' + rpcRes.status + '): ' + errBody.slice(0, 120), 'error');
         if (btn) { btn.disabled = false; btn.textContent = '🔗 Sync'; }
         return;
       }
-      const newClient = await postRes.json();
-      centralClientId = newClient?.[0]?.id || null;
-      console.log('[syncToCentral] Client créé:', centralClientId);
+      centralClientId = await rpcRes.json(); // RPC retourne l'UUID directement
+      console.log('[syncToCentral] Client créé via RPC:', centralClientId);
     }
 
     // Créer le contrat Central
@@ -7302,24 +7294,23 @@ async function submitApproveResident() {
         }
       );
     } else {
-      const postRes = await fetch(CENTRAL_URL + '/rest/v1/clients', {
+      // Créer via RPC (bypass RLS)
+      const rpcRes2 = await fetch(CENTRAL_URL + '/rest/v1/rpc/create_resident_client', {
         method: 'POST',
-        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: t.full_name || t.email || 'Résident',
-          client_type: plan === 'network' ? 'network' : 'local',
-          contact_email: t.email || '',
-          contact_name: t.full_name || '',
-          cohabitat_user_id: id,
-          cohabitat_email: t.email || '',
-          owner_client_id: ownerClientId,
-          pending_approval: false,
-          is_active: true,
-          created_at: new Date().toISOString()
+          p_name:              t.full_name || t.email || 'Résident',
+          p_client_type:       plan === 'network' ? 'network' : 'local',
+          p_contact_email:     t.email || '',
+          p_contact_name:      t.full_name || '',
+          p_cohabitat_user_id: id,
+          p_cohabitat_email:   t.email || '',
+          p_owner_client_id:   ownerClientId,
+          p_pending_approval:  false,
+          p_is_active:         true
         })
       });
-      const newClient = postRes.ok ? await postRes.json() : null;
-      centralClientId = newClient?.[0]?.id || null;
+      centralClientId = rpcRes2.ok ? await rpcRes2.json() : null;
     }
 
     // 4. Créer le contrat Central
