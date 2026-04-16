@@ -2516,6 +2516,22 @@ async function checkContracts(userId) {
 
     // En attente d'approbation
     if (!client || client.pending_approval) {
+      if (!client) {
+        // Absent de Central : vérifier le profil local pour distinguer
+        // un compte hérité (is_active=true + forfait) d'un nouveau compte en attente
+        try {
+          const profRes = await fetch(
+            SUPABASE_URL + '/rest/v1/profiles?id=eq.' + userId + '&select=is_active,resident_plan&limit=1',
+            { headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY } }
+          );
+          const profs = profRes.ok ? await profRes.json() : [];
+          const prof = profs?.[0];
+          // Compte hérité actif avec forfait → laisser passer
+          if (prof && prof.is_active !== false && prof.resident_plan && prof.resident_plan !== 'none') {
+            return { blocked: false };
+          }
+        } catch(e) {}
+      }
       return {
         blocked: true,
         type: 'pending',
@@ -6862,12 +6878,21 @@ async function loadTenants() {
       cData.forEach(c => { if (c.cohabitat_user_id) centralClientMap[c.cohabitat_user_id] = c; });
     }
   } catch(e) {}
-  // Marquer comme "en attente" : tenant UNIQUEMENT, pending_approval=true OU absent de Central
+  // Marquer comme "en attente" : tenant UNIQUEMENT
+  // Critères : pending_approval=true dans Central
+  //            OU absent de Central ET pas encore de forfait actif (resident_plan null/none)
   tenantsCache.forEach(t => {
     if (t.is_active === false) return; // déjà dans section inactive
-    if (t.role !== 'tenant') return;  // admins/principal_admin ne passent pas par Central
+    if (t.role !== 'tenant') return;  // admins ne passent pas par Central
     const cc = centralClientMap[t.id];
-    if (!cc || cc.pending_approval) centralPendingIds.add(t.id);
+    const hasPlan = t.resident_plan && t.resident_plan !== 'none';
+    if (cc) {
+      // Client Central existe : en attente seulement si pending_approval explicite
+      if (cc.pending_approval) centralPendingIds.add(t.id);
+    } else {
+      // Absent de Central : en attente seulement si pas encore de forfait assigné
+      if (!hasPlan) centralPendingIds.add(t.id);
+    }
   });
 
   const pending  = tenantsCache.filter(t => t.is_active === false);
