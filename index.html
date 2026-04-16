@@ -2597,7 +2597,7 @@ async function checkContracts(userId) {
 
     // ── 4. Contrat du résident
     const resContractRes = await fetch(
-      CENTRAL_URL + '/rest/v1/contracts?client_id=eq.' + client.id + '&type=eq.resident&order=created_at.desc&limit=1&select=id,status,starts_at,ends_at',
+      CENTRAL_URL + '/rest/v1/contracts?client_id=eq.' + client.id + '&type=eq.resident&order=created_at.desc&limit=1&select=id,status,starts_at,ends_at,paid_until',
       { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
     );
     const resContracts = resContractRes.ok ? await resContractRes.json() : [];
@@ -2622,6 +2622,12 @@ async function checkContracts(userId) {
     if (resContract.starts_at && resContract.starts_at > today) {
       return { blocked: true, type: 'not_started',
         message: '\ud83d\udcc5 Votre contrat entre en vigueur le ' + new Date(resContract.starts_at).toLocaleDateString('fr-CA') + '.' };
+    }
+
+    // ── 6. Vérifier le paiement mensuel
+    if (resContract.paid_until && resContract.paid_until < today) {
+      return { blocked: true, type: 'inactive',
+        message: '\ud83d\udcb3 Votre acc\u00e8s est suspendu en raison d\u2019un paiement en attente. Contactez l\'administration de votre immeuble.' };
     }
 
     return { blocked: false };
