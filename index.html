@@ -4084,6 +4084,20 @@ let _lunchQueuePoll = null;
 let _lunchMyEntry   = null;
 let _lunchMachines  = [];  // cache des machines pour le rafraîchissement
 
+// Kiosque envoie { type:'lunch-done', machineId } quand l'usager termine sa session.
+// On rafraichit immediatement les cartes (et le solde) sans attendre le polling.
+window.addEventListener('message', function(ev) {
+  const data = ev && ev.data;
+  if(!data || data.type !== 'lunch-done') return;
+  // Refresh du solde : le profil a ete debite cote DB
+  loadProfile().catch(function(){});
+  // Refresh des cartes machine
+  for(const m of _lunchMachines) {
+    const card = document.getElementById('lunch-card-' + m.id);
+    if(card) renderMachineCard(m, card).catch(function(){});
+  }
+});
+
 // Fetch vers CoHabitat propre (lunch_queue, lunch_sessions — dans ce Supabase)
 async function cohFetch(path, opts) {
   const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
