@@ -26,6 +26,8 @@
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 
 <!-- V25.1 Analytics — chargé uniquement après consentement (Loi 25) -->
 <script>
@@ -1323,25 +1325,18 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 
     <!-- ==================== TENANT: MES TRANSACTIONS ==================== -->
     <div id="page-transactions" class="page">
-      <div class="section-header">
+      <div class="section-header" style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div class="section-title">
           <h2 data-pt="Historique des transactions">Historique des transactions</h2>
+          <p style="color:var(--text3);font-size:13px;margin:0;">12 derniers mois — passé ce délai, les données sont archivées.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="tx-year" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;"></select>
+          <button onclick="downloadAnnualTransactionsPDF()" class="btn btn-secondary" style="white-space:nowrap;">📄 Récapitulatif annuel</button>
         </div>
       </div>
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th data-pt="Date">Date</th>
-              <th data-pt="Description">Description</th>
-              <th data-pt="Montant">Montant</th>
-              <th data-pt="Solde après">Solde après</th>
-            </tr>
-          </thead>
-          <tbody id="transactions-tbody">
-            <tr><td colspan="4"><div class="loading"><div class="spinner"></div></div></td></tr>
-          </tbody>
-        </table>
+      <div id="tx-groups">
+        <div style="text-align:center;padding:40px;color:var(--text3);">Chargement…</div>
       </div>
     </div>
 
@@ -6256,34 +6251,185 @@ async function submitDriverOffer() {
 // ==========================================
 // TRANSACTIONS
 // ==========================================
+// Rétention : 12 derniers mois glissants. Au-delà, les lignes seront
+// purgées côté serveur (voir sql/003_retention.sql à venir). La page
+// regroupe par mois et permet d'exporter chaque mois + le récap annuel.
+let _txCacheByYear = {};
+let _txCurrentYear = null;
+
 async function loadTransactions() {
+  const container = document.getElementById('tx-groups');
+  if(!container) return;
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const prevYear = currentYear - 1;
+  const yearSelect = document.getElementById('tx-year');
+  if(yearSelect && !yearSelect.dataset.filled) {
+    yearSelect.innerHTML = `<option value="${currentYear}">${currentYear}</option><option value="${prevYear}">${prevYear}</option>`;
+    yearSelect.value = String(currentYear);
+    yearSelect.dataset.filled = '1';
+    yearSelect.addEventListener('change', () => { _txCurrentYear = parseInt(yearSelect.value,10); renderTxGroups(); });
+  }
+  _txCurrentYear = parseInt(yearSelect?.value || currentYear, 10);
+
   if (isDemo) {
-    const rows = (window._demoTransactions || []).map(t => `
-    <tr>
-      <td style="white-space:nowrap">${new Date(t.created_at).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' })}</td>
-      <td>${t.description}</td>
-      <td style="color:${t.amount >= 0 ? 'var(--accent2)' : 'var(--accent3)'};font-weight:600">${t.amount >= 0 ? '+' : ''}${t.amount.toFixed(2)}</td>
-      <td>${t.balance_after.toFixed(2)}</td>
-    </tr>`).join('');
-    document.getElementById('transactions-tbody').innerHTML = rows || `<tr><td colspan="4" style="text-align:center;color:var(--text3)">Aucune transaction</td></tr>`;
+    const demo = window._demoTransactions || [];
+    _txCacheByYear[currentYear] = demo.slice();
+    renderTxGroups();
     return;
   }
-  const { data } = await sb.from('transactions')
-    .select('*')
-    .eq('user_id', currentProfile.id)
-    .order('created_at', { ascending: false })
-    .limit(100);
 
-  document.getElementById('transactions-tbody').innerHTML = (data || []).map(t => `
-    <tr>
-      <td style="white-space:nowrap">${new Date(t.created_at).toLocaleString('fr-CA', { dateStyle: 'medium', timeStyle: 'short' })}</td>
-      <td>${escHtml(t.description || txLabel(t.type))}</td>
-      <td style="color:${t.amount >= 0 ? 'var(--accent2)' : 'var(--accent3)'};font-weight:600">
-        ${t.amount >= 0 ? '+' : ''}${t.amount.toFixed(2)}
-      </td>
-      <td>${t.balance_after.toFixed(2)}</td>
-    </tr>
-  `).join('') || `<tr><td colspan="4" style="text-align:center;color:var(--text3)">${pt("Aucune transaction")}</td></tr>`;
+  container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3);">Chargement…</div>';
+
+  // Fetch 13 months to cover full current year + previous year
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - 1);
+  cutoff.setDate(1);
+  const { data, error } = await sb.from('transactions')
+    .select('id, amount, type, description, balance_after, created_at')
+    .eq('user_id', currentProfile.id)
+    .gte('created_at', cutoff.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(2000);
+
+  if(error) {
+    container.innerHTML = '<div style="color:var(--accent3);text-align:center;padding:20px;">Erreur: ' + error.message + '</div>';
+    return;
+  }
+
+  // Partitionner par année
+  _txCacheByYear = {};
+  (data || []).forEach(t => {
+    const y = new Date(t.created_at).getFullYear();
+    if(!_txCacheByYear[y]) _txCacheByYear[y] = [];
+    _txCacheByYear[y].push(t);
+  });
+  renderTxGroups();
+}
+
+function renderTxGroups() {
+  const container = document.getElementById('tx-groups');
+  if(!container) return;
+  const year = _txCurrentYear;
+  const rows = _txCacheByYear[year] || [];
+  if(!rows.length) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3);">' + pt('Aucune transaction') + ' ' + year + '</div>';
+    return;
+  }
+
+  // Grouper par mois (YYYY-MM)
+  const byMonth = {};
+  rows.forEach(t => {
+    const d = new Date(t.created_at);
+    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    if(!byMonth[key]) byMonth[key] = [];
+    byMonth[key].push(t);
+  });
+
+  const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const keys = Object.keys(byMonth).sort().reverse();
+
+  container.innerHTML = keys.map(key => {
+    const [y,m] = key.split('-');
+    const monthRows = byMonth[key];
+    let credit = 0, debit = 0;
+    monthRows.forEach(t => { if(t.amount >= 0) credit += Number(t.amount); else debit += Math.abs(Number(t.amount)); });
+    const net = credit - debit;
+    const rowsHtml = monthRows.map(t => `
+      <tr>
+        <td style="white-space:nowrap">${new Date(t.created_at).toLocaleDateString('fr-CA')}</td>
+        <td>${escHtml(t.description || txLabel(t.type))}</td>
+        <td style="color:${t.amount >= 0 ? 'var(--accent2)' : 'var(--accent3)'};font-weight:600;text-align:right;">${t.amount >= 0 ? '+' : ''}${Number(t.amount).toFixed(2)}</td>
+        <td style="text-align:right;">${Number(t.balance_after).toFixed(2)}</td>
+      </tr>`).join('');
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;">
+        <div style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-weight:700;color:var(--text);">${monthNames[parseInt(m,10)-1]} ${y}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">${monthRows.length} transaction${monthRows.length>1?'s':''} · crédits ${credit.toFixed(2)} · débits ${debit.toFixed(2)} · net ${net>=0?'+':''}${net.toFixed(2)}</div>
+          </div>
+          <button onclick="downloadMonthlyTransactionsPDF('${key}')" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;white-space:nowrap;">📄 PDF ${monthNames[parseInt(m,10)-1]}</button>
+        </div>
+        <div class="table-container" style="overflow-x:auto;">
+          <table><thead><tr><th>Date</th><th>Description</th><th style="text-align:right;">Montant</th><th style="text-align:right;">Solde après</th></tr></thead>
+          <tbody>${rowsHtml}</tbody></table>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Télécharger le PDF d'un mois spécifique (YYYY-MM)
+function downloadMonthlyTransactionsPDF(monthKey) {
+  const [y,m] = monthKey.split('-');
+  const year = parseInt(y,10);
+  const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const monthLbl = monthNames[parseInt(m,10)-1] + ' ' + year;
+  const rows = (_txCacheByYear[year] || []).filter(t => {
+    const d = new Date(t.created_at);
+    return d.getFullYear() === year && (d.getMonth()+1) === parseInt(m,10);
+  });
+  _buildTxPDF(rows, 'Relevé mensuel — ' + monthLbl, monthLbl);
+}
+
+function downloadAnnualTransactionsPDF() {
+  const year = _txCurrentYear;
+  const rows = _txCacheByYear[year] || [];
+  if(!rows.length) { toast('Aucune transaction pour ' + year, 'error'); return; }
+  _buildTxPDF(rows, 'Récapitulatif annuel — ' + year, String(year));
+}
+
+function _buildTxPDF(rows, title, period) {
+  if(!window.jspdf || !window.jspdf.jsPDF) { toast('Librairie PDF non chargée', 'error'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'letter' });
+
+  // En-tête
+  doc.setFontSize(16); doc.setTextColor(40);
+  doc.text(title, 40, 50);
+  doc.setFontSize(9); doc.setTextColor(110);
+  const userLabel = (currentProfile?.full_name || currentUser?.email || '') + (currentProfile?.unit ? ' · unité ' + currentProfile.unit : '');
+  doc.text(userLabel, 40, 68);
+  doc.text('Généré le ' + new Date().toLocaleString('fr-CA'), 40, 82);
+
+  // Tri chronologique ascendant pour la lecture
+  const sorted = rows.slice().sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  let credit = 0, debit = 0;
+  const body = sorted.map(t => {
+    const amt = Number(t.amount) || 0;
+    if(amt >= 0) credit += amt; else debit += Math.abs(amt);
+    return [
+      new Date(t.created_at).toLocaleString('fr-CA', { dateStyle:'short', timeStyle:'short' }),
+      (t.description || txLabel(t.type) || '').toString().slice(0,80),
+      (amt >= 0 ? '+' : '') + amt.toFixed(2) + ' $',
+      Number(t.balance_after).toFixed(2) + ' $'
+    ];
+  });
+
+  doc.autoTable({
+    startY: 100,
+    head: [['Date', 'Description', 'Montant', 'Solde après']],
+    body,
+    styles: { fontSize: 9, cellPadding: 4 },
+    headStyles: { fillColor: [30,30,30], textColor: 255 },
+    columnStyles: { 2: { halign:'right' }, 3: { halign:'right' } },
+    margin: { left: 40, right: 40 }
+  });
+
+  const endY = (doc.lastAutoTable?.finalY || 100) + 20;
+  doc.setFontSize(10); doc.setTextColor(40);
+  doc.text('Période : ' + period, 40, endY);
+  doc.text('Crédits : +' + credit.toFixed(2) + ' $', 40, endY + 16);
+  doc.text('Débits : -' + debit.toFixed(2) + ' $', 40, endY + 32);
+  doc.setFont(undefined, 'bold');
+  doc.text('Net : ' + (credit - debit >= 0 ? '+' : '') + (credit - debit).toFixed(2) + ' $', 40, endY + 48);
+
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(8); doc.setTextColor(150);
+  doc.text('CoHabitat · Modulimo — ce document est un relevé informatif.', 40, 760);
+
+  const slug = period.replace(/\s+/g,'-').toLowerCase();
+  doc.save('transactions-' + slug + '.pdf');
 }
 
 function txLabel(type, description) {
@@ -6460,27 +6606,47 @@ async function _renderInvoicesSection(el, isOwner, contract) {
     if(!invs || !invs.length) {
       body += '<div style="padding:40px 24px;text-align:center;color:var(--text3);font-style:italic;font-size:13px;">Aucune facture pour l\'instant.</div>';
     } else {
-      body += '<table style="width:100%;border-collapse:collapse;">'
-        + '<thead><tr style="background:rgba(255,255,255,.02);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);">'
-        + '<th style="padding:10px 16px;text-align:left;">Période</th>'
-        + '<th style="padding:10px 16px;text-align:right;">Total</th>'
-        + '<th style="padding:10px 16px;text-align:left;">Statut</th>'
-        + '<th style="padding:10px 16px;text-align:right;">Action</th>'
-        + '</tr></thead><tbody>';
+      // Grouper par année puis par mois (du plus récent au plus ancien)
+      const byYear = {};
       invs.forEach(inv => {
-        const badge = inv.status === 'paid'
-          ? '<span style="color:var(--success);font-weight:600;font-size:12px;">✓ Payée '+(inv.paid_at ? new Date(inv.paid_at).toLocaleDateString('fr-CA') : '')+'</span>'
-          : inv.status === 'cancelled'
-            ? '<span style="color:var(--text3);font-size:12px;">Annulée</span>'
-            : '<span style="color:var(--accent);font-weight:600;font-size:12px;">À payer '+(inv.billing_mode === 'modulimo_collects' ? '(Modulimo)' : '(propriétaire)')+'</span>';
-        body += '<tr style="border-top:1px solid var(--border);">'
-          + '<td style="padding:12px 16px;font-size:13px;">'+inv.period_start+' → '+inv.period_end+'</td>'
-          + '<td style="padding:12px 16px;text-align:right;font-weight:700;font-size:13px;">'+(Number(inv.total_amount)||0).toFixed(2)+' $</td>'
-          + '<td style="padding:12px 16px;">'+badge+'</td>'
-          + '<td style="padding:12px 16px;text-align:right;"><button onclick="viewMyInvoice(\''+inv.id+'\')" class="btn btn-secondary" style="padding:4px 10px;font-size:12px;">Détail</button></td>'
-          + '</tr>';
+        const y = (inv.period_end || inv.period_start || '').slice(0,4);
+        if(!byYear[y]) byYear[y] = [];
+        byYear[y].push(inv);
       });
-      body += '</tbody></table>';
+      const years = Object.keys(byYear).sort().reverse();
+      // Cache pour PDF annuel
+      window._invCacheByYear = byYear;
+
+      years.forEach(y => {
+        body += '<div style="padding:14px 20px;background:rgba(255,255,255,.02);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'
+          + '<div style="font-weight:700;color:var(--text);font-size:13px;">📅 ' + y + '</div>'
+          + '<button onclick="downloadAnnualInvoicesPDF(' + y + ')" class="btn btn-secondary" style="padding:4px 10px;font-size:12px;white-space:nowrap;">📄 Récap ' + y + '</button>'
+          + '</div>';
+        body += '<table style="width:100%;border-collapse:collapse;">'
+          + '<thead><tr style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);">'
+          + '<th style="padding:8px 16px;text-align:left;">Période</th>'
+          + '<th style="padding:8px 16px;text-align:right;">Total</th>'
+          + '<th style="padding:8px 16px;text-align:left;">Statut</th>'
+          + '<th style="padding:8px 16px;text-align:right;">Actions</th>'
+          + '</tr></thead><tbody>';
+        byYear[y].forEach(inv => {
+          const badge = inv.status === 'paid'
+            ? '<span style="color:var(--success);font-weight:600;font-size:12px;">✓ Payée '+(inv.paid_at ? new Date(inv.paid_at).toLocaleDateString('fr-CA') : '')+'</span>'
+            : inv.status === 'cancelled'
+              ? '<span style="color:var(--text3);font-size:12px;">Annulée</span>'
+              : '<span style="color:var(--accent);font-weight:600;font-size:12px;">À payer '+(inv.billing_mode === 'modulimo_collects' ? '(Modulimo)' : '(propriétaire)')+'</span>';
+          body += '<tr style="border-top:1px solid var(--border);">'
+            + '<td style="padding:10px 16px;font-size:13px;">'+inv.period_start+' → '+inv.period_end+'</td>'
+            + '<td style="padding:10px 16px;text-align:right;font-weight:700;font-size:13px;">'+(Number(inv.total_amount)||0).toFixed(2)+' $</td>'
+            + '<td style="padding:10px 16px;">'+badge+'</td>'
+            + '<td style="padding:10px 16px;text-align:right;white-space:nowrap;">'
+              + '<button onclick="viewMyInvoice(\''+inv.id+'\')" class="btn btn-secondary" style="padding:4px 10px;font-size:12px;margin-right:4px;">Détail</button>'
+              + '<button onclick="downloadInvoicePDF(\''+inv.id+'\')" class="btn btn-secondary" style="padding:4px 10px;font-size:12px;">📄</button>'
+            + '</td>'
+            + '</tr>';
+        });
+        body += '</tbody></table>';
+      });
     }
     body += '</div>';
     wrap.innerHTML += body;
@@ -6537,6 +6703,112 @@ async function viewMyInvoice(invoiceId) {
   } catch(e) {
     toast('Erreur: ' + e.message, 'error');
   }
+}
+
+// Génère et télécharge le PDF d'une facture unique avec son détail
+async function downloadInvoicePDF(invoiceId) {
+  if(!window.jspdf || !window.jspdf.jsPDF) { toast('Librairie PDF non chargée', 'error'); return; }
+  if(!currentUser) return;
+  try {
+    // Header depuis la liste déjà chargée
+    const all = [].concat(...Object.values(window._invCacheByYear || {}));
+    const inv = all.find(x => x.id === invoiceId);
+    if(!inv) { toast('Facture introuvable', 'error'); return; }
+    const { data: lines, error } = await sb.rpc('get_invoice_detail', {
+      p_invoice_id: invoiceId, p_cohabitat_user_id: currentUser.id
+    });
+    if(error) throw new Error(error.message);
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:'pt', format:'letter' });
+    doc.setFontSize(16); doc.setTextColor(40);
+    doc.text('Facture — ' + inv.period_start + ' → ' + inv.period_end, 40, 50);
+    doc.setFontSize(9); doc.setTextColor(110);
+    const userLabel = (currentProfile?.full_name || currentUser?.email || '') + (currentProfile?.unit ? ' · unité ' + currentProfile.unit : '');
+    doc.text(userLabel, 40, 68);
+    doc.text('Statut : ' + (inv.status === 'paid' ? 'Payée le ' + (inv.paid_at ? new Date(inv.paid_at).toLocaleDateString('fr-CA') : '') : inv.status), 40, 82);
+    doc.text('Généré le ' + new Date().toLocaleString('fr-CA'), 40, 96);
+
+    const catLbl = { monthly_fee:'Frais mensuel', space_reservation:'Espace', trip:'Trajet', trip_charge:'Frais trajet', lunch:'Lunch', other:'Autre' };
+    const body = (lines || []).map(l => [
+      catLbl[l.category] || l.category,
+      (l.description || '').slice(0,70),
+      l.transaction_date ? new Date(l.transaction_date).toLocaleDateString('fr-CA') : '—',
+      (Number(l.total_amount)||0).toFixed(2) + ' $'
+    ]);
+    doc.autoTable({
+      startY: 120,
+      head: [['Catégorie','Description','Date','Montant']],
+      body: body.length ? body : [['—','Aucun détail','—','0.00 $']],
+      styles: { fontSize: 9, cellPadding: 4 },
+      headStyles: { fillColor: [30,30,30], textColor: 255 },
+      columnStyles: { 3: { halign:'right' } },
+      margin: { left: 40, right: 40 }
+    });
+
+    const endY = (doc.lastAutoTable?.finalY || 120) + 20;
+    doc.setFontSize(10); doc.setTextColor(40);
+    doc.text('Frais mensuel : ' + (Number(inv.monthly_fee)||0).toFixed(2) + ' $', 40, endY);
+    doc.text('Services consommés : ' + (Number(inv.services_subtotal)||0).toFixed(2) + ' $', 40, endY + 16);
+    doc.setFont(undefined, 'bold');
+    doc.text('Total : ' + (Number(inv.total_amount)||0).toFixed(2) + ' $', 40, endY + 36);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8); doc.setTextColor(150);
+    doc.text('CoHabitat · Modulimo', 40, 760);
+
+    doc.save('facture-' + inv.period_start + '.pdf');
+  } catch(e) {
+    toast('Erreur PDF: ' + e.message, 'error');
+  }
+}
+
+// Récapitulatif annuel des factures (une ligne par facture + totaux)
+function downloadAnnualInvoicesPDF(year) {
+  if(!window.jspdf || !window.jspdf.jsPDF) { toast('Librairie PDF non chargée', 'error'); return; }
+  const invs = (window._invCacheByYear && window._invCacheByYear[year]) || [];
+  if(!invs.length) { toast('Aucune facture en ' + year, 'error'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'letter' });
+  doc.setFontSize(16); doc.setTextColor(40);
+  doc.text('Récapitulatif annuel des factures — ' + year, 40, 50);
+  doc.setFontSize(9); doc.setTextColor(110);
+  const userLabel = (currentProfile?.full_name || currentUser?.email || '') + (currentProfile?.unit ? ' · unité ' + currentProfile.unit : '');
+  doc.text(userLabel, 40, 68);
+  doc.text('Généré le ' + new Date().toLocaleString('fr-CA'), 40, 82);
+
+  let totalAll = 0, totalPaid = 0, totalDue = 0;
+  const body = invs.slice().sort((a,b) => a.period_start.localeCompare(b.period_start)).map(i => {
+    const t = Number(i.total_amount) || 0;
+    totalAll += t;
+    if(i.status === 'paid') totalPaid += t; else if(i.status !== 'cancelled') totalDue += t;
+    return [
+      i.period_start + ' → ' + i.period_end,
+      (Number(i.monthly_fee)||0).toFixed(2) + ' $',
+      (Number(i.services_subtotal)||0).toFixed(2) + ' $',
+      t.toFixed(2) + ' $',
+      i.status === 'paid' ? 'Payée' : (i.status === 'cancelled' ? 'Annulée' : 'À payer'),
+      i.billing_mode === 'modulimo_collects' ? 'Modulimo' : 'Proprio'
+    ];
+  });
+  doc.autoTable({
+    startY: 100,
+    head: [['Période','Frais mensuel','Services','Total','Statut','Collecte']],
+    body,
+    styles: { fontSize: 9, cellPadding: 4 },
+    headStyles: { fillColor: [30,30,30], textColor: 255 },
+    columnStyles: { 1: { halign:'right' }, 2: { halign:'right' }, 3: { halign:'right' } },
+    margin: { left: 40, right: 40 }
+  });
+  const endY = (doc.lastAutoTable?.finalY || 100) + 20;
+  doc.setFontSize(10); doc.setTextColor(40);
+  doc.text('Total facturé : ' + totalAll.toFixed(2) + ' $', 40, endY);
+  doc.text('Dont payé : ' + totalPaid.toFixed(2) + ' $', 40, endY + 16);
+  doc.setFont(undefined, 'bold');
+  doc.text('Reste à payer : ' + totalDue.toFixed(2) + ' $', 40, endY + 36);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(8); doc.setTextColor(150);
+  doc.text('CoHabitat · Modulimo', 40, 760);
+  doc.save('factures-' + year + '.pdf');
 }
 
 // ==========================================
