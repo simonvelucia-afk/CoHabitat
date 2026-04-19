@@ -40,17 +40,18 @@ ALTER TABLE lunch_transactions
   ADD COLUMN IF NOT EXISTS ledger_tx_id UUID,
   ADD COLUMN IF NOT EXISTS created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
--- Si slot_id existait deja en UUID, le convertir en TEXT (les ID de slot
--- ne sont pas garantis UUID selon comment lunch_slots a ete cree sur la
--- base centrale ; certaines installs utilisent des INT ou TEXT).
+-- Si slot_id n'est pas deja TEXT, le convertir. Les ID de slot peuvent
+-- etre UUID, INT ou TEXT selon comment lunch_slots a ete cree sur la base
+-- centrale ; on uniformise sur TEXT pour ne plus jamais avoir de mismatch.
 DO $do_slot$
+DECLARE
+  v_type TEXT;
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema='public' AND table_name='lunch_transactions'
-      AND column_name='slot_id' AND data_type='uuid'
-  ) THEN
-    ALTER TABLE lunch_transactions ALTER COLUMN slot_id TYPE TEXT USING slot_id::TEXT;
+  SELECT data_type INTO v_type
+    FROM information_schema.columns
+   WHERE table_schema='public' AND table_name='lunch_transactions' AND column_name='slot_id';
+  IF v_type IS NOT NULL AND v_type <> 'text' THEN
+    EXECUTE 'ALTER TABLE lunch_transactions ALTER COLUMN slot_id TYPE TEXT USING slot_id::TEXT';
   END IF;
 END $do_slot$;
 
