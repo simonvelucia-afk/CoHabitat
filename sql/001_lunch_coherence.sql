@@ -26,6 +26,42 @@ CREATE TABLE IF NOT EXISTS lunch_transactions (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Filet de securite : si une ancienne version de la table a ete creee sans
+-- ces colonnes (premier run partiel, version LunchMachine differente, etc.),
+-- on les rajoute ici plutot que de faire planter les CREATE INDEX / POLICY
+-- qui les referencent.
+ALTER TABLE lunch_transactions
+  ADD COLUMN IF NOT EXISTS machine_id   TEXT,
+  ADD COLUMN IF NOT EXISTS slot_id      UUID,
+  ADD COLUMN IF NOT EXISTS buyer_name   TEXT,
+  ADD COLUMN IF NOT EXISTS price        NUMERIC(8,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS user_id      UUID,
+  ADD COLUMN IF NOT EXISTS dep_id       UUID,
+  ADD COLUMN IF NOT EXISTS ledger_tx_id UUID,
+  ADD COLUMN IF NOT EXISTS created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- Ajouter les FK si manquantes (un ADD COLUMN IF NOT EXISTS ne les inclut pas
+-- quand la colonne pre-existait sans reference).
+DO $do_fk$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lunch_transactions_user_id_fkey') THEN
+    BEGIN
+      ALTER TABLE lunch_transactions
+        ADD CONSTRAINT lunch_transactions_user_id_fkey
+        FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE SET NULL;
+    EXCEPTION WHEN others THEN NULL; -- si profiles manque ou donnees incoherentes, on n'interrompt pas
+    END;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lunch_transactions_dep_id_fkey') THEN
+    BEGIN
+      ALTER TABLE lunch_transactions
+        ADD CONSTRAINT lunch_transactions_dep_id_fkey
+        FOREIGN KEY (dep_id) REFERENCES dependents(id) ON DELETE SET NULL;
+    EXCEPTION WHEN others THEN NULL;
+    END;
+  END IF;
+END $do_fk$;
+
 CREATE INDEX IF NOT EXISTS idx_lunch_tx_user    ON lunch_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_lunch_tx_dep     ON lunch_transactions(dep_id);
 CREATE INDEX IF NOT EXISTS idx_lunch_tx_machine ON lunch_transactions(machine_id, created_at DESC);
@@ -48,7 +84,7 @@ CREATE POLICY lunch_tx_select_own ON lunch_transactions
 -- B) Ledger financier : etendre le CHECK de transactions.type pour accepter
 --    'lunch_purchase'. Sans cela le ledger rejette l'insert du RPC.
 -- =========================================================================
-DO $$
+DO $do_ck$
 BEGIN
   -- Supprime puis recree la contrainte avec le nouveau type
   ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check;
@@ -65,7 +101,7 @@ BEGIN
       'lunch_purchase',
       'demo'
     ));
-END $$;
+END $do_ck$;
 
 -- =========================================================================
 -- C) RPC lunch_purchase : atomique, verifie les fonds, audit + ledger + debit.
@@ -82,12 +118,15 @@ CREATE OR REPLACE FUNCTION lunch_purchase(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $fn_lunch$
+#variable_conflict use_variable
 DECLARE
-  v_current NUMERIC;
-  v_new     NUMERIC;
-  v_audit_id  UUID;
-  v_ledger_id UUID;
+  v_current  NUMERIC;
+  v_new      NUMERIC;
+  v_audit_id UUID;
+  v_ledger   UUID;
+  v_desc     TEXT;
+  v_balance_after NUMERIC;
 BEGIN
   IF p_amount IS NULL OR p_amount < 0 THEN
     RAISE EXCEPTION 'Montant invalide';
@@ -96,9 +135,12 @@ BEGIN
     RAISE EXCEPTION 'user_id requis';
   END IF;
 
-  -- 1. Verrouiller + verifier + debiter le bon compte
+  -- 1. Verrouiller + verifier + debiter le bon compte.
+  --    On utilise une affectation par sous-requete scalaire (FOR UPDATE pose
+  --    quand meme le verrou sur la ligne) pour eviter que le SQL Editor de
+  --    Supabase confonde "SELECT INTO v_current" avec une creation de table.
   IF p_dep_id IS NOT NULL THEN
-    SELECT virtual_balance INTO v_current FROM dependents WHERE id = p_dep_id FOR UPDATE;
+    v_current := (SELECT virtual_balance FROM dependents WHERE id = p_dep_id FOR UPDATE);
     IF v_current IS NULL THEN
       RAISE EXCEPTION 'Dependant introuvable';
     END IF;
@@ -107,8 +149,11 @@ BEGIN
     END IF;
     v_new := v_current - p_amount;
     UPDATE dependents SET virtual_balance = v_new WHERE id = p_dep_id;
+    -- Pour le ledger du parent, on enregistre son solde courant inchange
+    v_balance_after := (SELECT virtual_balance FROM profiles WHERE id = p_user_id);
+    v_desc := 'Achat ' || p_machine_id || ' (dep) : ' || COALESCE(p_buyer_name,'');
   ELSE
-    SELECT virtual_balance INTO v_current FROM profiles WHERE id = p_user_id FOR UPDATE;
+    v_current := (SELECT virtual_balance FROM profiles WHERE id = p_user_id FOR UPDATE);
     IF v_current IS NULL THEN
       RAISE EXCEPTION 'Profil introuvable';
     END IF;
@@ -117,6 +162,8 @@ BEGIN
     END IF;
     v_new := v_current - p_amount;
     UPDATE profiles SET virtual_balance = v_new WHERE id = p_user_id;
+    v_balance_after := v_new;
+    v_desc := 'Achat ' || p_machine_id || ' : ' || COALESCE(p_buyer_name,'');
   END IF;
 
   -- 2. Audit machine-centric
@@ -125,32 +172,83 @@ BEGIN
   RETURNING id INTO v_audit_id;
 
   -- 3. Ledger financier resident-centric (visible dans CoHabitat > Mon profil)
-  --    Note : les depenses des dependants sont enregistrees sur le parent
-  --    (seul lien au ledger), mais le debit reel a bien touche le dependant.
+  --    Les depenses des dependants sont enregistrees sur le parent (seul lien
+  --    au ledger), mais le debit reel a bien touche le dependant.
   INSERT INTO transactions (user_id, amount, balance_after, type, reference_id, reference_type, description)
-  VALUES (
-    p_user_id,
-    -p_amount,
-    CASE WHEN p_dep_id IS NULL THEN v_new ELSE (SELECT virtual_balance FROM profiles WHERE id = p_user_id) END,
-    'lunch_purchase',
-    v_audit_id,
-    'lunch_transaction',
-    CASE WHEN p_dep_id IS NULL
-      THEN 'Achat ' || p_machine_id || ' : ' || COALESCE(p_buyer_name,'')
-      ELSE 'Achat ' || p_machine_id || ' (dep) : ' || COALESCE(p_buyer_name,'')
-    END
-  )
-  RETURNING id INTO v_ledger_id;
+  VALUES (p_user_id, -p_amount, v_balance_after, 'lunch_purchase', v_audit_id, 'lunch_transaction', v_desc)
+  RETURNING id INTO v_ledger;
 
   -- 4. Relier l'audit au ledger pour la tracabilite
-  UPDATE lunch_transactions SET ledger_tx_id = v_ledger_id WHERE id = v_audit_id;
+  UPDATE lunch_transactions SET ledger_tx_id = v_ledger WHERE id = v_audit_id;
 
   RETURN v_audit_id;
 END;
-$$;
+$fn_lunch$;
 
 -- Autoriser l'appel par anon + authenticated (le kiosque utilise l'anon key
 -- apres auto-login chsession). La fonction reste sure car elle verifie les
 -- soldes et est atomique.
 GRANT EXECUTE ON FUNCTION lunch_purchase(UUID, UUID, TEXT, UUID, TEXT, NUMERIC)
   TO anon, authenticated;
+
+
+-- =========================================================================
+-- D) RPC lunch_get_balance : lecture du solde virtuel sans exposer profiles
+--    a anon (RLS bloque la lecture directe de virtual_balance par la cle
+--    anon). SECURITY DEFINER + GRANT a anon. Retourne NULL si l'id n'existe
+--    pas. La securite repose sur le fait que les UUID ne sont pas devinables.
+-- =========================================================================
+CREATE OR REPLACE FUNCTION lunch_get_balance(
+  p_user_id UUID,
+  p_dep_id  UUID
+) RETURNS NUMERIC
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $fn_balance$
+BEGIN
+  IF p_dep_id IS NOT NULL THEN
+    RETURN (SELECT virtual_balance FROM dependents WHERE id = p_dep_id);
+  END IF;
+  IF p_user_id IS NULL THEN RETURN NULL; END IF;
+  RETURN (SELECT virtual_balance FROM profiles WHERE id = p_user_id);
+END;
+$fn_balance$;
+
+GRANT EXECUTE ON FUNCTION lunch_get_balance(UUID, UUID) TO anon, authenticated;
+
+
+-- =========================================================================
+-- E) Policies lunch_queue : le kiosque (cle anon) doit pouvoir inscrire un
+--    resident dans la file, lire la file, et la mettre a jour (status,
+--    expires_at). Pas de check restrictif puisque l'utilisation est limitee
+--    aux machines deja authentifiees via chsession.
+-- =========================================================================
+DO $do_lq$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='lunch_queue') THEN
+    EXECUTE 'ALTER TABLE lunch_queue ENABLE ROW LEVEL SECURITY';
+
+    -- SELECT pour anon (le kiosque doit voir la file pour afficher le rang)
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='lunch_queue' AND policyname='lunch_queue_select_anon') THEN
+      EXECUTE 'CREATE POLICY lunch_queue_select_anon ON lunch_queue FOR SELECT TO anon USING (TRUE)';
+    END IF;
+    -- INSERT pour anon (le kiosque ajoute le resident en file)
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='lunch_queue' AND policyname='lunch_queue_insert_anon') THEN
+      EXECUTE 'CREATE POLICY lunch_queue_insert_anon ON lunch_queue FOR INSERT TO anon WITH CHECK (TRUE)';
+    END IF;
+    -- UPDATE pour anon (status: waiting -> active, etc.)
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='lunch_queue' AND policyname='lunch_queue_update_anon') THEN
+      EXECUTE 'CREATE POLICY lunch_queue_update_anon ON lunch_queue FOR UPDATE TO anon USING (TRUE) WITH CHECK (TRUE)';
+    END IF;
+    -- DELETE pour anon (queueLeave appelle DELETE)
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='lunch_queue' AND policyname='lunch_queue_delete_anon') THEN
+      EXECUTE 'CREATE POLICY lunch_queue_delete_anon ON lunch_queue FOR DELETE TO anon USING (TRUE)';
+    END IF;
+  END IF;
+END $do_lq$;
+
+
+-- Forcer PostgREST a recharger son schema cache pour exposer les nouvelles
+-- RPC immediatement (sinon il faut attendre un cycle ou redemarrer).
+NOTIFY pgrst, 'reload schema';
