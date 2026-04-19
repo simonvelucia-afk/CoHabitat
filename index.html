@@ -1346,12 +1346,12 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     </div>
 
     <!-- ==================== PROFIL ==================== -->
-    <!-- MON CONTRAT -->
+    <!-- MON CONTRAT (lecture seule — signature via lien email depuis modulimo-admin) -->
     <div id="page-contract" class="page">
       <div class="section-header">
         <div class="section-title">
           <h2>📄 Mon contrat</h2>
-          <p>Votre entente de services avec Modulimo CoHabitat</p>
+          <p>Consultez les termes de votre entente et votre signature</p>
         </div>
       </div>
       <div id="contract-content" style="max-width:720px;margin:0 auto;">
@@ -2691,25 +2691,9 @@ async function syncNewResidentToCentral(userId, email, fullName, alreadyApproved
       })
     });
 
-    // Si compte hérité approuvé, créer aussi le contrat Central
-    if (alreadyApproved && rpcRes.ok) {
-      const clientId = await rpcRes.json();
-      if (clientId && ownerClientId) {
-        await fetch(CENTRAL_URL + '/rest/v1/contracts', {
-          method: 'POST',
-          headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({
-            client_id: clientId,
-            owner_client_id: ownerClientId,
-            type: 'resident',
-            plan: 'local',
-            starts_at: new Date().toISOString().slice(0, 10),
-            status: 'active',
-            created_by: 'cohabitat_auto_sync'
-          })
-        });
-      }
-    }
+    // Note : la création du contrat est désormais gérée exclusivement dans
+    // modulimo-admin. CoHabitat se contente d'enregistrer le client ;
+    // l'administrateur crée le contrat et envoie le lien de signature.
     console.log('[syncCentral] Résident créé dans Modulimo Central (approuvé=' + alreadyApproved + ')');
   } catch(e) {
     console.warn('[syncCentral] Erreur (non bloquant):', e.message);
@@ -6318,13 +6302,16 @@ function txLabel(type, description) {
 // ADMIN
 // ==========================================
 // ==========================================
-// PROFIL & DÉPENDANTS
+// MON CONTRAT (lecture seule)
 // ==========================================
-// ── MON CONTRAT ──────────────────────────────────────────────────────────────
+// La signature n'est plus faite dans CoHabitat — elle passe par un lien
+// tokenisé envoyé par email depuis modulimo-admin (voir sign.html).
+// Cette page sert uniquement à consulter les termes acceptés et la preuve
+// de signature.
 async function loadContractPage() {
   const el = document.getElementById('contract-content');
   if(!el) return;
-  // Mode démo — pas de contrat réel
+
   if (isDemo || !currentUser) {
     el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);"><div style="font-size:3rem;margin-bottom:16px;">📄</div><p>Contrat non disponible en mode d&#233;mo.</p></div>';
     return;
@@ -6355,7 +6342,7 @@ async function loadContractPage() {
     const contract = contracts?.[0];
 
     if(!contract) {
-      el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);"><div style="font-size:3rem;margin-bottom:16px;">⏳</div><p>Votre contrat est en cours de préparation.</p></div>';
+      el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);"><div style="font-size:3rem;margin-bottom:16px;">⏳</div><p>Votre contrat est en cours de préparation.</p><p style="font-size:13px;margin-top:8px;">Un administrateur vous contactera lorsqu\'il sera prêt à être signé.</p></div>';
       return;
     }
 
@@ -6370,8 +6357,8 @@ async function loadContractPage() {
       buildingName = owners?.[0]?.name || '';
     }
 
-    const planLabel = isOwner ? 'Propriétaire' : (contract.plan === 'network' ? 'Forfait Réseau' : 'Forfait Local');
-    const isSigned  = !!contract.signed_at;
+    const planLabel  = isOwner ? 'Propriétaire' : (contract.plan === 'network' ? 'Forfait Réseau' : 'Forfait Local');
+    const isSigned   = !!contract.signed_at;
     const signedDate = contract.signed_at ? new Date(contract.signed_at).toLocaleDateString('fr-CA') : null;
 
     const conditions = isOwner ? [
@@ -6418,22 +6405,19 @@ async function loadContractPage() {
           ? '<div style="background:rgba(93,232,140,.08);border:1px solid rgba(93,232,140,.3);border-radius:8px;padding:20px;text-align:center;margin-top:8px;">'
             + '<div style="color:var(--success);font-weight:700;font-size:1rem;margin-bottom:6px;">✓ Contrat signé le ' + signedDate + '</div>'
             + '<div style="font-size:12px;color:var(--text3);">Signé par : ' + (contract.signed_by_name || currentProfile.full_name) + '</div>'
-            + (contract.signature_data ? '<img src="' + contract.signature_data + '" style="max-width:220px;margin-top:14px;border:1px solid var(--border);border-radius:4px;background:#fff;padding:6px;">' : '')
+            + (contract.signature_data ? '<img src="' + contract.signature_data + '" alt="Signature" style="max-width:220px;margin-top:14px;border:1px solid var(--border);border-radius:4px;background:#fff;padding:6px;">' : '')
             + '</div>'
-          : '<div id="signature-section" style="margin-top:8px;">'
-            + '<h3 style="font-size:0.95rem;font-weight:700;color:var(--text);margin:0 0 10px;">Signature</h3>'
-            + '<p style="font-size:13px;color:var(--text2);margin-bottom:14px;">En signant ci-dessous, vous acceptez les termes du présent contrat.</p>'
-            + '<div style="position:relative;border:2px solid var(--border);border-radius:8px;overflow:hidden;background:#fff;margin-bottom:12px;">'
-            + '<canvas id="signature-pad" width="680" height="180" style="display:block;width:100%;touch-action:none;cursor:crosshair;"></canvas>'
-            + '<div id="sig-placeholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:#aaa;font-size:14px;">Signez ici</div>'
-            + '</div>'
-            + '<div style="display:flex;gap:10px;">'
-            + '<button onclick="clearSignature()" class="btn btn-secondary" style="flex:1;">✕ Effacer</button>'
-            + '<button onclick="saveContractSignature(\'' + contract.id + '\', \'' + isOwner + '\')" class="btn btn-primary" style="flex:2;">✓ Signer et accepter</button>'
-            + '</div></div>')
+          : '<div style="background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.3);border-radius:8px;padding:20px;margin-top:8px;">'
+            + '<div style="display:flex;align-items:flex-start;gap:12px;">'
+            + '<div style="font-size:1.5rem;">✉️</div>'
+            + '<div>'
+            + '<div style="color:var(--accent);font-weight:700;font-size:0.95rem;margin-bottom:4px;">En attente de signature</div>'
+            + '<div style="font-size:13px;color:var(--text2);line-height:1.6;">Un lien de signature sécurisé vous a été envoyé par courriel à <strong>' + (currentUser.email || '') + '</strong>. Cliquez sur ce lien pour signer votre contrat. Si vous ne l\'avez pas reçu, contactez l\'administration de votre immeuble.</div>'
+            + '</div></div></div>')
       + '</div></div>';
 
-    if(!isSigned) initSignaturePad();
+    // Section « Mes factures » + bouton demande d'upgrade
+    await _renderInvoicesSection(el, isOwner, contract);
 
   } catch(e) {
     el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--accent3);">Erreur: ' + e.message + '</div>';
@@ -6441,89 +6425,123 @@ async function loadContractPage() {
   }
 }
 
-function initSignaturePad() {
-  const canvas = document.getElementById('signature-pad');
-  if(!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let drawing = false;
-  let hasDrawn = false;
+// Liste les factures du résident + affiche le bouton d'upgrade Local→Réseau
+async function _renderInvoicesSection(el, isOwner, contract) {
+  if(!currentUser) return;
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'max-width:720px;margin:20px auto 0;';
 
-  ctx.strokeStyle = '#1a1a2e';
-  ctx.lineWidth = 2.5;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  function getPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const src = e.touches ? e.touches[0] : e;
-    return { x: (src.clientX - rect.left) * scaleX, y: (src.clientY - rect.top) * scaleY };
+  // Bouton upgrade (réservé aux résidents sur plan local)
+  if(!isOwner && contract && contract.plan === 'local' && contract.status !== 'terminated') {
+    const pending = !!contract.upgrade_requested_to_plan;
+    wrap.innerHTML += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;">'
+      + '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
+      + '<div style="flex:1;min-width:200px;">'
+      + '<div style="font-weight:700;color:var(--text);margin-bottom:4px;">🔗 Forfait Réseau</div>'
+      + '<div style="font-size:13px;color:var(--text3);">Accès aux ressources partagées entre immeubles du réseau Modulimo.</div>'
+      + '</div>'
+      + (pending
+          ? '<span class="badge" style="background:rgba(200,169,110,.15);color:var(--accent);padding:6px 12px;border-radius:6px;font-size:12px;">⏳ Demande envoyée</span>'
+          : '<button onclick="requestNetworkUpgrade()" class="btn btn-primary" style="white-space:nowrap;">Demander l\'accès</button>')
+      + '</div></div>';
   }
 
-  function start(e) { e.preventDefault(); drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
-  function move(e) {
-    if(!drawing) return; e.preventDefault();
-    const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke();
-    if(!hasDrawn) { hasDrawn = true; document.getElementById('sig-placeholder').style.display = 'none'; }
-  }
-  function end(e) { drawing = false; }
-
-  canvas.addEventListener('mousedown', start);
-  canvas.addEventListener('mousemove', move);
-  canvas.addEventListener('mouseup', end);
-  canvas.addEventListener('touchstart', start, { passive: false });
-  canvas.addEventListener('touchmove', move, { passive: false });
-  canvas.addEventListener('touchend', end);
-}
-
-function clearSignature() {
-  const canvas = document.getElementById('signature-pad');
-  if(!canvas) return;
-  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-  const ph = document.getElementById('sig-placeholder');
-  if(ph) ph.style.display = 'flex';
-}
-
-async function saveContractSignature(contractId, isOwnerStr) {
-  const isOwner = isOwnerStr === 'true';
-  const canvas = document.getElementById('signature-pad');
-  if(!canvas) return;
-
-  const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
-  if(!pixels.some((v, i) => i % 4 === 3 && v > 0)) { toast('Veuillez signer avant d\'accepter', 'error'); return; }
-
-  const signatureData = canvas.toDataURL('image/png');
-  const signedAt = new Date().toISOString();
-
+  // Factures
   try {
-    const res = await fetch(CENTRAL_URL + '/rest/v1/contracts?id=eq.' + contractId, {
-      method: 'PATCH',
-      headers: {
-        apikey: CENTRAL_KEY,
-        Authorization: 'Bearer ' + CENTRAL_KEY,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal'
-      },
-      body: JSON.stringify({
-        signed_at: signedAt,
-        signed_by_name: currentProfile.full_name || currentUser.email,
-        signature_data: signatureData
-      })
+    const { data: invs, error } = await sb.rpc('list_client_invoices', { p_cohabitat_user_id: currentUser.id });
+    if(error) throw new Error(error.message);
+
+    let body = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'
+      + '<div style="padding:18px 24px;border-bottom:1px solid var(--border);">'
+      + '<div style="font-weight:700;color:var(--text);">🧾 Mes factures</div>'
+      + '<div style="font-size:12px;color:var(--text3);margin-top:4px;">Détail des services consommés par mois.</div>'
+      + '</div>';
+
+    if(!invs || !invs.length) {
+      body += '<div style="padding:40px 24px;text-align:center;color:var(--text3);font-style:italic;font-size:13px;">Aucune facture pour l\'instant.</div>';
+    } else {
+      body += '<table style="width:100%;border-collapse:collapse;">'
+        + '<thead><tr style="background:rgba(255,255,255,.02);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);">'
+        + '<th style="padding:10px 16px;text-align:left;">Période</th>'
+        + '<th style="padding:10px 16px;text-align:right;">Total</th>'
+        + '<th style="padding:10px 16px;text-align:left;">Statut</th>'
+        + '<th style="padding:10px 16px;text-align:right;">Action</th>'
+        + '</tr></thead><tbody>';
+      invs.forEach(inv => {
+        const badge = inv.status === 'paid'
+          ? '<span style="color:var(--success);font-weight:600;font-size:12px;">✓ Payée '+(inv.paid_at ? new Date(inv.paid_at).toLocaleDateString('fr-CA') : '')+'</span>'
+          : inv.status === 'cancelled'
+            ? '<span style="color:var(--text3);font-size:12px;">Annulée</span>'
+            : '<span style="color:var(--accent);font-weight:600;font-size:12px;">À payer '+(inv.billing_mode === 'modulimo_collects' ? '(Modulimo)' : '(propriétaire)')+'</span>';
+        body += '<tr style="border-top:1px solid var(--border);">'
+          + '<td style="padding:12px 16px;font-size:13px;">'+inv.period_start+' → '+inv.period_end+'</td>'
+          + '<td style="padding:12px 16px;text-align:right;font-weight:700;font-size:13px;">'+(Number(inv.total_amount)||0).toFixed(2)+' $</td>'
+          + '<td style="padding:12px 16px;">'+badge+'</td>'
+          + '<td style="padding:12px 16px;text-align:right;"><button onclick="viewMyInvoice(\''+inv.id+'\')" class="btn btn-secondary" style="padding:4px 10px;font-size:12px;">Détail</button></td>'
+          + '</tr>';
+      });
+      body += '</tbody></table>';
+    }
+    body += '</div>';
+    wrap.innerHTML += body;
+    el.appendChild(wrap);
+  } catch(e) {
+    console.error('[invoices]', e);
+    wrap.innerHTML += '<div style="padding:20px;color:var(--accent3);font-size:13px;">Impossible de charger les factures: ' + e.message + '</div>';
+    el.appendChild(wrap);
+  }
+}
+
+async function requestNetworkUpgrade() {
+  if(!currentUser) return;
+  if(!confirm('Demander l\'accès au forfait Réseau ? Votre administrateur recevra la demande.')) return;
+  try {
+    const { error } = await sb.rpc('request_plan_upgrade', {
+      p_cohabitat_user_id: currentUser.id, p_target_plan: 'network'
     });
-    if(!res.ok) throw new Error('Erreur sauvegarde: ' + res.status);
-
-    toast('Contrat signé ✓ — un email de confirmation vous sera envoyé', 'success');
-
-    // L'email de confirmation est envoyé automatiquement par le trigger Supabase
-    // (Edge Function send-contract-signed-email)
-
+    if(error) throw new Error(error.message);
+    toast('Demande envoyée — votre admin va la traiter', 'success');
     loadContractPage();
   } catch(e) {
     toast('Erreur: ' + e.message, 'error');
   }
 }
 
+async function viewMyInvoice(invoiceId) {
+  if(!currentUser) return;
+  try {
+    const { data: lines, error } = await sb.rpc('get_invoice_detail', {
+      p_invoice_id: invoiceId, p_cohabitat_user_id: currentUser.id
+    });
+    if(error) throw new Error(error.message);
+    const catLbl = { monthly_fee:'📄 Frais mensuel', space_reservation:'🏢 Espace', trip:'🚗 Trajet', trip_charge:'🚗 Frais', lunch:'🍱 Lunch', other:'•' };
+    const rows = (lines || []).map(l => '<tr style="border-top:1px solid var(--border);">'
+      + '<td style="padding:10px;font-size:12px;">'+(catLbl[l.category]||'•')+'</td>'
+      + '<td style="padding:10px;font-size:12px;">'+String(l.description||'').replace(/</g,'&lt;')+'</td>'
+      + '<td style="padding:10px;font-size:11px;color:var(--text3);">'+(l.transaction_date ? new Date(l.transaction_date).toLocaleDateString('fr-CA') : '—')+'</td>'
+      + '<td style="padding:10px;text-align:right;font-size:12px;">'+(Number(l.total_amount)||0).toFixed(2)+' $</td>'
+      + '</tr>').join('') || '<tr><td colspan="4" style="padding:16px;text-align:center;color:var(--text3);font-style:italic;">Aucun détail</td></tr>';
+    const html = '<div id="modal-my-inv" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">'
+      + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;max-width:640px;width:100%;max-height:90vh;overflow:auto;">'
+      + '<div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">'
+      + '<div style="font-weight:700;">🧾 Détail de la facture</div>'
+      + '<button class="btn btn-secondary" style="padding:4px 10px;" onclick="document.getElementById(\'modal-my-inv\').remove()">✕</button>'
+      + '</div>'
+      + '<div style="padding:20px;">'
+      + '<table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:8px;overflow:hidden;">'
+      + '<thead><tr style="background:var(--surface2);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);"><th style="padding:10px;text-align:left;">Catégorie</th><th style="padding:10px;text-align:left;">Description</th><th style="padding:10px;text-align:left;">Date</th><th style="padding:10px;text-align:right;">Montant</th></tr></thead>'
+      + '<tbody>'+rows+'</tbody></table>'
+      + '</div></div></div>';
+    const w = document.createElement('div'); w.innerHTML = html;
+    document.body.appendChild(w.firstElementChild);
+  } catch(e) {
+    toast('Erreur: ' + e.message, 'error');
+  }
+}
+
+// ==========================================
+// PROFIL & DÉPENDANTS
+// ==========================================
 async function loadProfilePage() {
   document.getElementById('prof-name').value = isDemo ? (anonName(currentProfile?.id) || '') : (currentProfile?.full_name || '');
   document.getElementById('prof-phone').value = isDemo ? '+1 514 555-0000' : (currentProfile?.phone || '');
@@ -7193,38 +7211,14 @@ async function syncTenantToCentral(userId) {
       console.log('[syncToCentral] Client créé via RPC:', centralClientId);
     }
 
-    // Créer le contrat Central
-    if (centralClientId) {
-      const planUntil = t.resident_plan_until || null;
-      const contRes = await fetch(CENTRAL_URL + '/rest/v1/contracts', {
-        method: 'POST',
-        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          client_id: centralClientId,
-          owner_client_id: ownerClientId,
-          type: 'resident',
-          plan: plan,
-          starts_at: new Date().toISOString().slice(0, 10),
-          ends_at: planUntil ? planUntil.slice(0, 10) : null,
-          status: 'active',
-          created_by: 'cohabitat_admin_sync'
-        })
-      });
-      if (!contRes.ok) {
-        const errBody = await contRes.text();
-        console.warn('[syncToCentral] POST contracts failed:', contRes.status, errBody);
-        // Client créé mais contrat raté — toast partiel
-        toast('⚠️ Client créé dans Central mais erreur contrat (' + contRes.status + ')', 'error');
-        loadTenants();
-        return;
-      }
-    } else {
+    // Le contrat est désormais créé dans modulimo-admin (plus dans CoHabitat).
+    if (!centralClientId) {
       toast('⚠️ Sync: client Central créé mais ID non retourné', 'error');
       loadTenants();
       return;
     }
 
-    toast('🔗 ' + (t.full_name || 'Résident') + ' synchronisé avec Modulimo Central ✓', 'success');
+    toast('🔗 ' + (t.full_name || 'Résident') + ' synchronisé dans Modulimo — créez le contrat depuis Modulimo Admin', 'success');
     loadTenants();
   } catch(e) {
     console.error('[syncToCentral] Exception:', e);
@@ -7319,25 +7313,12 @@ async function submitApproveResident() {
       centralClientId = rpcRes2.ok ? await rpcRes2.json() : null;
     }
 
-    // 4. Créer le contrat Central
-    if (centralClientId) {
-      await fetch(CENTRAL_URL + '/rest/v1/contracts', {
-        method: 'POST',
-        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          client_id: centralClientId,
-          owner_client_id: ownerClientId,
-          type: 'resident',
-          plan: plan,
-          starts_at: new Date().toISOString().slice(0, 10),
-          status: 'active',
-          created_by: 'cohabitat_admin'
-        })
-      });
-    }
+    // 4. Le contrat est désormais créé par Modulimo Admin (signature via lien email).
+    //    L'accès résident restera bloqué par checkContracts() tant qu'un contrat
+    //    actif n'aura pas été créé côté Central.
 
     closeModal('modal-approve-resident');
-    toast('🟢 ' + (t.full_name || 'Résident') + ' approuvé — Forfait ' + (plan === 'network' ? 'Réseau' : 'Local'), 'success');
+    toast('🟢 ' + (t.full_name || 'Résident') + ' approuvé — contrat à générer dans Modulimo Admin', 'success');
     loadTenants();
   } catch(e) {
     toast('Erreur: ' + e.message, 'error');

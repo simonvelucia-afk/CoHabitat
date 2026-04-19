@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Signature de contrat — Modulimo</title>
+<style>
+  :root {
+    --bg:#0f0f0f; --surface:#1a1a1a; --surface2:#212121; --border:#2a2a2a;
+    --text:#e8e6df; --text2:#b8b6b0; --text3:#9a9890;
+    --accent:#c8a96e; --success:#5de88c; --danger:#e07060;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6}
+  .wrap{max-width:720px;margin:0 auto;padding:32px 16px;min-height:100vh}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+  .head{padding:28px 32px;border-bottom:1px solid var(--border);text-align:center}
+  .head h1{font-size:1.4rem;font-weight:700;color:var(--accent);margin:0 0 6px}
+  .head p{color:var(--text3);font-size:13px;margin:0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+  .grid2>div{background:var(--surface);padding:20px 24px}
+  .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px}
+  .bar{background:rgba(200,169,110,.06);border-top:1px solid rgba(200,169,110,.15);border-bottom:1px solid rgba(200,169,110,.15);padding:20px 32px}
+  .bar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center}
+  .body{padding:28px 32px}
+  .cond{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+  .cond-h{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .cond-h strong{color:var(--text);font-size:.9rem}
+  .cond p{margin:0;color:var(--text2);font-size:13px;padding-left:26px}
+  h3{font-size:.95rem;font-weight:700;margin:0 0 12px}
+  input[type=text]{width:100%;padding:12px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:14px}
+  .pad-wrap{position:relative;border:2px solid var(--border);border-radius:8px;overflow:hidden;background:#fff;margin:12px 0}
+  canvas{display:block;width:100%;touch-action:none;cursor:crosshair}
+  .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:#aaa;font-size:14px}
+  .row{display:flex;gap:10px}
+  .btn{display:inline-block;padding:12px 20px;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;text-decoration:none;text-align:center}
+  .btn-primary{background:var(--accent);color:#0f0f0f;flex:2}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);flex:1}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .ok{background:rgba(93,232,140,.08);border:1px solid rgba(93,232,140,.3);border-radius:8px;padding:20px;text-align:center}
+  .ok .t{color:var(--success);font-weight:700;font-size:1rem;margin-bottom:6px}
+  .err{background:rgba(224,112,96,.08);border:1px solid rgba(224,112,96,.3);border-radius:8px;padding:24px;text-align:center;color:var(--danger)}
+  .loading{text-align:center;padding:60px 20px;color:var(--text3)}
+  .mute{font-size:12px;color:var(--text3)}
+  .footer{text-align:center;color:var(--text3);font-size:12px;padding:20px}
+  @media (max-width:540px){.grid2,.bar-grid{grid-template-columns:1fr}.head,.body,.bar{padding-left:18px;padding-right:18px}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="app" class="loading">Chargement…</div>
+    <div class="footer">Modulimo — lien sécurisé à usage unique</div>
+  </div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const CENTRAL_URL  = 'https://bpxscgrbxjscicpnheep.supabase.co';
+const CENTRAL_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJweHNjZ3JieGpzY2ljcG5oZWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzOTYxNzIsImV4cCI6MjA5MDk3MjE3Mn0._M6HHhCwKuuqAzicDZzJp7ul0M3KpDBBDb6ImDWWcLo';
+const sb = createClient(CENTRAL_URL, CENTRAL_ANON);
+
+const app = document.getElementById('app');
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function showError(msg) {
+  app.className = '';
+  app.innerHTML = '<div class="card"><div class="body"><div class="err"><div style="font-size:2rem;margin-bottom:10px;">⚠</div><strong>' + esc(msg) + '</strong><p class="mute" style="margin-top:12px;">Contactez l\'administration de Modulimo si vous pensez qu\'il s\'agit d\'une erreur.</p></div></div></div>';
+}
+
+function showSigned(contract) {
+  app.className = '';
+  app.innerHTML = '<div class="card"><div class="body"><div class="ok"><div class="t">✓ Contrat déjà signé</div><div class="mute">Signé le ' + esc(new Date(contract.signed_at).toLocaleDateString('fr-CA')) + ' par ' + esc(contract.signed_by_name || '') + '</div></div></div></div>';
+}
+
+function conditionsFor(isOwner) {
+  return isOwner ? [
+    { icon: '📋', title: 'Objet de l\'entente', text: 'La présente entente définit les conditions dans lesquelles Modulimo inc. fournit la plateforme CoHabitat et ses modules au propriétaire de l\'immeuble désigné.' },
+    { icon: '🏢', title: 'Licence et modules', text: 'Modulimo accorde une licence non exclusive d\'utilisation de la plateforme CoHabitat selon le plan souscrit. Les modules activés sont définis dans la licence associée à l\'immeuble.' },
+    { icon: '👤', title: 'Responsabilités', text: 'Le propriétaire désigne un administrateur responsable de la gestion des résidents. Il est responsable de l\'approbation des nouveaux résidents et du respect des conditions par ceux-ci.' },
+    { icon: '💰', title: 'Facturation', text: 'Les frais de licence sont dus selon les termes convenus avec Modulimo. En cas de non-paiement dans les 30 jours, Modulimo peut suspendre l\'accès pour l\'ensemble des résidents.' },
+    { icon: '🔄', title: 'Renouvellement', text: 'Le contrat est renouvelable automatiquement, sauf avis de résiliation transmis à Modulimo au moins 30 jours avant l\'échéance.' },
+    { icon: '🛡', title: 'Protection des données', text: 'Modulimo s\'engage à protéger les données des résidents conformément à la Loi 25. Les données ne sont pas utilisées à des fins commerciales tierces. Suppression complète disponible sur demande.' }
+  ] : [
+    { icon: '📋', title: 'Dispositions générales', text: 'Les présentes conditions régissent l\'utilisation de l\'ensemble des services numériques mis à disposition des résidents de la communauté Modulimo via la plateforme CoHabitat.' },
+    { icon: '🏠', title: 'Espaces communs', text: 'Les réservations sont soumises à disponibilité. Toute réservation non annulée au moins 2 heures à l\'avance sera facturée au tarif plein. Le résident est responsable de l\'état de l\'espace.' },
+    { icon: '🚗', title: 'Auto-partage', text: 'Le covoiturage est basé sur la confiance mutuelle entre résidents. Tout incident doit être déclaré dans les 24 heures.' },
+    { icon: '🍱', title: 'Machine Lunch', text: 'Les commandes confirmées sont débitées immédiatement du solde virtuel. Aucun remboursement pour une commande déjà préparée.' },
+    { icon: '💳', title: 'Solde virtuel', text: 'Le solde virtuel CoHabitat n\'est pas remboursable en argent. En cas de résiliation, le solde restant est perdu après 30 jours.' },
+    { icon: '🛡', title: 'Protection des données', text: 'Vos données sont protégées conformément à la Loi 25. Suppression disponible sur demande depuis votre profil. Vos données ne sont jamais vendues.' }
+  ];
+}
+
+function render(contract, token) {
+  const isOwner = contract.type === 'owner';
+  const planLabel = isOwner ? 'Propriétaire' : (contract.plan === 'network' ? 'Forfait Réseau' : 'Forfait Local');
+  const conds = conditionsFor(isOwner);
+  const defaultName = contract.client_name || '';
+
+  app.className = '';
+  app.innerHTML =
+    '<div class="card">' +
+      '<div class="head">' +
+        '<div style="font-size:2.5rem;margin-bottom:12px;">📄</div>' +
+        '<h1>' + (isOwner ? 'Entente de licence Modulimo' : 'Contrat de services CoHabitat') + '</h1>' +
+        '<p>' + esc(contract.owner_name || '') + '</p>' +
+      '</div>' +
+      '<div class="grid2">' +
+        '<div><div class="label">Prestataire</div><div style="font-weight:600;">Modulimo inc.</div><div class="mute">cohabitat.modulimo.com</div></div>' +
+        '<div><div class="label">' + (isOwner ? 'Propriétaire' : 'Résident') + '</div><div style="font-weight:600;">' + esc(contract.client_name || '') + '</div><div class="mute">' + esc(contract.client_email || '') + '</div></div>' +
+      '</div>' +
+      '<div class="bar"><div class="bar-grid">' +
+        '<div><div class="label">Forfait</div><div style="font-weight:700;color:var(--accent);">' + esc(planLabel) + '</div></div>' +
+        '<div><div class="label">Début</div><div style="font-weight:600;">' + esc(contract.starts_at || '—') + '</div></div>' +
+        '<div><div class="label">Fin</div><div style="font-weight:600;">' + esc(contract.ends_at || 'Indéterminé') + '</div></div>' +
+      '</div></div>' +
+      '<div class="body">' +
+        '<h3>Conditions</h3>' +
+        conds.map(s => '<div class="cond"><div class="cond-h"><span>' + s.icon + '</span><strong>' + esc(s.title) + '</strong></div><p>' + esc(s.text) + '</p></div>').join('') +
+        '<h3 style="margin-top:20px;">Signature</h3>' +
+        '<p class="mute" style="margin:0 0 14px;">En signant ci-dessous, vous acceptez les termes du présent contrat.</p>' +
+        '<input id="signer-name" type="text" placeholder="Votre nom complet" value="' + esc(defaultName) + '">' +
+        '<div class="pad-wrap"><canvas id="pad" width="680" height="180"></canvas><div id="ph" class="ph">Signez ici</div></div>' +
+        '<div class="row">' +
+          '<button id="btn-clear" class="btn btn-secondary">✕ Effacer</button>' +
+          '<button id="btn-sign" class="btn btn-primary">✓ Signer et accepter</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  initPad();
+  document.getElementById('btn-clear').addEventListener('click', clearPad);
+  document.getElementById('btn-sign').addEventListener('click', () => submitSignature(token));
+}
+
+let _hasDrawn = false;
+function initPad() {
+  const canvas = document.getElementById('pad');
+  const ctx = canvas.getContext('2d');
+  let drawing = false;
+  ctx.strokeStyle = '#1a1a2e'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const sx = canvas.width / r.width, sy = canvas.height / r.height;
+    const src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - r.left) * sx, y: (src.clientY - r.top) * sy };
+  }
+  function start(e) { e.preventDefault(); drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
+  function move(e) {
+    if(!drawing) return; e.preventDefault();
+    const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke();
+    if(!_hasDrawn) { _hasDrawn = true; document.getElementById('ph').style.display = 'none'; }
+  }
+  function end() { drawing = false; }
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  canvas.addEventListener('mouseup', end);
+  canvas.addEventListener('mouseleave', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove',  move,  { passive: false });
+  canvas.addEventListener('touchend',   end);
+}
+
+function clearPad() {
+  const canvas = document.getElementById('pad');
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+  document.getElementById('ph').style.display = 'flex';
+  _hasDrawn = false;
+}
+
+async function submitSignature(token) {
+  const name = document.getElementById('signer-name').value.trim();
+  const canvas = document.getElementById('pad');
+  const btn = document.getElementById('btn-sign');
+
+  if(name.length < 2) { alert('Veuillez entrer votre nom complet.'); return; }
+  const px = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  if(!px.some((v, i) => i % 4 === 3 && v > 0)) { alert('Veuillez tracer votre signature.'); return; }
+
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+
+  const signatureData = canvas.toDataURL('image/png');
+  const { data, error } = await sb.rpc('sign_contract_with_token', {
+    p_token: token,
+    p_signed_by_name: name,
+    p_signature_data: signatureData
+  });
+
+  if(error) {
+    btn.disabled = false; btn.textContent = '✓ Signer et accepter';
+    showError('Impossible d\'enregistrer la signature : ' + error.message);
+    return;
+  }
+
+  app.className = '';
+  app.innerHTML = '<div class="card"><div class="body"><div class="ok"><div style="font-size:2.5rem;margin-bottom:8px;">✓</div><div class="t">Contrat signé avec succès</div><div class="mute">Merci ' + esc(name) + '. Une copie de votre contrat signé est conservée par Modulimo. Vous pouvez fermer cette page.</div></div></div></div>';
+}
+
+async function init() {
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token');
+  if(!token || token.length < 20) { showError('Lien invalide : aucun jeton fourni.'); return; }
+
+  const { data, error } = await sb.rpc('get_contract_by_token', { p_token: token });
+  if(error) { showError('Erreur : ' + error.message); return; }
+  if(!data || !data.length) { showError('Ce lien de signature n\'est pas reconnu ou a déjà été utilisé.'); return; }
+
+  const contract = data[0];
+  if(contract.token_expired) { showError('Ce lien de signature a expiré. Contactez Modulimo pour en obtenir un nouveau.'); return; }
+  if(contract.signed_at) { showSigned(contract); return; }
+
+  render(contract, token);
+}
+
+init();
+</script>
+</body>
+</html>
