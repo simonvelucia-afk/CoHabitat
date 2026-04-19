@@ -43,10 +43,30 @@ ALTER TABLE lunch_transactions
 -- Si slot_id n'est pas deja TEXT, le convertir. Les ID de slot peuvent
 -- etre UUID, INT ou TEXT selon comment lunch_slots a ete cree sur la base
 -- centrale ; on uniformise sur TEXT pour ne plus jamais avoir de mismatch.
+--
+-- Note importante : on commence par DROP toute FK existante sur slot_id.
+-- Une ancienne migration aurait pu creer lunch_transactions_slot_id_fkey
+-- vers une table lunch_slots locale (cas Pointe Est ou la table existait
+-- en double), mais la base centrale et CoHabitat sont distinctes : un
+-- slot_id est un simple champ d'audit, pas une vraie reference
+-- referentielle. La FK doit donc disparaitre.
 DO $do_slot$
 DECLARE
-  v_type TEXT;
+  v_type   TEXT;
+  v_fkname TEXT;
 BEGIN
+  -- Drop toute FK posee sur lunch_transactions.slot_id
+  FOR v_fkname IN
+    SELECT conname FROM pg_constraint c
+      JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+     WHERE c.contype = 'f'
+       AND c.conrelid = 'public.lunch_transactions'::regclass
+       AND a.attname = 'slot_id'
+  LOOP
+    EXECUTE 'ALTER TABLE lunch_transactions DROP CONSTRAINT ' || quote_ident(v_fkname);
+  END LOOP;
+
+  -- Convertir le type si necessaire
   SELECT data_type INTO v_type
     FROM information_schema.columns
    WHERE table_schema='public' AND table_name='lunch_transactions' AND column_name='slot_id';
