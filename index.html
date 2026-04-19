@@ -1346,6 +1346,19 @@ tr:hover td { background: rgba(255,255,255,0.02); }
     </div>
 
     <!-- ==================== PROFIL ==================== -->
+    <!-- MON CONTRAT (lecture seule — signature via lien email depuis modulimo-admin) -->
+    <div id="page-contract" class="page">
+      <div class="section-header">
+        <div class="section-title">
+          <h2>📄 Mon contrat</h2>
+          <p>Consultez les termes de votre entente et votre signature</p>
+        </div>
+      </div>
+      <div id="contract-content" style="max-width:720px;margin:0 auto;">
+        <div style="text-align:center;padding:60px 20px;color:var(--text3);">Chargement…</div>
+      </div>
+    </div>
+
     <div id="page-profile" class="page">
       <div class="section-header">
         <div class="section-title">
@@ -3892,6 +3905,7 @@ function buildNav() {
   if (window.appModules.trips) html += `<button class="nav-tab" onclick="navigateTo('trips')">${t('navTrips')}</button>`;
   if (window.appModules.lunch) html += `<button class="nav-tab" onclick="navigateTo('lunch')">${t('navLunch')}</button>`;
   html += `<button class="nav-tab" onclick="navigateTo('transactions')">${t('navTransactions')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('contract')">📄 Mon contrat</button>`;
   html += `<button class="nav-tab" onclick="navigateTo('profile')">👤 ${t('navProfile')}</button>`;
   if (isAdmin) {
     html += `<button class="nav-tab" onclick="navigateTo('admin')">${t('navAdmin')}</button>`;
@@ -3980,6 +3994,7 @@ function navigateTo(page) {
     case 'spaces': loadSpaces(); break;
     case 'trips': loadTrips(); break;
     case 'transactions': loadTransactions(); break;
+    case 'contract': loadContractPage(); break;
     case 'profile': loadProfilePage(); break;
     case 'admin': loadAdmin(); break;
     case 'lunch': onLunchPageShow(); break;
@@ -6286,6 +6301,127 @@ function txLabel(type, description) {
 // ==========================================
 // ADMIN
 // ==========================================
+// ==========================================
+// MON CONTRAT (lecture seule)
+// ==========================================
+// La signature n'est plus faite dans CoHabitat — elle passe par un lien
+// tokenisé envoyé par email depuis modulimo-admin (voir sign.html).
+// Cette page sert uniquement à consulter les termes acceptés et la preuve
+// de signature.
+async function loadContractPage() {
+  const el = document.getElementById('contract-content');
+  if(!el) return;
+
+  if (isDemo || !currentUser) {
+    el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);"><div style="font-size:3rem;margin-bottom:16px;">📄</div><p>Contrat non disponible en mode d&#233;mo.</p></div>';
+    return;
+  }
+  el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);">Chargement…</div>';
+
+  const isOwner = currentProfile.role === 'principal_admin';
+
+  try {
+    const clientRes = await fetch(
+      CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + currentUser.id + '&select=id,name,owner_client_id&limit=1',
+      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+    );
+    const clients = await clientRes.json();
+    const client = clients?.[0];
+
+    if(!client) {
+      el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);"><div style="font-size:3rem;margin-bottom:16px;">📄</div><p>Aucun contrat trouvé.</p><p style="font-size:13px;margin-top:8px;">Contactez l\'administration de votre immeuble.</p></div>';
+      return;
+    }
+
+    const contractType = isOwner ? 'owner' : 'resident';
+    const contractRes = await fetch(
+      CENTRAL_URL + '/rest/v1/contracts?client_id=eq.' + client.id + '&type=eq.' + contractType + '&order=created_at.desc&limit=1&select=*',
+      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+    );
+    const contracts = await contractRes.json();
+    const contract = contracts?.[0];
+
+    if(!contract) {
+      el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3);"><div style="font-size:3rem;margin-bottom:16px;">⏳</div><p>Votre contrat est en cours de préparation.</p><p style="font-size:13px;margin-top:8px;">Un administrateur vous contactera lorsqu\'il sera prêt à être signé.</p></div>';
+      return;
+    }
+
+    let buildingName = '';
+    const ownerId = isOwner ? client.id : client.owner_client_id;
+    if(ownerId) {
+      const ownerRes = await fetch(
+        CENTRAL_URL + '/rest/v1/clients?id=eq.' + ownerId + '&select=name&limit=1',
+        { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      );
+      const owners = await ownerRes.json();
+      buildingName = owners?.[0]?.name || '';
+    }
+
+    const planLabel  = isOwner ? 'Propriétaire' : (contract.plan === 'network' ? 'Forfait Réseau' : 'Forfait Local');
+    const isSigned   = !!contract.signed_at;
+    const signedDate = contract.signed_at ? new Date(contract.signed_at).toLocaleDateString('fr-CA') : null;
+
+    const conditions = isOwner ? [
+      { icon: '📋', title: 'Objet de l\'entente', text: 'La présente entente définit les conditions dans lesquelles Modulimo inc. fournit la plateforme CoHabitat et ses modules au propriétaire de l\'immeuble désigné.' },
+      { icon: '🏢', title: 'Licence et modules', text: 'Modulimo accorde une licence non exclusive d\'utilisation de la plateforme CoHabitat selon le plan souscrit. Les modules activés sont définis dans la licence associée à l\'immeuble.' },
+      { icon: '👤', title: 'Responsabilités', text: 'Le propriétaire désigne un administrateur responsable de la gestion des résidents. Il est responsable de l\'approbation des nouveaux résidents et du respect des conditions par ceux-ci.' },
+      { icon: '💰', title: 'Facturation', text: 'Les frais de licence sont dus selon les termes convenus avec Modulimo. En cas de non-paiement dans les 30 jours, Modulimo peut suspendre l\'accès pour l\'ensemble des résidents.' },
+      { icon: '🔄', title: 'Renouvellement', text: 'Le contrat est renouvelable automatiquement, sauf avis de résiliation transmis à Modulimo au moins 30 jours avant l\'échéance.' },
+      { icon: '🛡', title: 'Protection des données', text: 'Modulimo s\'engage à protéger les données des résidents conformément à la Loi 25. Les données ne sont pas utilisées à des fins commerciales tierces. Suppression complète disponible sur demande.' },
+    ] : [
+      { icon: '📋', title: 'Dispositions générales', text: 'Les présentes conditions régissent l\'utilisation de l\'ensemble des services numériques mis à disposition des résidents de la communauté Modulimo via la plateforme CoHabitat.' },
+      { icon: '🏠', title: 'Espaces communs', text: 'Les réservations sont soumises à disponibilité. Toute réservation non annulée au moins 2 heures à l\'avance sera facturée au tarif plein. Le résident est responsable de l\'état de l\'espace.' },
+      { icon: '🚗', title: 'Auto-partage', text: 'Le covoiturage est basé sur la confiance mutuelle entre résidents. Tout incident doit être déclaré dans les 24 heures.' },
+      { icon: '🍱', title: 'Machine Lunch', text: 'Les commandes confirmées sont débitées immédiatement du solde virtuel. Aucun remboursement pour une commande déjà préparée.' },
+      { icon: '💳', title: 'Solde virtuel', text: 'Le solde virtuel CoHabitat n\'est pas remboursable en argent. En cas de résiliation, le solde restant est perdu après 30 jours.' },
+      { icon: '🛡', title: 'Protection des données', text: 'Vos données sont protégées conformément à la Loi 25. Suppression disponible sur demande depuis votre profil. Vos données ne sont jamais vendues.' },
+    ];
+
+    el.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;">'
+      + '<div style="padding:28px 32px;border-bottom:1px solid var(--border);text-align:center;">'
+      + '<div style="font-size:2.5rem;margin-bottom:12px;">📄</div>'
+      + '<h2 style="font-size:1.4rem;font-weight:700;color:var(--accent);margin:0 0 6px;">' + (isOwner ? 'Entente de licence Modulimo' : 'Contrat de services CoHabitat') + '</h2>'
+      + '<p style="color:var(--text3);font-size:13px;margin:0;">' + buildingName + '</p>'
+      + '</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);">'
+      + '<div style="background:var(--surface);padding:20px 24px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px;">Prestataire</div><div style="font-weight:600;">Modulimo inc.</div><div style="font-size:12px;color:var(--text3);">cohabitat.modulimo.com</div></div>'
+      + '<div style="background:var(--surface);padding:20px 24px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px;">' + (isOwner ? 'Propriétaire' : 'Résident') + '</div><div style="font-weight:600;">' + (currentProfile.full_name || '') + '</div><div style="font-size:12px;color:var(--text3);">' + (currentUser.email || '') + '</div></div>'
+      + '</div>'
+      + '<div style="background:rgba(200,169,110,.06);border-top:1px solid rgba(200,169,110,.15);border-bottom:1px solid rgba(200,169,110,.15);padding:20px 32px;">'
+      + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center;">'
+      + '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px;">FORFAIT</div><div style="font-weight:700;color:var(--accent);">' + planLabel + '</div></div>'
+      + '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px;">DÉBUT</div><div style="font-weight:600;">' + (contract.starts_at || '—') + '</div></div>'
+      + '<div><div style="font-size:11px;color:var(--text3);margin-bottom:4px;">FIN</div><div style="font-weight:600;">' + (contract.ends_at || 'Indéterminé') + '</div></div>'
+      + '</div></div>'
+      + '<div style="padding:28px 32px;">'
+      + '<h3 style="font-size:0.95rem;font-weight:700;color:var(--text);margin:0 0 20px;">Conditions</h3>'
+      + conditions.map(function(s) {
+          return '<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);">'
+            + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><span>' + s.icon + '</span><strong style="color:var(--text);font-size:0.9rem;">' + s.title + '</strong></div>'
+            + '<p style="margin:0;color:var(--text2);font-size:13px;line-height:1.7;padding-left:26px;">' + s.text + '</p>'
+            + '</div>';
+        }).join('')
+      + (isSigned
+          ? '<div style="background:rgba(93,232,140,.08);border:1px solid rgba(93,232,140,.3);border-radius:8px;padding:20px;text-align:center;margin-top:8px;">'
+            + '<div style="color:var(--success);font-weight:700;font-size:1rem;margin-bottom:6px;">✓ Contrat signé le ' + signedDate + '</div>'
+            + '<div style="font-size:12px;color:var(--text3);">Signé par : ' + (contract.signed_by_name || currentProfile.full_name) + '</div>'
+            + (contract.signature_data ? '<img src="' + contract.signature_data + '" alt="Signature" style="max-width:220px;margin-top:14px;border:1px solid var(--border);border-radius:4px;background:#fff;padding:6px;">' : '')
+            + '</div>'
+          : '<div style="background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.3);border-radius:8px;padding:20px;margin-top:8px;">'
+            + '<div style="display:flex;align-items:flex-start;gap:12px;">'
+            + '<div style="font-size:1.5rem;">✉️</div>'
+            + '<div>'
+            + '<div style="color:var(--accent);font-weight:700;font-size:0.95rem;margin-bottom:4px;">En attente de signature</div>'
+            + '<div style="font-size:13px;color:var(--text2);line-height:1.6;">Un lien de signature sécurisé vous a été envoyé par courriel à <strong>' + (currentUser.email || '') + '</strong>. Cliquez sur ce lien pour signer votre contrat. Si vous ne l\'avez pas reçu, contactez l\'administration de votre immeuble.</div>'
+            + '</div></div></div>')
+      + '</div></div>';
+
+  } catch(e) {
+    el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--accent3);">Erreur: ' + e.message + '</div>';
+    console.error('[loadContractPage]', e);
+  }
+}
+
 // ==========================================
 // PROFIL & DÉPENDANTS
 // ==========================================
