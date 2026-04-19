@@ -66,10 +66,13 @@ BEGIN
     EXECUTE 'ALTER TABLE lunch_transactions DROP CONSTRAINT ' || quote_ident(v_fkname);
   END LOOP;
 
-  -- Convertir le type si necessaire
-  SELECT data_type INTO v_type
-    FROM information_schema.columns
-   WHERE table_schema='public' AND table_name='lunch_transactions' AND column_name='slot_id';
+  -- Convertir le type si necessaire. Affectation par sous-requete scalaire
+  -- plutot que SELECT INTO pour ne pas se faire piger par le parser du
+  -- SQL Editor de Supabase qui interprete "SELECT ... INTO v_type" comme
+  -- une creation de table v_type (cf. meme bug avec v_current dans la
+  -- RPC plus haut).
+  v_type := (SELECT data_type FROM information_schema.columns
+              WHERE table_schema='public' AND table_name='lunch_transactions' AND column_name='slot_id');
   IF v_type IS NOT NULL AND v_type <> 'text' THEN
     EXECUTE 'ALTER TABLE lunch_transactions ALTER COLUMN slot_id TYPE TEXT USING slot_id::TEXT';
   END IF;
