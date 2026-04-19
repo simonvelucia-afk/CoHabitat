@@ -119,11 +119,14 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $fn_lunch$
+#variable_conflict use_variable
 DECLARE
-  v_current NUMERIC;
-  v_new     NUMERIC;
-  v_audit_id  UUID;
-  v_ledger_id UUID;
+  v_current  NUMERIC;
+  v_new      NUMERIC;
+  v_audit_id UUID;
+  v_ledger   UUID;
+  v_desc     TEXT;
+  v_balance_after NUMERIC;
 BEGIN
   IF p_amount IS NULL OR p_amount < 0 THEN
     RAISE EXCEPTION 'Montant invalide';
@@ -132,9 +135,12 @@ BEGIN
     RAISE EXCEPTION 'user_id requis';
   END IF;
 
-  -- 1. Verrouiller + verifier + debiter le bon compte
+  -- 1. Verrouiller + verifier + debiter le bon compte.
+  --    On utilise une affectation par sous-requete scalaire (FOR UPDATE pose
+  --    quand meme le verrou sur la ligne) pour eviter que le SQL Editor de
+  --    Supabase confonde "SELECT INTO v_current" avec une creation de table.
   IF p_dep_id IS NOT NULL THEN
-    SELECT virtual_balance INTO v_current FROM dependents WHERE id = p_dep_id FOR UPDATE;
+    v_current := (SELECT virtual_balance FROM dependents WHERE id = p_dep_id FOR UPDATE);
     IF v_current IS NULL THEN
       RAISE EXCEPTION 'Dependant introuvable';
     END IF;
@@ -143,8 +149,11 @@ BEGIN
     END IF;
     v_new := v_current - p_amount;
     UPDATE dependents SET virtual_balance = v_new WHERE id = p_dep_id;
+    -- Pour le ledger du parent, on enregistre son solde courant inchange
+    v_balance_after := (SELECT virtual_balance FROM profiles WHERE id = p_user_id);
+    v_desc := 'Achat ' || p_machine_id || ' (dep) : ' || COALESCE(p_buyer_name,'');
   ELSE
-    SELECT virtual_balance INTO v_current FROM profiles WHERE id = p_user_id FOR UPDATE;
+    v_current := (SELECT virtual_balance FROM profiles WHERE id = p_user_id FOR UPDATE);
     IF v_current IS NULL THEN
       RAISE EXCEPTION 'Profil introuvable';
     END IF;
@@ -153,6 +162,8 @@ BEGIN
     END IF;
     v_new := v_current - p_amount;
     UPDATE profiles SET virtual_balance = v_new WHERE id = p_user_id;
+    v_balance_after := v_new;
+    v_desc := 'Achat ' || p_machine_id || ' : ' || COALESCE(p_buyer_name,'');
   END IF;
 
   -- 2. Audit machine-centric
@@ -161,25 +172,14 @@ BEGIN
   RETURNING id INTO v_audit_id;
 
   -- 3. Ledger financier resident-centric (visible dans CoHabitat > Mon profil)
-  --    Note : les depenses des dependants sont enregistrees sur le parent
-  --    (seul lien au ledger), mais le debit reel a bien touche le dependant.
+  --    Les depenses des dependants sont enregistrees sur le parent (seul lien
+  --    au ledger), mais le debit reel a bien touche le dependant.
   INSERT INTO transactions (user_id, amount, balance_after, type, reference_id, reference_type, description)
-  VALUES (
-    p_user_id,
-    -p_amount,
-    CASE WHEN p_dep_id IS NULL THEN v_new ELSE (SELECT virtual_balance FROM profiles WHERE id = p_user_id) END,
-    'lunch_purchase',
-    v_audit_id,
-    'lunch_transaction',
-    CASE WHEN p_dep_id IS NULL
-      THEN 'Achat ' || p_machine_id || ' : ' || COALESCE(p_buyer_name,'')
-      ELSE 'Achat ' || p_machine_id || ' (dep) : ' || COALESCE(p_buyer_name,'')
-    END
-  )
-  RETURNING id INTO v_ledger_id;
+  VALUES (p_user_id, -p_amount, v_balance_after, 'lunch_purchase', v_audit_id, 'lunch_transaction', v_desc)
+  RETURNING id INTO v_ledger;
 
   -- 4. Relier l'audit au ledger pour la tracabilite
-  UPDATE lunch_transactions SET ledger_tx_id = v_ledger_id WHERE id = v_audit_id;
+  UPDATE lunch_transactions SET ledger_tx_id = v_ledger WHERE id = v_audit_id;
 
   RETURN v_audit_id;
 END;
