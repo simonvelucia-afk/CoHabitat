@@ -6384,6 +6384,13 @@ function _buildTxPDF(rows, title, period) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'pt', format:'letter' });
 
+  // Logo Modulimo en haut à droite (le src est un JPEG malgré le préfixe data:image/png)
+  const logo = (typeof _getModulimoLogoDataURL === 'function') ? _getModulimoLogoDataURL() : null;
+  if(logo) {
+    try { doc.addImage(logo, 'JPEG', 470, 28, 102, 44); }
+    catch(e) { console.warn('[tx pdf] logo failed:', e.message); }
+  }
+
   // En-tête
   doc.setFontSize(16); doc.setTextColor(40);
   doc.text(title, 40, 50);
@@ -6429,7 +6436,7 @@ function _buildTxPDF(rows, title, period) {
   doc.text('CoHabitat · Modulimo — ce document est un relevé informatif.', 40, 760);
 
   const slug = period.replace(/\s+/g,'-').toLowerCase();
-  doc.save('transactions-' + slug + '.pdf');
+  doc.save('Modulimo-transactions-' + slug + '.pdf');
 }
 
 function txLabel(type, description) {
@@ -6687,10 +6694,12 @@ async function viewMyInvoice(invoiceId) {
       + '<td style="padding:10px;font-size:11px;color:var(--text3);">'+(l.transaction_date ? new Date(l.transaction_date).toLocaleDateString('fr-CA') : '—')+'</td>'
       + '<td style="padding:10px;text-align:right;font-size:12px;">'+(Number(l.total_amount)||0).toFixed(2)+' $</td>'
       + '</tr>').join('') || '<tr><td colspan="4" style="padding:16px;text-align:center;color:var(--text3);font-style:italic;">Aucun détail</td></tr>';
+    const _logo = _getModulimoLogoDataURL();
+    const _logoImg = _logo ? '<img src="'+_logo+'" alt="Modulimo" style="height:28px;width:auto;display:block;">' : '';
     const html = '<div id="modal-my-inv" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">'
       + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;max-width:640px;width:100%;max-height:90vh;overflow:auto;">'
-      + '<div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">'
-      + '<div style="font-weight:700;">🧾 Détail de la facture</div>'
+      + '<div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+      + '<div style="display:flex;align-items:center;gap:12px;">'+_logoImg+'<div style="font-weight:700;">🧾 Détail de la facture</div></div>'
       + '<button class="btn btn-secondary" style="padding:4px 10px;" onclick="document.getElementById(\'modal-my-inv\').remove()">✕</button>'
       + '</div>'
       + '<div style="padding:20px;">'
@@ -6703,6 +6712,12 @@ async function viewMyInvoice(invoiceId) {
   } catch(e) {
     toast('Erreur: ' + e.message, 'error');
   }
+}
+
+// Récupère la data-URL du logo Modulimo (image inline de la page de login)
+function _getModulimoLogoDataURL() {
+  const img = document.querySelector('.login-logo img');
+  return img && img.src ? img.src : null;
 }
 
 // Génère et télécharge le PDF d'une facture unique avec son détail
@@ -6721,6 +6736,12 @@ async function downloadInvoicePDF(invoiceId) {
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit:'pt', format:'letter' });
+    // Logo Modulimo en haut à droite (le src est un JPEG malgré le préfixe data:image/png)
+    const logo = _getModulimoLogoDataURL();
+    if(logo) {
+      try { doc.addImage(logo, 'JPEG', 470, 28, 102, 44); }
+      catch(e) { console.warn('[invoice pdf] logo failed:', e.message); }
+    }
     doc.setFontSize(16); doc.setTextColor(40);
     doc.text('Facture — ' + inv.period_start + ' → ' + inv.period_end, 40, 50);
     doc.setFontSize(9); doc.setTextColor(110);
@@ -6756,7 +6777,7 @@ async function downloadInvoicePDF(invoiceId) {
     doc.setFontSize(8); doc.setTextColor(150);
     doc.text('CoHabitat · Modulimo', 40, 760);
 
-    doc.save('facture-' + inv.period_start + '.pdf');
+    doc.save('Modulimo-facture-' + inv.period_start + '.pdf');
   } catch(e) {
     toast('Erreur PDF: ' + e.message, 'error');
   }
@@ -6769,6 +6790,12 @@ function downloadAnnualInvoicesPDF(year) {
   if(!invs.length) { toast('Aucune facture en ' + year, 'error'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'pt', format:'letter' });
+  // Logo Modulimo en haut à droite (le src est un JPEG malgré le préfixe data:image/png)
+  const logo = _getModulimoLogoDataURL();
+  if(logo) {
+    try { doc.addImage(logo, 'JPEG', 470, 28, 102, 44); }
+    catch(e) { console.warn('[annual pdf] logo failed:', e.message); }
+  }
   doc.setFontSize(16); doc.setTextColor(40);
   doc.text('Récapitulatif annuel des factures — ' + year, 40, 50);
   doc.setFontSize(9); doc.setTextColor(110);
@@ -6808,7 +6835,7 @@ function downloadAnnualInvoicesPDF(year) {
   doc.setFont(undefined, 'normal');
   doc.setFontSize(8); doc.setTextColor(150);
   doc.text('CoHabitat · Modulimo', 40, 760);
-  doc.save('factures-' + year + '.pdf');
+  doc.save('Modulimo-factures-' + year + '.pdf');
 }
 
 // ==========================================
