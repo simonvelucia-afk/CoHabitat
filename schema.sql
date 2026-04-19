@@ -19,6 +19,8 @@ CREATE TABLE profiles (
   role TEXT NOT NULL DEFAULT 'tenant' CHECK (role IN ('principal_admin', 'admin', 'tenant', 'demo')),
   is_approved_driver BOOLEAN DEFAULT FALSE,
   virtual_balance DECIMAL(10,2) DEFAULT 0.00,
+  logo_bg_color TEXT CHECK (logo_bg_color IS NULL OR logo_bg_color IN
+    ('red','orange','yellow','green','blue','indigo','violet','pink')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
