@@ -26,6 +26,42 @@ CREATE TABLE IF NOT EXISTS lunch_transactions (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Filet de securite : si une ancienne version de la table a ete creee sans
+-- ces colonnes (premier run partiel, version LunchMachine differente, etc.),
+-- on les rajoute ici plutot que de faire planter les CREATE INDEX / POLICY
+-- qui les referencent.
+ALTER TABLE lunch_transactions
+  ADD COLUMN IF NOT EXISTS machine_id   TEXT,
+  ADD COLUMN IF NOT EXISTS slot_id      UUID,
+  ADD COLUMN IF NOT EXISTS buyer_name   TEXT,
+  ADD COLUMN IF NOT EXISTS price        NUMERIC(8,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS user_id      UUID,
+  ADD COLUMN IF NOT EXISTS dep_id       UUID,
+  ADD COLUMN IF NOT EXISTS ledger_tx_id UUID,
+  ADD COLUMN IF NOT EXISTS created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- Ajouter les FK si manquantes (un ADD COLUMN IF NOT EXISTS ne les inclut pas
+-- quand la colonne pre-existait sans reference).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lunch_transactions_user_id_fkey') THEN
+    BEGIN
+      ALTER TABLE lunch_transactions
+        ADD CONSTRAINT lunch_transactions_user_id_fkey
+        FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE SET NULL;
+    EXCEPTION WHEN others THEN NULL; -- si profiles manque ou donnees incoherentes, on n'interrompt pas
+    END;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lunch_transactions_dep_id_fkey') THEN
+    BEGIN
+      ALTER TABLE lunch_transactions
+        ADD CONSTRAINT lunch_transactions_dep_id_fkey
+        FOREIGN KEY (dep_id) REFERENCES dependents(id) ON DELETE SET NULL;
+    EXCEPTION WHEN others THEN NULL;
+    END;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_lunch_tx_user    ON lunch_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_lunch_tx_dep     ON lunch_transactions(dep_id);
 CREATE INDEX IF NOT EXISTS idx_lunch_tx_machine ON lunch_transactions(machine_id, created_at DESC);
