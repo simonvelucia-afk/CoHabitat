@@ -190,3 +190,65 @@ $fn_lunch$;
 -- soldes et est atomique.
 GRANT EXECUTE ON FUNCTION lunch_purchase(UUID, UUID, TEXT, UUID, TEXT, NUMERIC)
   TO anon, authenticated;
+
+
+-- =========================================================================
+-- D) RPC lunch_get_balance : lecture du solde virtuel sans exposer profiles
+--    a anon (RLS bloque la lecture directe de virtual_balance par la cle
+--    anon). SECURITY DEFINER + GRANT a anon. Retourne NULL si l'id n'existe
+--    pas. La securite repose sur le fait que les UUID ne sont pas devinables.
+-- =========================================================================
+CREATE OR REPLACE FUNCTION lunch_get_balance(
+  p_user_id UUID,
+  p_dep_id  UUID
+) RETURNS NUMERIC
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $fn_balance$
+BEGIN
+  IF p_dep_id IS NOT NULL THEN
+    RETURN (SELECT virtual_balance FROM dependents WHERE id = p_dep_id);
+  END IF;
+  IF p_user_id IS NULL THEN RETURN NULL; END IF;
+  RETURN (SELECT virtual_balance FROM profiles WHERE id = p_user_id);
+END;
+$fn_balance$;
+
+GRANT EXECUTE ON FUNCTION lunch_get_balance(UUID, UUID) TO anon, authenticated;
+
+
+-- =========================================================================
+-- E) Policies lunch_queue : le kiosque (cle anon) doit pouvoir inscrire un
+--    resident dans la file, lire la file, et la mettre a jour (status,
+--    expires_at). Pas de check restrictif puisque l'utilisation est limitee
+--    aux machines deja authentifiees via chsession.
+-- =========================================================================
+DO $do_lq$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='lunch_queue') THEN
+    EXECUTE 'ALTER TABLE lunch_queue ENABLE ROW LEVEL SECURITY';
+
+    -- SELECT pour anon (le kiosque doit voir la file pour afficher le rang)
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='lunch_queue' AND policyname='lunch_queue_select_anon') THEN
+      EXECUTE 'CREATE POLICY lunch_queue_select_anon ON lunch_queue FOR SELECT TO anon USING (TRUE)';
+    END IF;
+    -- INSERT pour anon (le kiosque ajoute le resident en file)
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='lunch_queue' AND policyname='lunch_queue_insert_anon') THEN
+      EXECUTE 'CREATE POLICY lunch_queue_insert_anon ON lunch_queue FOR INSERT TO anon WITH CHECK (TRUE)';
+    END IF;
+    -- UPDATE pour anon (status: waiting -> active, etc.)
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='lunch_queue' AND policyname='lunch_queue_update_anon') THEN
+      EXECUTE 'CREATE POLICY lunch_queue_update_anon ON lunch_queue FOR UPDATE TO anon USING (TRUE) WITH CHECK (TRUE)';
+    END IF;
+    -- DELETE pour anon (queueLeave appelle DELETE)
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='lunch_queue' AND policyname='lunch_queue_delete_anon') THEN
+      EXECUTE 'CREATE POLICY lunch_queue_delete_anon ON lunch_queue FOR DELETE TO anon USING (TRUE)';
+    END IF;
+  END IF;
+END $do_lq$;
+
+
+-- Forcer PostgREST a recharger son schema cache pour exposer les nouvelles
+-- RPC immediatement (sinon il faut attendre un cycle ou redemarrer).
+NOTIFY pgrst, 'reload schema';
