@@ -42,7 +42,7 @@ ALTER TABLE lunch_transactions
 
 -- Ajouter les FK si manquantes (un ADD COLUMN IF NOT EXISTS ne les inclut pas
 -- quand la colonne pre-existait sans reference).
-DO $$
+DO $do_fk$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lunch_transactions_user_id_fkey') THEN
     BEGIN
@@ -60,7 +60,7 @@ BEGIN
     EXCEPTION WHEN others THEN NULL;
     END;
   END IF;
-END $$;
+END $do_fk$;
 
 CREATE INDEX IF NOT EXISTS idx_lunch_tx_user    ON lunch_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_lunch_tx_dep     ON lunch_transactions(dep_id);
@@ -84,7 +84,7 @@ CREATE POLICY lunch_tx_select_own ON lunch_transactions
 -- B) Ledger financier : etendre le CHECK de transactions.type pour accepter
 --    'lunch_purchase'. Sans cela le ledger rejette l'insert du RPC.
 -- =========================================================================
-DO $$
+DO $do_ck$
 BEGIN
   -- Supprime puis recree la contrainte avec le nouveau type
   ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check;
@@ -101,7 +101,7 @@ BEGIN
       'lunch_purchase',
       'demo'
     ));
-END $$;
+END $do_ck$;
 
 -- =========================================================================
 -- C) RPC lunch_purchase : atomique, verifie les fonds, audit + ledger + debit.
@@ -118,7 +118,7 @@ CREATE OR REPLACE FUNCTION lunch_purchase(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $fn_lunch$
 DECLARE
   v_current NUMERIC;
   v_new     NUMERIC;
@@ -183,7 +183,7 @@ BEGIN
 
   RETURN v_audit_id;
 END;
-$$;
+$fn_lunch$;
 
 -- Autoriser l'appel par anon + authenticated (le kiosque utilise l'anon key
 -- apres auto-login chsession). La fonction reste sure car elle verifie les
