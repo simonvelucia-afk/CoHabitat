@@ -6416,9 +6416,126 @@ async function loadContractPage() {
             + '</div></div></div>')
       + '</div></div>';
 
+    // Section « Mes factures » + bouton demande d'upgrade
+    await _renderInvoicesSection(el, isOwner, contract);
+
   } catch(e) {
     el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--accent3);">Erreur: ' + e.message + '</div>';
     console.error('[loadContractPage]', e);
+  }
+}
+
+// Liste les factures du résident + affiche le bouton d'upgrade Local→Réseau
+async function _renderInvoicesSection(el, isOwner, contract) {
+  if(!currentUser) return;
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'max-width:720px;margin:20px auto 0;';
+
+  // Bouton upgrade (réservé aux résidents sur plan local)
+  if(!isOwner && contract && contract.plan === 'local' && contract.status !== 'terminated') {
+    const pending = !!contract.upgrade_requested_to_plan;
+    wrap.innerHTML += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;">'
+      + '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">'
+      + '<div style="flex:1;min-width:200px;">'
+      + '<div style="font-weight:700;color:var(--text);margin-bottom:4px;">🔗 Forfait Réseau</div>'
+      + '<div style="font-size:13px;color:var(--text3);">Accès aux ressources partagées entre immeubles du réseau Modulimo.</div>'
+      + '</div>'
+      + (pending
+          ? '<span class="badge" style="background:rgba(200,169,110,.15);color:var(--accent);padding:6px 12px;border-radius:6px;font-size:12px;">⏳ Demande envoyée</span>'
+          : '<button onclick="requestNetworkUpgrade()" class="btn btn-primary" style="white-space:nowrap;">Demander l\'accès</button>')
+      + '</div></div>';
+  }
+
+  // Factures
+  try {
+    const { data: invs, error } = await sb.rpc('list_client_invoices', { p_cohabitat_user_id: currentUser.id });
+    if(error) throw new Error(error.message);
+
+    let body = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'
+      + '<div style="padding:18px 24px;border-bottom:1px solid var(--border);">'
+      + '<div style="font-weight:700;color:var(--text);">🧾 Mes factures</div>'
+      + '<div style="font-size:12px;color:var(--text3);margin-top:4px;">Détail des services consommés par mois.</div>'
+      + '</div>';
+
+    if(!invs || !invs.length) {
+      body += '<div style="padding:40px 24px;text-align:center;color:var(--text3);font-style:italic;font-size:13px;">Aucune facture pour l\'instant.</div>';
+    } else {
+      body += '<table style="width:100%;border-collapse:collapse;">'
+        + '<thead><tr style="background:rgba(255,255,255,.02);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);">'
+        + '<th style="padding:10px 16px;text-align:left;">Période</th>'
+        + '<th style="padding:10px 16px;text-align:right;">Total</th>'
+        + '<th style="padding:10px 16px;text-align:left;">Statut</th>'
+        + '<th style="padding:10px 16px;text-align:right;">Action</th>'
+        + '</tr></thead><tbody>';
+      invs.forEach(inv => {
+        const badge = inv.status === 'paid'
+          ? '<span style="color:var(--success);font-weight:600;font-size:12px;">✓ Payée '+(inv.paid_at ? new Date(inv.paid_at).toLocaleDateString('fr-CA') : '')+'</span>'
+          : inv.status === 'cancelled'
+            ? '<span style="color:var(--text3);font-size:12px;">Annulée</span>'
+            : '<span style="color:var(--accent);font-weight:600;font-size:12px;">À payer '+(inv.billing_mode === 'modulimo_collects' ? '(Modulimo)' : '(propriétaire)')+'</span>';
+        body += '<tr style="border-top:1px solid var(--border);">'
+          + '<td style="padding:12px 16px;font-size:13px;">'+inv.period_start+' → '+inv.period_end+'</td>'
+          + '<td style="padding:12px 16px;text-align:right;font-weight:700;font-size:13px;">'+(Number(inv.total_amount)||0).toFixed(2)+' $</td>'
+          + '<td style="padding:12px 16px;">'+badge+'</td>'
+          + '<td style="padding:12px 16px;text-align:right;"><button onclick="viewMyInvoice(\''+inv.id+'\')" class="btn btn-secondary" style="padding:4px 10px;font-size:12px;">Détail</button></td>'
+          + '</tr>';
+      });
+      body += '</tbody></table>';
+    }
+    body += '</div>';
+    wrap.innerHTML += body;
+    el.appendChild(wrap);
+  } catch(e) {
+    console.error('[invoices]', e);
+    wrap.innerHTML += '<div style="padding:20px;color:var(--accent3);font-size:13px;">Impossible de charger les factures: ' + e.message + '</div>';
+    el.appendChild(wrap);
+  }
+}
+
+async function requestNetworkUpgrade() {
+  if(!currentUser) return;
+  if(!confirm('Demander l\'accès au forfait Réseau ? Votre administrateur recevra la demande.')) return;
+  try {
+    const { error } = await sb.rpc('request_plan_upgrade', {
+      p_cohabitat_user_id: currentUser.id, p_target_plan: 'network'
+    });
+    if(error) throw new Error(error.message);
+    toast('Demande envoyée — votre admin va la traiter', 'success');
+    loadContractPage();
+  } catch(e) {
+    toast('Erreur: ' + e.message, 'error');
+  }
+}
+
+async function viewMyInvoice(invoiceId) {
+  if(!currentUser) return;
+  try {
+    const { data: lines, error } = await sb.rpc('get_invoice_detail', {
+      p_invoice_id: invoiceId, p_cohabitat_user_id: currentUser.id
+    });
+    if(error) throw new Error(error.message);
+    const catLbl = { monthly_fee:'📄 Frais mensuel', space_reservation:'🏢 Espace', trip:'🚗 Trajet', trip_charge:'🚗 Frais', lunch:'🍱 Lunch', other:'•' };
+    const rows = (lines || []).map(l => '<tr style="border-top:1px solid var(--border);">'
+      + '<td style="padding:10px;font-size:12px;">'+(catLbl[l.category]||'•')+'</td>'
+      + '<td style="padding:10px;font-size:12px;">'+String(l.description||'').replace(/</g,'&lt;')+'</td>'
+      + '<td style="padding:10px;font-size:11px;color:var(--text3);">'+(l.transaction_date ? new Date(l.transaction_date).toLocaleDateString('fr-CA') : '—')+'</td>'
+      + '<td style="padding:10px;text-align:right;font-size:12px;">'+(Number(l.total_amount)||0).toFixed(2)+' $</td>'
+      + '</tr>').join('') || '<tr><td colspan="4" style="padding:16px;text-align:center;color:var(--text3);font-style:italic;">Aucun détail</td></tr>';
+    const html = '<div id="modal-my-inv" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)this.remove()">'
+      + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;max-width:640px;width:100%;max-height:90vh;overflow:auto;">'
+      + '<div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">'
+      + '<div style="font-weight:700;">🧾 Détail de la facture</div>'
+      + '<button class="btn btn-secondary" style="padding:4px 10px;" onclick="document.getElementById(\'modal-my-inv\').remove()">✕</button>'
+      + '</div>'
+      + '<div style="padding:20px;">'
+      + '<table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:8px;overflow:hidden;">'
+      + '<thead><tr style="background:var(--surface2);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);"><th style="padding:10px;text-align:left;">Catégorie</th><th style="padding:10px;text-align:left;">Description</th><th style="padding:10px;text-align:left;">Date</th><th style="padding:10px;text-align:right;">Montant</th></tr></thead>'
+      + '<tbody>'+rows+'</tbody></table>'
+      + '</div></div></div>';
+    const w = document.createElement('div'); w.innerHTML = html;
+    document.body.appendChild(w.firstElementChild);
+  } catch(e) {
+    toast('Erreur: ' + e.message, 'error');
   }
 }
 
