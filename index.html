@@ -4085,13 +4085,44 @@ let _lunchMyEntry   = null;
 let _lunchMachines  = [];  // cache des machines pour le rafraîchissement
 
 // Kiosque envoie { type:'lunch-done', machineId } quand l'usager termine sa session.
-// On rafraichit immediatement les cartes (et le solde) sans attendre le polling.
+// On rafraichit immediatement les donnees (solde, transactions, cartes machine)
+// sans attendre le polling ou forcer un Ctrl+Shift+R.
 window.addEventListener('message', function(ev) {
   const data = ev && ev.data;
   if(!data || data.type !== 'lunch-done') return;
-  // Refresh du solde : le profil a ete debite cote DB
-  loadProfile().catch(function(){});
-  // Refresh des cartes machine
+
+  // 1. Refresh du solde : le profil a ete debite cote DB
+  loadProfile().then(function() {
+    // 2. Rebuild de la nav (balance pill, mobile drawer) avec le nouveau solde
+    if(typeof buildNav === 'function') buildNav();
+
+    // 3. Rafraichir la page active pour que les affichages du solde (dashboard,
+    //    profil, transactions, lunch) refletent la nouvelle valeur.
+    const activePage = document.querySelector('.page.active');
+    if(activePage && typeof navigateTo === 'function') {
+      const map = {
+        'page-dashboard':   'dashboard',
+        'page-transactions':'transactions',
+        'page-profile':     'profile',
+        'page-lunch':       'lunch'
+      };
+      const pageKey = map[activePage.id];
+      if(pageKey) {
+        // Appel direct du loader de la page plutot que navigateTo (qui changerait
+        // le scroll et l'etat UI), juste pour rafraichir les donnees.
+        const loaderMap = {
+          'dashboard':   typeof loadDashboard === 'function'   ? loadDashboard   : null,
+          'transactions':typeof loadTransactions === 'function'? loadTransactions: null,
+          'profile':     typeof loadProfilePage === 'function' ? loadProfilePage : null,
+          'lunch':       typeof onLunchPageShow === 'function' ? onLunchPageShow : null
+        };
+        const loader = loaderMap[pageKey];
+        if(loader) loader().catch(function(){});
+      }
+    }
+  }).catch(function(){});
+
+  // 4. Refresh des cartes machine (si sur la page lunch mais aussi autre)
   for(const m of _lunchMachines) {
     const card = document.getElementById('lunch-card-' + m.id);
     if(card) renderMachineCard(m, card).catch(function(){});
