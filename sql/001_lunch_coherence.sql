@@ -14,6 +14,24 @@
 -- =========================================================================
 -- A) Audit : journal machine-centric (quelle machine / quel slot / quel prix)
 -- =========================================================================
+-- Si une ancienne version de la table existe avec id INTEGER (heritage), on
+-- la drop pour la recreer avec id UUID. Sinon le RPC plante avec "invalid
+-- input syntax for type uuid" en faisant RETURNING id INTO v_audit_id UUID.
+-- C'est une table d'audit purement applicative, sans donnees persistantes
+-- critiques au-dela de l'historique d'achats — l'historique financier vit
+-- dans la table transactions (ledger), pas ici.
+DO $do_pk$
+DECLARE
+  v_id_type TEXT;
+BEGIN
+  v_id_type := (SELECT data_type FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='lunch_transactions' AND column_name='id');
+  IF v_id_type IS NOT NULL AND v_id_type <> 'uuid' THEN
+    RAISE NOTICE 'lunch_transactions.id est % au lieu de uuid : DROP+RECREATE', v_id_type;
+    EXECUTE 'DROP TABLE lunch_transactions CASCADE';
+  END IF;
+END $do_pk$;
+
 CREATE TABLE IF NOT EXISTS lunch_transactions (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   machine_id  TEXT NOT NULL,
