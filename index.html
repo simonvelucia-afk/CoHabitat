@@ -4415,11 +4415,16 @@ async function lunchQueueLeave(machineId) {
 }
 
 // Ouvre le kiosque en déposant d'abord une session dans Modulimo Central
-async function openKiosk(machineId) {
+// Pre-ouverture synchrone : Chrome bloque window.open si appele apres un
+// await (user activation perdue). On ouvre un about:blank immediatement au
+// clic, puis on lui affecte l'URL finale une fois la chsession creee.
+// C'est le pattern standard pour contourner le popup blocker.
+async function openKiosk(machineId, preOpenedTab) {
+  var tab = preOpenedTab || window.open('about:blank', '_blank');
   try {
     if(!currentUser || !currentProfile) {
       console.warn('[openKiosk] pas de currentUser/currentProfile');
-      window.open(LM_KIOSK_BASE + '?machine=' + machineId, '_blank');
+      if(tab) tab.location.href = LM_KIOSK_BASE + '?machine=' + machineId;
       return;
     }
     console.log('[openKiosk] user:', currentProfile.full_name, 'machine:', machineId);
@@ -4442,17 +4447,21 @@ async function openKiosk(machineId) {
     console.log('[openKiosk] sessionId:', sessionId);
     const url = LM_KIOSK_BASE + '?machine=' + machineId + (sessionId ? '&chsession=' + sessionId : '');
     console.log('[openKiosk] url:', url.substring(0, 120));
-    window.open(url, '_blank');
+    if(tab) tab.location.href = url; else window.open(url, '_blank');
   } catch(e) {
     console.error('[openKiosk]', e);
-    window.open(LM_KIOSK_BASE + '?machine=' + machineId, '_blank');
+    if(tab) tab.location.href = LM_KIOSK_BASE + '?machine=' + machineId;
+    else window.open(LM_KIOSK_BASE + '?machine=' + machineId, '_blank');
   }
 }
 
-// Rejoindre la file ET ouvrir le kiosque (machine libre)
+// Rejoindre la file ET ouvrir le kiosque (machine libre). Meme motif de
+// pre-ouverture synchrone : on capture l'user activation au clic avant
+// tout await.
 async function lunchQueueJoinAndOpen(machineId) {
+  var tab = window.open('about:blank', '_blank');
   await lunchQueueJoin(machineId, null);
-  await openKiosk(machineId);
+  await openKiosk(machineId, tab);
 }
 
 function openLunchKiosk(machineId) {
