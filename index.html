@@ -4104,25 +4104,26 @@ window.addEventListener('message', function(ev) {
     // 2. Rebuild de la nav (balance pill, mobile drawer) avec le nouveau solde
     if(typeof buildNav === 'function') buildNav();
 
-    // 3. Rafraichir la page active pour que les affichages du solde (dashboard,
-    //    profil, transactions, lunch) refletent la nouvelle valeur.
+    // 3. Rafraichir la page active pour que les affichages du solde
+    //    refletent la nouvelle valeur. IMPORTANT : on n'inclut PAS 'lunch'
+    //    ici — onLunchPageShow ecraserait le container avec "Chargement..."
+    //    et relancerait un fetch complet qui peut entrer en conflit avec
+    //    le rendu en cours ou le visibilitychange handler, laissant la
+    //    page bloquee. Les cartes machine sont rafraichies plus bas via
+    //    renderMachineCard directement, ce qui est leger et non-destructif.
     const activePage = document.querySelector('.page.active');
     if(activePage && typeof navigateTo === 'function') {
       const map = {
         'page-dashboard':   'dashboard',
         'page-transactions':'transactions',
-        'page-profile':     'profile',
-        'page-lunch':       'lunch'
+        'page-profile':     'profile'
       };
       const pageKey = map[activePage.id];
       if(pageKey) {
-        // Appel direct du loader de la page plutot que navigateTo (qui changerait
-        // le scroll et l'etat UI), juste pour rafraichir les donnees.
         const loaderMap = {
           'dashboard':   typeof loadDashboard === 'function'   ? loadDashboard   : null,
           'transactions':typeof loadTransactions === 'function'? loadTransactions: null,
-          'profile':     typeof loadProfilePage === 'function' ? loadProfilePage : null,
-          'lunch':       typeof onLunchPageShow === 'function' ? onLunchPageShow : null
+          'profile':     typeof loadProfilePage === 'function' ? loadProfilePage : null
         };
         const loader = loaderMap[pageKey];
         if(loader) loader().catch(function(){});
