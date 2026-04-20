@@ -4046,6 +4046,15 @@ function navigateTo(page) {
     if (t.textContent.toLowerCase().includes(pageName(page))) t.classList.add('active');
   });
 
+  // Arreter le polling lunch_queue des qu'on quitte la page Lunch pour n'importe
+  // quelle autre page. Sans ca, le setInterval continue a taper /lunch_queue
+  // toutes les 6s en arriere-plan et sature les autres requetes (espaces,
+  // transactions), au point que leur chargement ne se termine jamais.
+  if(page !== 'lunch' && _lunchQueuePoll) {
+    clearInterval(_lunchQueuePoll);
+    _lunchQueuePoll = null;
+  }
+
   // Load page data
   switch(page) {
     case 'dashboard': loadDashboard(); break;
@@ -4058,7 +4067,6 @@ function navigateTo(page) {
     case 'profile': loadProfilePage(); break;
     case 'admin': loadAdmin(); break;
     case 'lunch': onLunchPageShow(); break;
-    default: if(_lunchQueuePoll) { clearInterval(_lunchQueuePoll); _lunchQueuePoll = null; } break;
   }
   trackFeature('navigation', 'page_view', {
     cohabitat_page: page,
