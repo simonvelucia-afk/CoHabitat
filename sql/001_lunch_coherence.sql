@@ -17,7 +17,7 @@
 CREATE TABLE IF NOT EXISTS lunch_transactions (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   machine_id  TEXT NOT NULL,
-  slot_id     UUID,               -- reference vers lunch_slots.id (sur central)
+  slot_id     TEXT,               -- reference vers lunch_slots.id (peut etre UUID, INT ou TEXT selon la base centrale)
   buyer_name  TEXT NOT NULL,
   price       NUMERIC(8,2) NOT NULL DEFAULT 0,
   user_id     UUID REFERENCES profiles(id)   ON DELETE SET NULL,
@@ -32,13 +32,51 @@ CREATE TABLE IF NOT EXISTS lunch_transactions (
 -- qui les referencent.
 ALTER TABLE lunch_transactions
   ADD COLUMN IF NOT EXISTS machine_id   TEXT,
-  ADD COLUMN IF NOT EXISTS slot_id      UUID,
+  ADD COLUMN IF NOT EXISTS slot_id      TEXT,
   ADD COLUMN IF NOT EXISTS buyer_name   TEXT,
   ADD COLUMN IF NOT EXISTS price        NUMERIC(8,2) NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS user_id      UUID,
   ADD COLUMN IF NOT EXISTS dep_id       UUID,
   ADD COLUMN IF NOT EXISTS ledger_tx_id UUID,
   ADD COLUMN IF NOT EXISTS created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- Si slot_id n'est pas deja TEXT, le convertir. Les ID de slot peuvent
+-- etre UUID, INT ou TEXT selon comment lunch_slots a ete cree sur la base
+-- centrale ; on uniformise sur TEXT pour ne plus jamais avoir de mismatch.
+--
+-- Note importante : on commence par DROP toute FK existante sur slot_id.
+-- Une ancienne migration aurait pu creer lunch_transactions_slot_id_fkey
+-- vers une table lunch_slots locale (cas Pointe Est ou la table existait
+-- en double), mais la base centrale et CoHabitat sont distinctes : un
+-- slot_id est un simple champ d'audit, pas une vraie reference
+-- referentielle. La FK doit donc disparaitre.
+DO $do_slot$
+DECLARE
+  v_type   TEXT;
+  v_fkname TEXT;
+BEGIN
+  -- Drop toute FK posee sur lunch_transactions.slot_id
+  FOR v_fkname IN
+    SELECT conname FROM pg_constraint c
+      JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+     WHERE c.contype = 'f'
+       AND c.conrelid = 'public.lunch_transactions'::regclass
+       AND a.attname = 'slot_id'
+  LOOP
+    EXECUTE 'ALTER TABLE lunch_transactions DROP CONSTRAINT ' || quote_ident(v_fkname);
+  END LOOP;
+
+  -- Convertir le type si necessaire. Affectation par sous-requete scalaire
+  -- plutot que SELECT INTO pour ne pas se faire piger par le parser du
+  -- SQL Editor de Supabase qui interprete "SELECT ... INTO v_type" comme
+  -- une creation de table v_type (cf. meme bug avec v_current dans la
+  -- RPC plus haut).
+  v_type := (SELECT data_type FROM information_schema.columns
+              WHERE table_schema='public' AND table_name='lunch_transactions' AND column_name='slot_id');
+  IF v_type IS NOT NULL AND v_type <> 'text' THEN
+    EXECUTE 'ALTER TABLE lunch_transactions ALTER COLUMN slot_id TYPE TEXT USING slot_id::TEXT';
+  END IF;
+END $do_slot$;
 
 -- Ajouter les FK si manquantes (un ADD COLUMN IF NOT EXISTS ne les inclut pas
 -- quand la colonne pre-existait sans reference).
@@ -107,11 +145,16 @@ END $do_ck$;
 -- C) RPC lunch_purchase : atomique, verifie les fonds, audit + ledger + debit.
 --    Appele par le kiosque (anon key apres chsession auto-login).
 -- =========================================================================
+-- p_slot_db_id en TEXT pour s'adapter a n'importe quel type d'ID dans
+-- lunch_slots (UUID, INT, TEXT). Le DROP est necessaire car CREATE OR REPLACE
+-- ne change pas les types d'arguments d'une fonction existante.
+DROP FUNCTION IF EXISTS lunch_purchase(UUID, UUID, TEXT, UUID, TEXT, NUMERIC);
+
 CREATE OR REPLACE FUNCTION lunch_purchase(
   p_user_id     UUID,
   p_dep_id      UUID,
   p_machine_id  TEXT,
-  p_slot_db_id  UUID,
+  p_slot_db_id  TEXT,
   p_buyer_name  TEXT,
   p_amount      NUMERIC
 ) RETURNS UUID
@@ -188,7 +231,7 @@ $fn_lunch$;
 -- Autoriser l'appel par anon + authenticated (le kiosque utilise l'anon key
 -- apres auto-login chsession). La fonction reste sure car elle verifie les
 -- soldes et est atomique.
-GRANT EXECUTE ON FUNCTION lunch_purchase(UUID, UUID, TEXT, UUID, TEXT, NUMERIC)
+GRANT EXECUTE ON FUNCTION lunch_purchase(UUID, UUID, TEXT, TEXT, TEXT, NUMERIC)
   TO anon, authenticated;
 
 
