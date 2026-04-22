@@ -2512,6 +2512,10 @@ async function initApp() {
   if (window._gaConsent === 'granted') gtag('set', 'user_properties', { user_type: 'resident' });
   trackFeature('platform', 'resident_login');
   await Promise.all([loadResourceAccess(), loadAppModules(), loadNetworkData()]);
+  // Phase 3C : aligner le solde sur la centrale apres chargement des modules
+  // (le flag est lu dans loadAppModules). Si central est inaccessible, on
+  // garde la valeur locale — pas de blocage.
+  await syncCentralBalanceToProfile();
   showApp();
 }
 
@@ -3055,14 +3059,63 @@ async function toggleDepResourceAccess(type, resourceId, grant, name) {
   openDepAccessManager(depAccessManagerId, depAccessManagerName);
 }
 
+// ── SOLDE CENTRAL (Phase 3C) ────────────────────────────────────────────────
+// Quand system_settings.finance_central_enabled='true', l'UI remplace la
+// valeur locale profiles.virtual_balance par celle de central.balances via
+// l'Edge Function finance-bridge. La centrale est la source de verite
+// post-bascule ; profiles.virtual_balance devient une copie cache
+// entretenue par le worker finance-sync pour le fallback.
+async function fetchCentralBalance(depExternalId) {
+  if (!window._financeCentralEnabled) return null;
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session?.access_token) return null;
+    const res = await fetch(`${CENTRAL_URL}/functions/v1/finance-bridge/get-balance`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': CENTRAL_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ dependent_id: depExternalId ?? null })
+    });
+    if (!res.ok) {
+      console.warn('[finance-central] get-balance', res.status, await res.text().catch(()=>''));
+      return null;
+    }
+    return await res.json();
+  } catch (e) {
+    console.warn('[finance-central] fetch error', e?.message);
+    return null;
+  }
+}
+
+// Lit le solde central et ecrit dans currentProfile.virtual_balance. Fire-
+// and-forget : en cas d'echec on garde la valeur locale. Logge une
+// divergence si central et local ne correspondent pas (outil de debug).
+async function syncCentralBalanceToProfile() {
+  if (!window._financeCentralEnabled || !currentProfile) return;
+  const central = await fetchCentralBalance(null);
+  if (!central) return;
+  const localBal   = Number(currentProfile.virtual_balance || 0);
+  const centralBal = Number(central.virtual_balance || 0);
+  if (Math.abs(localBal - centralBal) > 0.001) {
+    console.info(`[finance-central] divergence local=${localBal} central=${centralBal} kind=${central.source_kind}`);
+  }
+  currentProfile.virtual_balance = centralBal;
+}
+
 async function loadAppModules() {
   if (isDemo) return;
   // 1. Lire les préférences locales (admin local peut désactiver dans son enveloppe)
   const { data: localSettings } = await sb.from('system_settings')
     .select('key, value')
-    .in('key', ['module_trips', 'module_lunch']);
+    .in('key', ['module_trips', 'module_lunch', 'finance_central_enabled']);
   const localTrips = localSettings?.find(s => s.key === 'module_trips')?.value !== 'false';
   const localLunch = localSettings?.find(s => s.key === 'module_lunch')?.value !== 'false';
+  // Phase 3C : si finance_central_enabled=true, l'UI lit le solde depuis
+  // la centrale Modulimo via finance-bridge au lieu de profiles.virtual_balance.
+  window._financeCentralEnabled = localSettings?.find(s => s.key === 'finance_central_enabled')?.value === 'true';
 
   // 2. Vérifier la licence centrale (définit l'enveloppe max)
   const licence = await checkLicence();
