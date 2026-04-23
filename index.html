@@ -2385,7 +2385,7 @@ async function loadLandingPlans() {
   try {
     const res = await fetch(
       CENTRAL_URL + '/rest/v1/plans?active=eq.true&select=*,plan_features(*)&order=sort_order',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const plans = await res.json();
     if (!plans || !plans.length) {
@@ -2528,7 +2528,7 @@ async function checkContracts(userId) {
     // ── 0. Licence de l'immeuble via le domaine — bloque TOUS les résidents si inactive
     const licRes = await fetch(
       CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(domain) + '&select=client_id,active,expires_at&limit=1',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const lics = licRes.ok ? await licRes.json() : [];
     const lic  = lics?.[0];
@@ -2551,7 +2551,7 @@ async function checkContracts(userId) {
     if (ownerClientId) {
       const ownRes = await fetch(
         CENTRAL_URL + '/rest/v1/contracts?client_id=eq.' + ownerClientId + '&type=eq.owner&order=created_at.desc&limit=1&select=status,ends_at',
-        { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+        { headers: { apikey: CENTRAL_KEY } }
       );
       const ownContracts = ownRes.ok ? await ownRes.json() : [];
       const ownContract  = ownContracts?.[0];
@@ -2574,7 +2574,7 @@ async function checkContracts(userId) {
     // ── 1. Client Central du résident
     const clientRes = await fetch(
       CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + userId + '&select=id,is_active,pending_approval,owner_client_id&limit=1',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const clients = clientRes.ok ? await clientRes.json() : [];
     const client  = clients?.[0];
@@ -2616,7 +2616,7 @@ async function checkContracts(userId) {
     // ── 4. Contrat du résident
     const resContractRes = await fetch(
       CENTRAL_URL + '/rest/v1/contracts?client_id=eq.' + client.id + '&type=eq.resident&order=created_at.desc&limit=1&select=id,status,starts_at,ends_at,paid_until',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const resContracts = resContractRes.ok ? await resContractRes.json() : [];
     const resContract  = resContracts?.[0];
@@ -2679,7 +2679,7 @@ async function syncNewResidentToCentral(userId, email, fullName, alreadyApproved
     const domain = window.location.hostname;
     const licRes = await fetch(
       CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(domain) + '&select=client_id&limit=1',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const licData = await licRes.json();
     const ownerClientId = licData?.[0]?.client_id || null;
@@ -2687,7 +2687,7 @@ async function syncNewResidentToCentral(userId, email, fullName, alreadyApproved
     // Vérifier si ce résident a déjà un client dans Central
     const checkRes = await fetch(
       CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + userId + '&select=id&limit=1',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const existing = await checkRes.json();
     if (existing && existing.length > 0) return; // Déjà existant
@@ -2695,7 +2695,7 @@ async function syncNewResidentToCentral(userId, email, fullName, alreadyApproved
     // Créer le client via RPC (bypass RLS)
     const rpcRes = await fetch(CENTRAL_URL + '/rest/v1/rpc/create_resident_client', {
       method: 'POST',
-      headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json' },
+      headers: { apikey: CENTRAL_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         p_name:              fullName || email?.split('@')[0] || 'Nouveau résident',
         p_client_type:       'local',
@@ -3225,7 +3225,7 @@ async function loadNetworkData() {
     // 1. Trouver le client correspondant à ce domaine
     const licRes = await fetch(
       CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(domain) + '&select=client_id',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const licData = await licRes.json();
     if (!licData?.length) return;
@@ -3234,7 +3234,7 @@ async function loadNetworkData() {
     // 2. Trouver les réseaux auxquels ce bâtiment appartient
     const netRes = await fetch(
       CENTRAL_URL + '/rest/v1/network_members?client_id=eq.' + clientId + '&select=network_id,priority,networks(id,name,active)',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const netData = await netRes.json();
     const activeNet = (netData || []).find(m => m.networks?.active);
@@ -3247,7 +3247,7 @@ async function loadNetworkData() {
     // 3. Charger tous les membres du réseau (inclus soi-même pour ressources croisées)
     const membRes = await fetch(
       CENTRAL_URL + '/rest/v1/network_members?network_id=eq.' + activeNet.network_id + '&select=client_id,supabase_url,anon_key,priority,clients(name)',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const members = await membRes.json();
     window.networkData.members = members || [];
@@ -3255,7 +3255,7 @@ async function loadNetworkData() {
     // 4. Charger les ressources partagées
     const srRes = await fetch(
       CENTRAL_URL + '/rest/v1/shared_resources?network_id=eq.' + activeNet.network_id + '&active=eq.true&select=*',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const sharedResources = await srRes.json();
     window.networkData.sharedResources = sharedResources || [];
@@ -3327,7 +3327,7 @@ async function checkLicence() {
     const domain = window.location.hostname;
     const res = await fetch(
       CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(domain) + '&active=eq.true&select=modules,expires_at,plan,max_units',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     if (!res.ok) return {}; // En cas d'erreur réseau — ne pas bloquer
     const data = await res.json();
@@ -4985,7 +4985,7 @@ async function confirmNetworkBookSpace() {
       CENTRAL_URL + '/rest/v1/network_transactions',
       {
         method: 'POST',
-        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json' },
+        headers: { apikey: CENTRAL_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           network_id: window.networkData.network.id,
           from_client_id: window.networkData.myClientId,
@@ -6725,7 +6725,7 @@ async function loadContractPage() {
   try {
     const clientRes = await fetch(
       CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + currentUser.id + '&select=id,name,owner_client_id&limit=1',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const clients = await clientRes.json();
     const client = clients?.[0];
@@ -6738,7 +6738,7 @@ async function loadContractPage() {
     const contractType = isOwner ? 'owner' : 'resident';
     const contractRes = await fetch(
       CENTRAL_URL + '/rest/v1/contracts?client_id=eq.' + client.id + '&type=eq.' + contractType + '&order=created_at.desc&limit=1&select=*',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const contracts = await contractRes.json();
     const contract = contracts?.[0];
@@ -6753,7 +6753,7 @@ async function loadContractPage() {
     if(ownerId) {
       const ownerRes = await fetch(
         CENTRAL_URL + '/rest/v1/clients?id=eq.' + ownerId + '&select=name&limit=1',
-        { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+        { headers: { apikey: CENTRAL_KEY } }
       );
       const owners = await ownerRes.json();
       buildingName = owners?.[0]?.name || '';
@@ -7471,7 +7471,7 @@ async function loadTenants() {
   try {
     const cRes = await fetch(
       CENTRAL_URL + '/rest/v1/clients?select=cohabitat_user_id,id,is_active,pending_approval',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     if (cRes.ok) {
       const cData = await cRes.json();
@@ -7693,7 +7693,7 @@ async function syncTenantToCentral(userId) {
     let ownerClientId = null;
     const licRes = await fetch(
       CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(window.location.hostname) + '&select=client_id&limit=1',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const licData = licRes.ok ? await licRes.json() : [];
     ownerClientId = licData?.[0]?.client_id || null;
@@ -7701,7 +7701,7 @@ async function syncTenantToCentral(userId) {
     // Vérifier si client Central existe déjà (cas pending_approval)
     const checkRes = await fetch(
       CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(userId) + '&select=id&limit=1',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const existing = checkRes.ok ? await checkRes.json() : [];
 
@@ -7716,7 +7716,7 @@ async function syncTenantToCentral(userId) {
         CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(userId),
         {
           method: 'PATCH',
-          headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          headers: { apikey: CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
           body: JSON.stringify({
             pending_approval: false,
             is_active: true,
@@ -7736,7 +7736,7 @@ async function syncTenantToCentral(userId) {
       // Créer le client Central via RPC (bypass RLS)
       const rpcRes = await fetch(CENTRAL_URL + '/rest/v1/rpc/create_resident_client', {
         method: 'POST',
-        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json' },
+        headers: { apikey: CENTRAL_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           p_name:                t.full_name || t.email || 'Résident',
           p_client_type:         plan === 'network' ? 'network' : 'local',
@@ -7814,7 +7814,7 @@ async function submitApproveResident() {
     try {
       const licRes = await fetch(
         CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(window.location.hostname) + '&select=client_id&limit=1',
-        { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+        { headers: { apikey: CENTRAL_KEY } }
       );
       const licData = await licRes.json();
       ownerClientId = licData?.[0]?.client_id || null;
@@ -7824,7 +7824,7 @@ async function submitApproveResident() {
     let centralClientId = null;
     const checkRes = await fetch(
       CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id) + '&select=id&limit=1',
-      { headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY } }
+      { headers: { apikey: CENTRAL_KEY } }
     );
     const existing = checkRes.ok ? await checkRes.json() : [];
     if (existing && existing.length > 0) {
@@ -7833,7 +7833,7 @@ async function submitApproveResident() {
         CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id),
         {
           method: 'PATCH',
-          headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          headers: { apikey: CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
           body: JSON.stringify({
             pending_approval: false,
             is_active: true,
@@ -7846,7 +7846,7 @@ async function submitApproveResident() {
       // Créer via RPC (bypass RLS)
       const rpcRes2 = await fetch(CENTRAL_URL + '/rest/v1/rpc/create_resident_client', {
         method: 'POST',
-        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json' },
+        headers: { apikey: CENTRAL_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           p_name:              t.full_name || t.email || 'Résident',
           p_client_type:       plan === 'network' ? 'network' : 'local',
@@ -7894,7 +7894,7 @@ async function quickToggleTenant(id, activate) {
       CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(id),
       {
         method: 'PATCH',
-        headers: { apikey: CENTRAL_KEY, Authorization: 'Bearer ' + CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        headers: { apikey: CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({ is_active: false, updated_at: new Date().toISOString() })
       }
     );
