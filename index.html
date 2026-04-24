@@ -4182,7 +4182,12 @@ function pageName(page) {
 // ═══════════════════════════════════════════════
 const LM_KIOSK_BASE = 'https://simonvelucia-afk.github.io/LunchMachine/';
 const LM_CENTRAL_URL  = 'https://bpxscgrbxjscicpnheep.supabase.co';
-const LM_CENTRAL_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJweHNjZ3JieGpzY2ljcG5oZWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzOTYxNzIsImV4cCI6MjA5MDk3MjE3Mn0._M6HHhCwKuuqAzicDZzJp7ul0M3KpDBBDb6ImDWWcLo';
+// LM_CENTRAL_URL pointe vers le meme projet Supabase que CENTRAL_URL
+// (bpxscgrbxjscicpnheep). Les RPC / tables lunch_* vivent sur la centrale,
+// comme les tables business core (clients, contracts, etc.). On reutilise
+// donc CENTRAL_KEY (sb_publishable_...) pour l'apikey. L'ancienne constante
+// LM_CENTRAL_ANON (legacy JWT HS256) a ete desactivee par Supabase post-PR #15
+// et n'est plus acceptee par PostgREST → tous les appels renvoyaient 401.
 
 // ── LUNCH QUEUE ─────────────────────────────────────────────────────────────
 const LUNCH_QUEUE_POLL = 6000; // ms
@@ -4259,27 +4264,30 @@ async function cohFetch(path, opts) {
 }
 
 async function lmFetch(path, opts, userToken) {
-  const authToken = userToken || LM_CENTRAL_ANON;
-  const res = await fetch(LM_CENTRAL_URL + '/rest/v1/' + path, {
-    ...opts,
-    headers: {
-      'apikey': LM_CENTRAL_ANON,
-      'Authorization': 'Bearer ' + authToken,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation',
-      ...(opts && opts.headers)
-    }
-  });
+  // userToken : JWT utilisateur signe par l'Auth de l'immeuble, necessaire
+  // pour les requetes qui frappent une RLS scope par auth.uid(). Absent =>
+  // on envoie juste apikey (CENTRAL_KEY) et on tombe sur les policies anon.
+  const headers = {
+    'apikey': CENTRAL_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+    ...(opts && opts.headers)
+  };
+  if (userToken) headers['Authorization'] = 'Bearer ' + userToken;
+  const res = await fetch(LM_CENTRAL_URL + '/rest/v1/' + path, { ...opts, headers });
   if(!res.ok) return null;
   const ct = res.headers.get('content-type') || '';
   return ct.includes('json') ? res.json() : null;
 }
 
 async function getLmToken() {
+  // Retourne le JWT user si une session existe, sinon null. lmFetch gere
+  // le cas null en n'ajoutant pas de header Authorization (les nouvelles
+  // sb_publishable_* cles ne sont pas des JWT et sont rejetees en Bearer).
   try {
     const { data: { session } } = await sb.auth.getSession();
-    return session?.access_token || LM_CENTRAL_ANON;
-  } catch(e) { return LM_CENTRAL_ANON; }
+    return session?.access_token || null;
+  } catch(e) { return null; }
 }
 
 async function onLunchPageShow() {
@@ -4299,7 +4307,7 @@ async function onLunchPageShow() {
       : `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&select=id,name,building_id&order=name`;
 
     const res = await fetch(query, {
-      headers: { 'apikey': LM_CENTRAL_ANON, 'Authorization': 'Bearer ' + LM_CENTRAL_ANON }
+      headers: { 'apikey': CENTRAL_KEY }
     });
     const machines = await res.json();
 
