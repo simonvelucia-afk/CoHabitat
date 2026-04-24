@@ -3377,6 +3377,17 @@ async function loadProfile() {
   }
   currentProfile = data;
   applyLogoBg(currentProfile.logo_bg_color);
+
+  // Phase 3C : la colonne profiles.virtual_balance est un cache local qui
+  // peut derailler apres une bascule sur finance_central_enabled (ex : une
+  // /debit qui ecrit direct sur central ne touche pas profiles.virtual_balance,
+  // donc loadProfile re-ecrirait la stale value). On re-aligne sur central
+  // apres chaque rechargement pour que le pill et les autres vues affichent
+  // la source de verite. Fire-and-forget : si central est injoignable, on
+  // garde la valeur locale (comportement de fallback documente).
+  if (window._financeCentralEnabled) {
+    await syncCentralBalanceToProfile();
+  }
 }
 
 // ==========================================
