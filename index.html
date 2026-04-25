@@ -4538,37 +4538,50 @@ async function lunchQueueLeave(machineId) {
 // C'est le pattern standard pour contourner le popup blocker.
 async function openKiosk(machineId, preOpenedTab) {
   var tab = preOpenedTab || window.open('about:blank', '_blank');
+  // Pre-genere le chsession id cote client : permet de construire et assigner
+  // tab.location.href de facon synchrone si l'INSERT lunch_sessions plante,
+  // au lieu de laisser le popup coince sur about:blank (bug observe en prod
+  // sur le 2e clic kiosque). Le kiosque attend la row via un petit retry sur
+  // le chsession bootstrap, ce qui couvre la course INSERT/navigation.
+  const sessionId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2));
+  const url = LM_KIOSK_BASE + '?machine=' + machineId + '&chsession=' + sessionId;
+  // Navigation synchrone : on ne perd pas l'user activation si l'INSERT
+  // qui suit prend du temps. Si le popup est null (bloque), window.open en
+  // fallback — meme contrainte mais plus rien a perdre.
+  if(tab) { try { tab.location.href = url; } catch(e) { console.warn('[openKiosk] nav', e); } }
+  else { window.open(url, '_blank'); }
   try {
     if(!currentUser || !currentProfile) {
-      console.warn('[openKiosk] pas de currentUser/currentProfile');
-      if(tab) tab.location.href = LM_KIOSK_BASE + '?machine=' + machineId;
+      console.warn('[openKiosk] pas de currentUser/currentProfile — kiosk en mode borne');
       return;
     }
-    console.log('[openKiosk] user:', currentProfile.full_name, 'machine:', machineId);
-    // Créer une session temporaire dans CoHabitat Supabase (expire dans 2 min)
+    console.log('[openKiosk] user:', currentProfile.full_name, 'machine:', machineId, 'chsession:', sessionId);
+    const { data: { session: authSession } } = await sb.auth.getSession();
+    const accessToken = authSession?.access_token || null;
+    // Phase 3D : on relaie le JWT et le flag finance_central_enabled au kiosque
+    // dans la row lunch_sessions (one-shot, supprimee a la lecture). Sans ca,
+    // le bootstrap chsession cote LunchMachine reste sans token et debite la
+    // base locale au lieu de la centrale — divergence visible dans la console
+    // ([finance-central] divergence local=X central=Y).
     const expires = new Date(Date.now() + 2 * 60000).toISOString();
     const rows = await cohFetch('lunch_sessions', {
       method: 'POST',
       body: JSON.stringify({
-        machine_id:    machineId,
-        user_id:       currentUser.id,
-        full_name:     currentProfile.full_name || '',
-        unit:          currentProfile.unit || '',
-        role:          currentProfile.role || 'tenant',
-        resident_plan: currentProfile.resident_plan || 'local',
-        expires_at:    expires
+        id:                       sessionId,
+        machine_id:               machineId,
+        user_id:                  currentUser.id,
+        full_name:                currentProfile.full_name || '',
+        unit:                     currentProfile.unit || '',
+        role:                     currentProfile.role || 'tenant',
+        resident_plan:            currentProfile.resident_plan || 'local',
+        expires_at:               expires,
+        access_token:             accessToken,
+        finance_central_enabled:  !!window._financeCentralEnabled
       })
     });
-    console.log('[openKiosk] rows:', JSON.stringify(rows));
-    const sessionId = Array.isArray(rows) && rows[0]?.id;
-    console.log('[openKiosk] sessionId:', sessionId);
-    const url = LM_KIOSK_BASE + '?machine=' + machineId + (sessionId ? '&chsession=' + sessionId : '');
-    console.log('[openKiosk] url:', url.substring(0, 120));
-    if(tab) tab.location.href = url; else window.open(url, '_blank');
+    console.log('[openKiosk] inserted', Array.isArray(rows) && rows[0]?.id, 'central=', !!window._financeCentralEnabled, 'token=', accessToken ? 'yes' : 'no');
   } catch(e) {
-    console.error('[openKiosk]', e);
-    if(tab) tab.location.href = LM_KIOSK_BASE + '?machine=' + machineId;
-    else window.open(LM_KIOSK_BASE + '?machine=' + machineId, '_blank');
+    console.error('[openKiosk] insert lunch_sessions failed (kiosk navigated, fallback to local debit):', e);
   }
 }
 
