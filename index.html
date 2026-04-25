@@ -2284,6 +2284,102 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ── MODULIMO CENTRAL ─────────────────────────────────────────────────
 const CENTRAL_URL = 'https://bpxscgrbxjscicpnheep.supabase.co';
 const CENTRAL_KEY = 'sb_publishable_2V-eHOvw1v_Xwr1bpHfHLg_cbHW9ctD';
+const FINANCE_BRIDGE_URL = CENTRAL_URL + '/functions/v1/finance-bridge';
+
+// ── HEALTH PROBE CENTRALE ────────────────────────────────────────────
+// Etat global mis a jour par probeCentralHealth(). Utilise pour gater
+// les boutons transactionnels (transfert dependant, reservation espace,
+// kiosque lunch, facturation trajet) AVANT que l'usager s'engage dans
+// un flow voue a echouer parce que la centrale ne repond pas. Le probe
+// tourne au boot + toutes les 60 s + sur l'evenement window 'online'.
+window._centralOnline    = null;     // null tant qu'aucune reponse
+window._centralLatencyMs = null;
+let _centralProbeTimer    = null;
+let _centralProbeInflight = false;
+
+async function probeCentralHealth() {
+  if (_centralProbeInflight) return window._centralOnline === true;
+  _centralProbeInflight = true;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const res = await fetch(FINANCE_BRIDGE_URL + '/health', {
+      method: 'GET',
+      headers: { apikey: CENTRAL_KEY },
+      signal: ctrl.signal
+    });
+    const ok = res.ok;
+    if (ok) {
+      try { const j = await res.json(); window._centralLatencyMs = (j && typeof j.latency_ms === 'number') ? j.latency_ms : null; } catch (_) {}
+    } else {
+      window._centralLatencyMs = null;
+    }
+    if (window._centralOnline !== ok) {
+      console.info('[health] central ' + (ok ? 'UP' : 'DOWN ' + res.status));
+      window._centralOnline = ok;
+      renderCentralBanner();
+    } else {
+      window._centralOnline = ok;
+    }
+    return ok;
+  } catch (err) {
+    if (window._centralOnline !== false) {
+      console.warn('[health] central injoignable:', err && err.message ? err.message : err);
+      window._centralOnline = false;
+      window._centralLatencyMs = null;
+      renderCentralBanner();
+    }
+    return false;
+  } finally {
+    clearTimeout(timer);
+    _centralProbeInflight = false;
+  }
+}
+
+function startCentralHealthProbe() {
+  if (_centralProbeTimer) return;
+  probeCentralHealth();
+  _centralProbeTimer = setInterval(probeCentralHealth, 60000);
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('online',  probeCentralHealth);
+    window.addEventListener('offline', () => {
+      if (window._centralOnline !== false) {
+        window._centralOnline = false;
+        window._centralLatencyMs = null;
+        renderCentralBanner();
+      }
+    });
+  }
+}
+
+// Banniere visible globalement quand la centrale est down. Inseree en
+// tete de body pour rester visible sur toutes les pages.
+function renderCentralBanner() {
+  const off = (window._centralOnline === false);
+  let banner = document.getElementById('central-offline-banner');
+  if (off) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'central-offline-banner';
+      banner.style.cssText = 'background:#3a1818;border-bottom:1px solid #e85047;color:#ffb3a8;font-family:monospace;font-size:12px;padding:8px 12px;text-align:center;letter-spacing:.04em;position:sticky;top:0;z-index:9999;';
+      banner.textContent = '🔴 CENTRALE HORS-LIGNE — Achats, reservations et transferts indisponibles. Reessayez sous peu.';
+      document.body.insertBefore(banner, document.body.firstChild);
+    }
+  } else if (banner) {
+    banner.remove();
+  }
+}
+
+// Garde-fou commun appele par chaque action transactionnelle. Retourne
+// true si ok pour continuer, false si on doit refuser (et affiche un toast).
+function ensureCentralOnline(actionLabel) {
+  if (window._centralOnline === false) {
+    if (typeof toast === 'function') toast('Centrale hors-ligne — ' + (actionLabel || 'action') + ' indisponible', 'error');
+    probeCentralHealth(); // re-probe immediat au cas ou
+    return false;
+  }
+  return true;
+}
 
 // ==========================================
 // STATE GLOBAL
@@ -2425,6 +2521,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const today = new Date().toISOString().split('T')[0];
   const spacesDate = document.getElementById('spaces-date');
   if (spacesDate) spacesDate.value = today;
+
+  // Demarre le probe central des le DOMReady : on veut connaitre l'etat
+  // avant que l'usager arrive sur une page transactionnelle (espaces,
+  // trajets, transferts, kiosque). Le probe est independant de l'auth.
+  startCentralHealthProbe();
 
   // Enregistrer onAuthStateChange EN PREMIER pour ne manquer aucun event
   sb.auth.onAuthStateChange(async (event, session) => {
@@ -4583,6 +4684,13 @@ async function lunchQueueLeave(machineId) {
 // clic, puis on lui affecte l'URL finale une fois la chsession creee.
 // C'est le pattern standard pour contourner le popup blocker.
 async function openKiosk(machineId, preOpenedTab) {
+  // Sans centrale joignable, le kiosque ne pourra pas debiter — on refuse
+  // d'ouvrir l'onglet plutot que de laisser l'usager arriver devant un
+  // bouton "Acheter" qui echouera (cf. LunchMachine startPurchase).
+  if (!ensureCentralOnline('kiosque lunch')) {
+    if (preOpenedTab) { try { preOpenedTab.close(); } catch(_) {} }
+    return;
+  }
   var tab = preOpenedTab || window.open('about:blank', '_blank');
   // Pre-genere le chsession id cote client : permet de construire et assigner
   // tab.location.href de facon synchrone si l'INSERT lunch_sessions plante,
@@ -4993,6 +5101,7 @@ function openBookSpace(spaceId, spaceName) {
 }
 
 async function confirmNetworkBookSpace() {
+  if (!ensureCentralOnline('reservation reseau')) return;
   const nb = window._networkBooking;
   if (!nb) return;
   const date  = document.getElementById('book-date').value;
@@ -5137,6 +5246,7 @@ document.getElementById('book-start').addEventListener('change', updateBookCostP
 document.getElementById('book-end').addEventListener('change', updateBookCostPreview);
 
 async function confirmBookSpace() {
+  if (!ensureCentralOnline('reservation')) return;
   // Si c'est une réservation réseau, rediriger vers confirmNetworkBookSpace
   if (window._networkBooking?.isNetwork) {
     await confirmNetworkBookSpace();
@@ -6075,6 +6185,11 @@ function previewTripCost(tripId, priceMin, priceKm, reductionPct, totalSeats) {
 
 // Save trip data (driver), optionally confirm + bill
 async function saveTripData(tripId, andConfirm) {
+  // La sauvegarde simple ne touche pas central, mais la confirmation
+  // declenche la facturation (passagers + credit chauffeur). On bloque
+  // donc la confirmation si central est hors-ligne pour ne pas rouvrir
+  // la fenetre de divergence.
+  if (andConfirm && !ensureCentralOnline('facturation trajet')) return;
   const actualKm        = parseFloat(document.getElementById('td-actual-km')?.value) || null;
   const takenAt         = document.getElementById('td-taken-at')?.value || null;
   const returnedAt      = document.getElementById('td-returned-at')?.value || null;
@@ -7402,6 +7517,7 @@ function openTransfer(depId, depName, depBalance) {
 }
 
 async function confirmTransfer() {
+  if (!ensureCentralOnline('transfert')) return;
   const depId = document.getElementById('transfer-dep-id').value;
   const amount = parseFloat(document.getElementById('transfer-amount').value);
   if (!amount || amount <= 0) { toast('Montant invalide', 'error'); return; }
