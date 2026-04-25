@@ -28,6 +28,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="balanceOps.js"></script>
 
 <!-- V25.1 Analytics — chargé uniquement après consentement (Loi 25) -->
 <script>
@@ -2286,6 +2287,23 @@ const CENTRAL_URL = 'https://bpxscgrbxjscicpnheep.supabase.co';
 const CENTRAL_KEY = 'sb_publishable_2V-eHOvw1v_Xwr1bpHfHLg_cbHW9ctD';
 const FINANCE_BRIDGE_URL = CENTRAL_URL + '/functions/v1/finance-bridge';
 
+// ── balanceOps : primitive unifiee + outbox localStorage ─────────────
+// Toutes les mutations de solde (debit reservation, transfert dependant,
+// credit chauffeur) passent par ce module pour beneficier du retry auto
+// en cas de coupure reseau. L'idempotency_key cote serveur garantit
+// l'absence de double debit. Voir balanceOps.js pour le contrat.
+const _balanceOps = (typeof createBalanceOps === 'function') ? createBalanceOps({
+  bridgeUrl: FINANCE_BRIDGE_URL,
+  anonKey:   CENTRAL_KEY,
+  getAuthToken: async function () {
+    try { const { data: { session } } = await sb.auth.getSession(); return session && session.access_token || null; }
+    catch (e) { console.warn('[balanceOps] getAuthToken failed:', e && e.message); return null; }
+  },
+  storageKey: 'modulimo:cohab:balanceOps:outbox:v1',
+  onChange: function (count, hasStuck) { renderOutboxBanner(count, hasStuck); },
+}) : null;
+if (!_balanceOps) console.error('[balanceOps] module non charge — verifier <script src="balanceOps.js">');
+
 // ── HEALTH PROBE CENTRALE ────────────────────────────────────────────
 // Etat global mis a jour par probeCentralHealth(). Utilise pour gater
 // les boutons transactionnels (transfert dependant, reservation espace,
@@ -2368,6 +2386,33 @@ function renderCentralBanner() {
   } else if (banner) {
     banner.remove();
   }
+}
+
+// Banniere "X operations en attente" rendue par balanceOps.onChange.
+// Distincte de central-offline-banner : peut rester visible apres que la
+// centrale est revenue, le temps que les ops en attente soient drainees.
+function renderOutboxBanner(count, hasStuck) {
+  const existing = document.getElementById('balance-outbox-banner');
+  if (!count) { if (existing) existing.remove(); return; }
+  const bg = hasStuck ? '#3a1818' : '#3a3018';
+  const bd = hasStuck ? '#e85047' : '#e8c547';
+  const fg = hasStuck ? '#ffb3a8' : '#ffe8a8';
+  const msg = hasStuck
+    ? '⚠ ' + count + ' transaction(s) bloquee(s) — contacter l\'administrateur'
+    : '⏳ ' + count + ' transaction(s) en cours de synchronisation';
+  let banner = existing;
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'balance-outbox-banner';
+    banner.style.cssText = 'border-bottom:1px solid;font-family:monospace;font-size:12px;padding:8px 12px;text-align:center;letter-spacing:.04em;position:sticky;top:0;z-index:9998;cursor:pointer;';
+    banner.title = 'Cliquer pour forcer un retry immediat';
+    banner.onclick = function () { if (_balanceOps) _balanceOps.retryNow(); };
+    document.body.insertBefore(banner, document.body.firstChild);
+  }
+  banner.style.background  = bg;
+  banner.style.borderColor = bd;
+  banner.style.color       = fg;
+  banner.textContent = msg;
 }
 
 // Garde-fou commun appele par chaque action transactionnelle. Retourne
@@ -3188,97 +3233,6 @@ async function fetchCentralBalance(depExternalId) {
   } catch (e) {
     console.warn('[finance-central] fetch error', e?.message);
     return null;
-  }
-}
-
-// Debit resident via finance-bridge (Phase 3D) : remplace l'appel
-// adjust_balance local quand finance_central_enabled=true. Central
-// devient la source d'autorite pour le solde — pas de fenetre de 5 min
-// ou un reload afficherait un solde stale apres mutation.
-//
-// Retour :
-//   { ok: true, virtual_balance, transaction_id }           succes
-//   { ok: false, status, error, detail }                    echec applicatif
-//   null                                                    flag off (l'appelant
-//                                                           doit tomber sur
-//                                                           l'ancien adjust_balance)
-async function financeBridgeDebit({ amount, type, description, referenceId, referenceType, dependentId, idempotencyKey }) {
-  if (!window._financeCentralEnabled) return null;
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session?.access_token) return { ok: false, status: 401, error: 'NO_SESSION' };
-    const res = await fetch(`${CENTRAL_URL}/functions/v1/finance-bridge/debit`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'apikey': CENTRAL_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        amount,
-        type,
-        description: description ?? null,
-        reference_id: referenceId ?? null,
-        reference_type: referenceType ?? null,
-        dependent_id: dependentId ?? null,
-        idempotency_key: idempotencyKey
-      })
-    });
-    const json = await res.json().catch(() => null);
-    if (!res.ok) {
-      console.warn('[finance-central] /debit', res.status, json);
-      return { ok: false, status: res.status, error: json?.error || 'UNKNOWN', detail: json };
-    }
-    return { ok: true, virtual_balance: Number(json.virtual_balance), transaction_id: json.transaction_id };
-  } catch (e) {
-    console.warn('[finance-central] /debit network error', e?.message);
-    return { ok: false, status: 0, error: 'NETWORK', detail: e?.message };
-  }
-}
-
-// Transfert atomique parent -> dependant via finance-bridge (Phase 3D).
-// Wrap la RPC centrale transfer_to_dependent_central : un seul appel HTTP
-// declenche les deux jambes ledger (debit parent + credit dep) dans une
-// meme transaction PG. Idempotent via idempotencyKey unique par tentative.
-//
-// Retour :
-//   { ok: true, parent_balance_after, dep_balance_after, parent_transaction_id, dep_transaction_id }
-//   { ok: false, status, error, detail }
-//   null  -> flag off
-async function financeBridgeTransferToDep({ dependentId, amount, description, idempotencyKey }) {
-  if (!window._financeCentralEnabled) return null;
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session?.access_token) return { ok: false, status: 401, error: 'NO_SESSION' };
-    const res = await fetch(`${CENTRAL_URL}/functions/v1/finance-bridge/transfer-to-dep`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'apikey': CENTRAL_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        dependent_id: dependentId,
-        amount,
-        description: description ?? null,
-        idempotency_key: idempotencyKey
-      })
-    });
-    const json = await res.json().catch(() => null);
-    if (!res.ok) {
-      console.warn('[finance-central] /transfer-to-dep', res.status, json);
-      return { ok: false, status: res.status, error: json?.error || 'UNKNOWN', detail: json };
-    }
-    return {
-      ok: true,
-      parent_balance_after: Number(json.parent_balance_after),
-      dep_balance_after:    Number(json.dep_balance_after),
-      parent_transaction_id: json.parent_transaction_id,
-      dep_transaction_id:    json.dep_transaction_id
-    };
-  } catch (e) {
-    console.warn('[finance-central] /transfer-to-dep network error', e?.message);
-    return { ok: false, status: 0, error: 'NETWORK', detail: e?.message };
   }
 }
 
@@ -5161,39 +5115,39 @@ async function confirmNetworkBookSpace() {
     let networkResvId = null;
     try { const created = await resRes.json(); networkResvId = Array.isArray(created) ? created[0]?.id : created?.id; } catch(e) {}
 
-    // 3. Débiter le solde — Phase 3D : passe par finance-bridge si flag actif.
-    if (window._financeCentralEnabled) {
-      const debit = await financeBridgeDebit({
-        amount: -cost,
-        type: 'space_reservation',
-        description: 'Réservation réseau — ' + nb.spaceName,
-        referenceId: networkResvId,
-        referenceType: 'space_reservation_network',
-        idempotencyKey: 'space-resv-network:' + (networkResvId || (currentProfile.id + ':' + startDT))
-      });
-      if (!debit?.ok) {
-        // Rollback : supprimer la résa réseau pour ne pas garder un trou
-        if (networkResvId) {
-          try {
-            await fetch(nb.memberUrl + '/rest/v1/space_reservations?id=eq.' + networkResvId, {
-              method: 'DELETE',
-              headers: { apikey: nb.memberKey, Authorization: 'Bearer ' + nb.memberKey }
-            });
-          } catch(e) { console.warn('rollback résa réseau:', e); }
-        }
-        if (debit?.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant (central)', 'error');
-        else toast(`Erreur débit central (${debit?.error || 'inconnue'}) — réservation annulée`, 'error');
-        return;
+    // 3. Débiter via balanceOps. La cle d'idempotence est deterministe sur
+    // l'id de reservation reseau (ou sur user+startDT en fallback) pour que
+    // tout retry de l'outbox tombe sur la meme transaction cote central.
+    const debit = await _balanceOps.commit({
+      amount: -cost,
+      type: 'space_reservation',
+      description: 'Réservation réseau — ' + nb.spaceName,
+      reference_id: networkResvId,
+      reference_type: 'space_reservation_network',
+      idempotency_key: 'space-resv-network:' + (networkResvId || (currentProfile.id + ':' + startDT))
+    });
+    if (!debit.ok && !debit.queued) {
+      // Erreur metier definitive : rollback de la resa pour eviter le trou.
+      if (networkResvId) {
+        try {
+          await fetch(nb.memberUrl + '/rest/v1/space_reservations?id=eq.' + networkResvId, {
+            method: 'DELETE',
+            headers: { apikey: nb.memberKey, Authorization: 'Bearer ' + nb.memberKey }
+          });
+        } catch (e) { console.warn('rollback résa réseau:', e); }
       }
+      if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant (central)', 'error');
+      else toast(`Erreur débit central (${debit.error || 'inconnue'}) — réservation annulée`, 'error');
+      return;
+    }
+    if (debit.queued) {
+      // Mis en outbox : la resa reste, le debit sera retente. On previent
+      // l'usager qu'une synchro est en cours plutot que d'annuler une resa
+      // potentiellement valide (le serveur peut avoir recu le debit malgre
+      // le timeout — l'idempotency_key garantira la coherence).
+      toast('Réservation enregistrée — débit en cours de synchronisation', 'info');
+    } else if (typeof debit.virtual_balance === 'number') {
       currentProfile.virtual_balance = debit.virtual_balance;
-    } else {
-      await sb.rpc('adjust_balance', {
-        p_user_id: currentProfile.id,
-        p_amount: -cost,
-        p_type: 'space_reservation',
-        p_description: 'Réservation réseau — ' + nb.spaceName
-      });
-      currentProfile.virtual_balance -= cost;
     }
     document.getElementById('nav-balance').textContent = currentProfile.virtual_balance.toFixed(2);
 
@@ -5297,39 +5251,28 @@ async function confirmBookSpace() {
 
   if (error) { toast('Erreur lors de la réservation: ' + error.message, 'error'); return; }
 
-  // Debit balance — Phase 3D : quand finance_central_enabled=true, le
-  // debit passe par finance-bridge et central devient la source
-  // d'autorite. Sinon (fallback), ancien chemin local.
-  if (window._financeCentralEnabled) {
-    const debit = await financeBridgeDebit({
-      amount: -cost,
-      type: 'space_reservation',
-      description: `Reservation ${space?.name}`,
-      referenceId: res.id,
-      referenceType: 'space_reservation',
-      idempotencyKey: `space-resv:${res.id}`
-    });
-    if (!debit?.ok) {
-      // Rollback de la reservation pour garder base coherente
-      await sb.from('space_reservations').delete().eq('id', res.id);
-      if (debit?.error === 'INSUFFICIENT_FUNDS') {
-        toast('Solde insuffisant (central)', 'error');
-      } else {
-        toast(`Erreur debit central (${debit?.error || 'inconnue'}) — reservation annulee`, 'error');
-      }
-      return;
-    }
+  // Debit via balanceOps. Source de verite : central. La cle d'idempotence
+  // est deterministe sur l'id de reservation pour que tout retry retombe
+  // sur la meme transaction.
+  const debit = await _balanceOps.commit({
+    amount: -cost,
+    type: 'space_reservation',
+    description: `Reservation ${space?.name}`,
+    reference_id: res.id,
+    reference_type: 'space_reservation',
+    idempotency_key: `space-resv:${res.id}`
+  });
+  if (!debit.ok && !debit.queued) {
+    // Erreur metier definitive : rollback la resa pour ne pas garder un trou.
+    await sb.from('space_reservations').delete().eq('id', res.id);
+    if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant (central)', 'error');
+    else toast(`Erreur debit central (${debit.error || 'inconnue'}) — reservation annulee`, 'error');
+    return;
+  }
+  if (debit.queued) {
+    toast('Réservation enregistrée — débit en cours de synchronisation', 'info');
+  } else if (typeof debit.virtual_balance === 'number') {
     currentProfile.virtual_balance = debit.virtual_balance;
-  } else {
-    await sb.rpc('adjust_balance', {
-      p_user_id: currentProfile.id,
-      p_amount: -cost,
-      p_type: 'space_reservation',
-      p_reference_id: res.id,
-      p_reference_type: 'space_reservation',
-      p_description: `Réservation ${space?.name}`
-    });
-    currentProfile.virtual_balance -= cost;
   }
   document.getElementById('nav-balance').textContent = `${currentProfile.virtual_balance.toFixed(2)}`;
 
@@ -6245,32 +6188,35 @@ async function saveTripData(tripId, andConfirm) {
       }
     }
 
-    // Driver reduction credit — Phase 3D : passe par finance-bridge si flag
-    // actif. Le chauffeur agit sur son propre solde, donc claims.client_id
-    // matche le target — chemin /debit utilisable directement (type
-    // 'trip_driver_earning' dans la whitelist refund de central).
+    // Driver reduction credit. Le chauffeur agit sur son propre solde, donc
+    // claims.client_id == target cote central — chemin /debit avec type refund
+    // 'trip_driver_earning' (cf. ALLOWED_REFUND_TYPES dans finance-bridge).
+    // Idempotency_key deterministe sur l'id du trip pour que tout retry
+    // converge sur la meme transaction.
     const grossCost   = (durationMin * pMin) + (actualKm * pKm);
     const driverShare = totalSeats > 0 ? 1 / (totalSeats + 1) : 1;
     const driverCredit = grossCost * driverShare * (redPct / 100);
     if (driverCredit > 0 && tripRow?.driver_id) {
       const desc = 'Réduction chauffeur #' + tripId.slice(0,8);
-      if (window._financeCentralEnabled && tripRow.driver_id === currentProfile.id) {
-        const credit = await financeBridgeDebit({
+      if (tripRow.driver_id === currentProfile.id) {
+        const credit = await _balanceOps.refund({
           amount: driverCredit,                     // > 0 = refund cote central
           type: 'trip_driver_earning',
           description: desc,
-          referenceId: tripId,
-          referenceType: 'trip',
-          idempotencyKey: 'trip-driver-earning:' + tripId
+          reference_id: tripId,
+          reference_type: 'trip',
+          idempotency_key: 'trip-driver-earning:' + tripId
         });
-        if (!credit?.ok) {
-          // On ne bloque pas la confirmation du trajet si le crédit échoue —
-          // les passagers ont déjà été débités localement. On surface un
-          // toast pour que l'admin puisse retourner re-créditer manuellement.
-          console.warn('[trip] crédit chauffeur central echoué:', credit);
-          toast(`Crédit chauffeur central échoué (${credit?.error || 'inconnue'})`, 'error');
-        } else {
+        if (credit.ok && typeof credit.virtual_balance === 'number') {
           currentProfile.virtual_balance = credit.virtual_balance;
+        } else if (credit.queued) {
+          toast('Crédit chauffeur en cours de synchronisation', 'info');
+        } else {
+          // Erreur metier definitive : on ne bloque pas la confirmation —
+          // les passagers ont deja ete debites cote local (le cron sync
+          // de Phase 3B propagera). Admin peut re-crediter manuellement.
+          console.warn('[trip] crédit chauffeur central echoué:', credit);
+          toast(`Crédit chauffeur central échoué (${credit.error || 'inconnue'})`, 'error');
         }
       } else {
         await sb.rpc('adjust_balance', { p_user_id: tripRow.driver_id, p_amount: driverCredit, p_description: desc, p_type: 'trip_driver_reduction' }).catch(() => {});
@@ -7523,27 +7469,27 @@ async function confirmTransfer() {
   if (!amount || amount <= 0) { toast('Montant invalide', 'error'); return; }
   if (amount > (currentProfile?.virtual_balance || 0)) { toast('Solde insuffisant', 'error'); return; }
 
-  // Phase 3D : si finance_central_enabled, on debite + credite via la
-  // RPC centrale transfer_to_dependent_central (atomique cote PG, idempotent
-  // via une seule cle qui pilote les 2 jambes ":out" / ":in"). On garde le
-  // call local en parallele pour que la RPC locale transfer_to_dependent
-  // mette a jour profiles.virtual_balance / dependents.virtual_balance —
-  // sinon le reste de l'UI (cards dependants, soldes en cache) verrait un
-  // delta jusqu'au prochain finance-sync. Si la branche centrale plante,
-  // on ne touche PAS le local pour eviter la divergence inverse.
-  if (window._financeCentralEnabled) {
-    const idem = 'transfer-to-dep:' + currentProfile.id + ':' + depId + ':' + Date.now();
-    const tr = await financeBridgeTransferToDep({
-      dependentId: depId,
-      amount,
-      description: 'Transfert vers dépendant',
-      idempotencyKey: idem
-    });
-    if (!tr?.ok) {
-      if (tr?.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant (central)', 'error');
-      else toast(`Erreur transfert central (${tr?.error || 'inconnue'})`, 'error');
-      return;
-    }
+  // Transfer atomique cote central via balanceOps (RPC transfer_to_dependent_central :
+  // 2 jambes ledger parent->dep dans une seule transaction PG, idempotent).
+  // Cle d'idempotence = UUID genere une fois au clic ; un usager qui clique
+  // deux fois cree volontairement deux transferts distincts.
+  const idem = (window.crypto && crypto.randomUUID)
+    ? 'transfer-to-dep:' + crypto.randomUUID()
+    : 'transfer-to-dep:' + currentProfile.id + ':' + depId + ':' + Date.now() + ':' + Math.random().toString(36).slice(2,10);
+  const tr = await _balanceOps.transferToDep({
+    dependent_id:    depId,
+    amount:          amount,
+    description:     'Transfert vers dépendant',
+    idempotency_key: idem,
+  });
+  if (!tr.ok && !tr.queued) {
+    if (tr.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant (central)', 'error');
+    else toast(`Erreur transfert central (${tr.error || 'inconnue'})`, 'error');
+    return;
+  }
+  if (tr.queued) {
+    toast('Transfert en cours de synchronisation', 'info');
+  } else {
     // Aligne le local sur la verite centrale post-transfert pour que les
     // composants UI a base de profiles.virtual_balance restent coherents.
     const { error: eLocal } = await sb.rpc('transfer_to_dependent', {
@@ -7552,15 +7498,8 @@ async function confirmTransfer() {
       p_amount: amount
     });
     if (eLocal) console.warn('[transfer] central OK mais maj locale echouee:', eLocal.message);
-    currentProfile.virtual_balance = tr.parent_balance_after;
-  } else {
-    const { error: e1 } = await sb.rpc('transfer_to_dependent', {
-      p_parent_id: currentProfile.id,
-      p_dependent_id: depId,
-      p_amount: amount
-    });
-    if (e1) { toast('Erreur transfert: ' + e1.message, 'error'); return; }
-    currentProfile.virtual_balance -= amount;
+    if (typeof tr.virtual_balance === 'number') currentProfile.virtual_balance = tr.virtual_balance;
+    else currentProfile.virtual_balance -= amount;
   }
 
   const pill = document.getElementById('nav-balance');
