@@ -7633,8 +7633,13 @@ async function loadTenants() {
   const { data } = await sb.from('profiles').select('*').neq('role', 'demo').order('full_name');
   tenantsCache = data || [];
 
-  // Récupérer TOUS les clients Central pour détecter: absent, pending_approval, ou inactif
-  let centralPendingIds = new Set(); // bloqués au login (absent OU pending_approval=true)
+  // Récupérer la liste des clients Central pour détecter ceux qui sont
+  // sans forfait + sans row côté central -> 🟢 Approuver. Les résidents
+  // AVEC forfait n'ont plus besoin de cet UI : finance-bridge auto-
+  // provisionne leur row clients au premier appel JWT (sql/016
+  // ensure_client). L'ancien chemin "🔗 Sync" + badge "Non-sync" est
+  // retiré comme dead code.
+  let centralPendingIds = new Set(); // sans forfait + absent/pending de central -> bouton Approuver
   let centralClientMap  = {};        // cohabitat_user_id -> client row
   try {
     const cRes = await fetch(
@@ -7646,22 +7651,13 @@ async function loadTenants() {
       cData.forEach(c => { if (c.cohabitat_user_id) centralClientMap[c.cohabitat_user_id] = c; });
     }
   } catch(e) {}
-  // Deux catégories de résidents sans lien Central complet :
-  // centralPendingIds  : nouveaux sans forfait → bouton 🟢 Approuver
-  // centralNotSyncedIds: ont un forfait mais absent/pending de Central → bouton 🔗 Sync Central
-  let centralNotSyncedIds = new Set();
   tenantsCache.forEach(t => {
     if (t.is_active === false) return;
     if (t.role !== 'tenant') return;
     const cc = centralClientMap[t.id];
     const hasPlan = t.resident_plan && t.resident_plan !== 'none';
-    if (!cc) {
-      if (hasPlan) centralNotSyncedIds.add(t.id); // actif avec forfait mais absent de Central
-      else         centralPendingIds.add(t.id);    // nouveau sans forfait
-    } else if (cc.pending_approval) {
-      if (hasPlan) centralNotSyncedIds.add(t.id); // pending mais forfait déjà assigné localement
-      else         centralPendingIds.add(t.id);
-    }
+    if (hasPlan) return; // auto-provision se charge du reste, plus rien a flagger
+    if (!cc || cc.pending_approval) centralPendingIds.add(t.id);
   });
 
   const pending  = tenantsCache.filter(t => t.is_active === false);
@@ -7677,11 +7673,10 @@ async function loadTenants() {
     const roleIcon = t.role === 'principal_admin' ? '<span title="Principal Admin" style="margin-right:6px;font-size:1rem;">⭐</span>'
                    : t.role === 'admin'           ? '<span title="Admin" style="margin-right:6px;font-size:1rem;">👑</span>'
                    :                                '<span title="Locataire" style="margin-right:6px;font-size:1rem;">👤</span>';
-    const isCentralPending   = centralPendingIds.has(t.id);
-    const isCentralNotSynced = centralNotSyncedIds.has(t.id);
+    const isCentralPending = centralPendingIds.has(t.id);
     return `
-    <tr${(isCentralPending || isCentralNotSynced) ? ' style="background:rgba(200,169,110,.04);"' : ''}>
-      <td style="white-space:nowrap;">${roleIcon}${displayName}${isCentralPending ? ' <span class="badge badge-yellow" style="font-size:0.7rem;">⏳ Approbation</span>' : isCentralNotSynced ? ' <span class="badge badge-gray" style="font-size:0.7rem;">⚠️ Non-sync</span>' : ''}</td>
+    <tr${isCentralPending ? ' style="background:rgba(200,169,110,.04);"' : ''}>
+      <td style="white-space:nowrap;">${roleIcon}${displayName}${isCentralPending ? ' <span class="badge badge-yellow" style="font-size:0.7rem;">⏳ Approbation</span>' : ''}</td>
       <td>${displayUnit}</td>
       <td><span class="badge badge-gray">${t.role}</span></td>
       <td>${t.is_approved_driver ? '<span class="badge badge-green">✓ Chauffeur</span>' : '—'}</td>
@@ -7693,8 +7688,7 @@ async function loadTenants() {
         : '<span class="badge badge-gray">Aucun</span>'}</td>
       <td>${(t.virtual_balance || 0).toFixed(2)} $</td>
       <td class="td-actions" style="flex-wrap:wrap;">
-        ${isCentralPending   ? `<button class="btn btn-primary btn-sm" onclick="openApproveModal('${tid}')">🟢 Approuver</button>` : ''}
-        ${isCentralNotSynced ? `<button class="btn btn-info btn-sm" onclick="syncTenantToCentral('${tid}')" title="Synchroniser avec Modulimo Central">🔗 Sync</button>` : ''}
+        ${isCentralPending ? `<button class="btn btn-primary btn-sm" onclick="openApproveModal('${tid}')">🟢 Approuver</button>` : ''}
         ${t.role === 'tenant' ? `<button class="btn btn-warning btn-sm" onclick="quickToggleTenant('${tid}', false)">🔒 Suspendre</button>` : ''}
         <button class="btn btn-info btn-sm" onclick="openAccessManagerById('${tid}')">🗝 Accès</button>
         ${t.role !== 'principal_admin' || currentProfile?.role === 'principal_admin' ? `<button class="btn btn-secondary btn-sm" onclick="editTenant('${tid}')">✏️ Modifier</button>` : ''}
@@ -7704,15 +7698,11 @@ async function loadTenants() {
 
   // Inactifs/en attente en bas
   // Résumé Central pending dans le header actifs si applicable
-  const centralPendingCount   = centralPendingIds.size;
-  const centralNotSyncedCount = centralNotSyncedIds.size;
-  if (centralPendingCount > 0 || centralNotSyncedCount > 0) {
-    const parts = [];
-    if (centralPendingCount > 0)   parts.push(`⏳ ${centralPendingCount} en attente d'approbation`);
-    if (centralNotSyncedCount > 0) parts.push(`⚠️ ${centralNotSyncedCount} non-synchronisé(s) avec Central`);
+  const centralPendingCount = centralPendingIds.size;
+  if (centralPendingCount > 0) {
     html = `<tr><td colspan="7" style="padding:8px 12px;background:rgba(200,169,110,.08);border-bottom:1px solid rgba(200,169,110,.2);">
       <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);">
-        ${parts.join(' — ')}
+        ⏳ ${centralPendingCount} en attente d'approbation
       </span>
     </td></tr>` + html;
   }
@@ -7846,102 +7836,6 @@ async function savePlanManager() {
   toast('Forfait mis à jour', 'success');
   closeModal('modal-plan-manager');
   loadTenants();
-}
-
-// Synchroniser un résident existant (avec forfait local) vers Modulimo Central
-async function syncTenantToCentral(userId) {
-  const t = tenantsCache.find(x => x.id === userId);
-  if (!t) return;
-
-  const btn = document.querySelector(`button[onclick="syncTenantToCentral('${userId}')"]`);
-  if (btn) { btn.disabled = true; btn.textContent = 'Sync…'; }
-
-  try {
-    // Trouver owner_client_id via la licence du domaine
-    let ownerClientId = null;
-    const licRes = await fetch(
-      CENTRAL_URL + '/rest/v1/licences?domain=eq.' + encodeURIComponent(window.location.hostname) + '&select=client_id&limit=1',
-      { headers: { apikey: CENTRAL_KEY } }
-    );
-    const licData = licRes.ok ? await licRes.json() : [];
-    ownerClientId = licData?.[0]?.client_id || null;
-
-    // Vérifier si client Central existe déjà (cas pending_approval)
-    const checkRes = await fetch(
-      CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(userId) + '&select=id&limit=1',
-      { headers: { apikey: CENTRAL_KEY } }
-    );
-    const existing = checkRes.ok ? await checkRes.json() : [];
-
-    let centralClientId = null;
-    const plan = t.resident_plan || 'local';
-
-    console.log('[syncToCentral] ownerClientId:', ownerClientId, '| existing:', existing);
-    if (existing && existing.length > 0) {
-      // Existe mais pending — activer
-      centralClientId = existing[0].id;
-      const patchRes = await fetch(
-        CENTRAL_URL + '/rest/v1/clients?cohabitat_user_id=eq.' + encodeURIComponent(userId),
-        {
-          method: 'PATCH',
-          headers: { apikey: CENTRAL_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({
-            pending_approval: false,
-            is_active: true,
-            owner_client_id: ownerClientId,
-            client_type: plan === 'network' ? 'network' : 'local'
-          })
-        }
-      );
-      if (!patchRes.ok) {
-        const errBody = await patchRes.text();
-        console.error('[syncToCentral] PATCH clients failed:', patchRes.status, errBody);
-        toast('Erreur Central PATCH (' + patchRes.status + '): ' + errBody.slice(0, 120), 'error');
-        if (btn) { btn.disabled = false; btn.textContent = '🔗 Sync'; }
-        return;
-      }
-    } else {
-      // Créer le client Central via RPC (bypass RLS)
-      const rpcRes = await fetch(CENTRAL_URL + '/rest/v1/rpc/create_resident_client', {
-        method: 'POST',
-        headers: { apikey: CENTRAL_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          p_name:                t.full_name || t.email || 'Résident',
-          p_client_type:         plan === 'network' ? 'network' : 'local',
-          p_contact_email:       t.email || '',
-          p_contact_name:        t.full_name || '',
-          p_cohabitat_user_id:   userId,
-          p_cohabitat_email:     t.email || '',
-          p_owner_client_id:     ownerClientId,
-          p_pending_approval:    false,
-          p_is_active:           true
-        })
-      });
-      if (!rpcRes.ok) {
-        const errBody = await rpcRes.text();
-        console.error('[syncToCentral] RPC create_resident_client failed:', rpcRes.status, errBody);
-        toast('Erreur Central (' + rpcRes.status + '): ' + errBody.slice(0, 120), 'error');
-        if (btn) { btn.disabled = false; btn.textContent = '🔗 Sync'; }
-        return;
-      }
-      centralClientId = await rpcRes.json(); // RPC retourne l'UUID directement
-      console.log('[syncToCentral] Client créé via RPC:', centralClientId);
-    }
-
-    // Le contrat est désormais créé dans modulimo-admin (plus dans CoHabitat).
-    if (!centralClientId) {
-      toast('⚠️ Sync: client Central créé mais ID non retourné', 'error');
-      loadTenants();
-      return;
-    }
-
-    toast('🔗 ' + (t.full_name || 'Résident') + ' synchronisé dans Modulimo — créez le contrat depuis Modulimo Admin', 'success');
-    loadTenants();
-  } catch(e) {
-    console.error('[syncToCentral] Exception:', e);
-    toast('Erreur sync: ' + e.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '🔗 Sync'; }
-  }
 }
 
 // Ouvrir le modal d'approbation avec choix du plan
