@@ -3211,8 +3211,13 @@ async function toggleDepResourceAccess(type, resourceId, grant, name) {
 // l'Edge Function finance-bridge. La centrale est la source de verite
 // post-bascule ; profiles.virtual_balance devient une copie cache
 // entretenue par le worker finance-sync pour le fallback.
+// Lecture du solde courant via la centrale (finance-bridge). Apres
+// P1+P2+P3, central est la source de verite unique pour le solde ; la
+// colonne profiles.virtual_balance n'est plus alimentee de facon fiable
+// et ne doit plus etre lue. Retourne null si pas de session ou si
+// central est injoignable (l'appelant garde alors la derniere valeur
+// connue plutot que d'afficher 0$ qui serait trompeur).
 async function fetchCentralBalance(depExternalId) {
-  if (!window._financeCentralEnabled) return null;
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session?.access_token) return null;
@@ -3240,7 +3245,7 @@ async function fetchCentralBalance(depExternalId) {
 // and-forget : en cas d'echec on garde la valeur locale. Logge une
 // divergence si central et local ne correspondent pas (outil de debug).
 async function syncCentralBalanceToProfile() {
-  if (!window._financeCentralEnabled || !currentProfile) return;
+  if (!currentProfile) return;
   const central = await fetchCentralBalance(null);
   if (!central) return;
   const localBal   = Number(currentProfile.virtual_balance || 0);
@@ -3479,16 +3484,14 @@ async function loadProfile() {
   currentProfile = data;
   applyLogoBg(currentProfile.logo_bg_color);
 
-  // Phase 3C : la colonne profiles.virtual_balance est un cache local qui
-  // peut derailler apres une bascule sur finance_central_enabled (ex : une
-  // /debit qui ecrit direct sur central ne touche pas profiles.virtual_balance,
-  // donc loadProfile re-ecrirait la stale value). On re-aligne sur central
-  // apres chaque rechargement pour que le pill et les autres vues affichent
-  // la source de verite. Fire-and-forget : si central est injoignable, on
-  // garde la valeur locale (comportement de fallback documente).
-  if (window._financeCentralEnabled) {
-    await syncCentralBalanceToProfile();
-  }
+  // Central est la source de verite unique pour le solde depuis P1+P2+P3 :
+  // les debits/refunds (lunch, espaces, trajets, transferts) ecrivent sur
+  // central uniquement. profiles.virtual_balance est un cache stale, donc
+  // on re-aligne systematiquement sur central apres chaque loadProfile.
+  // Si central est injoignable, currentProfile.virtual_balance garde la
+  // derniere valeur connue (le banner "CENTRALE HORS-LIGNE" du probe P1
+  // signale a l'usager que les donnees ne sont pas a jour).
+  await syncCentralBalanceToProfile();
 }
 
 // ==========================================
