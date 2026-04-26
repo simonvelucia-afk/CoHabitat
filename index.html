@@ -2333,13 +2333,27 @@ function _attachAuthListener(client) {
 }
 
 function recreateSb() {
-  // Stoppe l'auto-refresh de l'ancien client pour eviter le warning
-  // "Multiple GoTrueClient instances" et les races sur localStorage.
+  // Stoppe l'auto-refresh de l'ancien client pour eviter les races sur
+  // localStorage. Le warning "Multiple GoTrueClient instances" reste
+  // emis par supabase-js lui-meme au moment du createClient — supprime
+  // via le filtre console.warn ci-dessous.
   try { sb.auth.stopAutoRefresh && sb.auth.stopAutoRefresh().catch(()=>{}); } catch(_) {}
   sb = _createSbClient();
   _attachAuthListener(sb);
-  console.info('[sb] client supabase recree (workaround wedge state)');
 }
+
+// Filtre le warning "Multiple GoTrueClient instances" : il est genere
+// volontairement par notre workaround recreateSb(). Le garder satura
+// la console et faisait laguer Chrome DevTools quand l'usager naviguait
+// rapidement entre les pages.
+(function () {
+  const origWarn = console.warn.bind(console);
+  console.warn = function (...args) {
+    const first = args[0];
+    if (typeof first === 'string' && first.indexOf('Multiple GoTrueClient instances') !== -1) return;
+    origWarn(...args);
+  };
+})();
 
 // ── MODULIMO CENTRAL ─────────────────────────────────────────────────
 const CENTRAL_URL = 'https://bpxscgrbxjscicpnheep.supabase.co';
@@ -4284,12 +4298,15 @@ function buildNav() {
 function navigateTo(page) {
   if (page === 'trips' && !window.appModules.trips) { toast('Module Auto-partage non activé', 'info'); return; }
   if (page === 'lunch' && !window.appModules.lunch) { toast('Module Machine Lunch non activé', 'info'); return; }
-  // Workaround sb wedge state : on recree le client supabase avant
-  // chaque navigation pour s'assurer que sb.from(...) ne hang pas a
-  // cause d'un etat interne corrompu. Cf. console verbose [sb] client
-  // supabase recree. Couterait theoriquement quelques objets a GC, mais
-  // bien moins cher qu'un hard refresh complet de l'app.
-  recreateSb();
+  // Workaround sb wedge state : on ne recree le client que si on quitte
+  // la page Lunch (le seul cas qui wedge sb dans l'observe). Recreer a
+  // chaque navigation saturait la console avec le warning "Multiple
+  // GoTrueClient instances" et faisait laguer l'app.
+  const activeBefore = document.querySelector('.page.active');
+  const wasOnLunch = activeBefore && activeBefore.id === 'page-lunch';
+  if (wasOnLunch && page !== 'lunch') {
+    recreateSb();
+  }
   closeMobileMenu();
   document.querySelectorAll('.page').forEach(p => {
     p.classList.remove('active');
