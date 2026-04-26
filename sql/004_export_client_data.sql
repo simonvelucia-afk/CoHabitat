@@ -47,10 +47,10 @@ BEGIN
   -- vides retournent un tableau vide (ne pas omettre — le rapport doit
   -- etre exhaustif et auditable).
   SELECT jsonb_build_object(
-    'exported_at',           to_jsonb(now()),
-    'subject_user_id',       to_jsonb(p_user_id),
-    'exported_by',           to_jsonb(auth.uid()),
-    'schema_version',        to_jsonb('1.0'),
+    'exported_at',           now(),
+    'subject_user_id',       p_user_id,
+    'exported_by',           auth.uid(),
+    'schema_version',        '1.0'::text,
 
     'profile', (
       SELECT to_jsonb(p) FROM profiles p WHERE p.id = p_user_id
