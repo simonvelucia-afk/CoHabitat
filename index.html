@@ -2295,9 +2295,10 @@ const FINANCE_BRIDGE_URL = CENTRAL_URL + '/functions/v1/finance-bridge';
 const _balanceOps = (typeof createBalanceOps === 'function') ? createBalanceOps({
   bridgeUrl: FINANCE_BRIDGE_URL,
   anonKey:   CENTRAL_KEY,
-  getAuthToken: async function () {
-    try { const { data: { session } } = await sb.auth.getSession(); return session && session.access_token || null; }
-    catch (e) { console.warn('[balanceOps] getAuthToken failed:', e && e.message); return null; }
+  getAuthToken: function () {
+    // Cache synchrone : pas de verrou Web Locks, donc pas de deadlock si
+    // l'onglet est passe en background pendant un fetch precedent.
+    return window._cachedAccessToken || null;
   },
   storageKey: 'modulimo:cohab:balanceOps:outbox:v1',
   onChange: function (count, hasStuck) { renderOutboxBanner(count, hasStuck); },
@@ -4420,14 +4421,13 @@ async function lmFetch(path, opts, userToken) {
   return ct.includes('json') ? res.json() : null;
 }
 
-async function getLmToken() {
-  // Retourne le JWT user si une session existe, sinon null. lmFetch gere
-  // le cas null en n'ajoutant pas de header Authorization (les nouvelles
-  // sb_publishable_* cles ne sont pas des JWT et sont rejetees en Bearer).
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    return session?.access_token || null;
-  } catch(e) { return null; }
+function getLmToken() {
+  // Retourne le JWT user depuis le cache (window._cachedAccessToken).
+  // sb.auth.getSession() utiliserait un verrou Web Locks qui peut etre
+  // bloque indefiniment si declenche pendant que l'onglet est en
+  // background — symptome : page lunch/trips/spaces hang en
+  // "Chargement...".
+  return window._cachedAccessToken || null;
 }
 
 async function onLunchPageShow() {
@@ -8471,13 +8471,14 @@ async function recordPayment() {
   // > Paiements de CoHabitat (pas de divergence visuelle).
   if (window._financeCentralEnabled) {
     try {
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session?.access_token) { toast('Session expirée', 'error'); return; }
+      // Cache token (synchrone, pas de verrou) plutot que sb.auth.getSession.
+      const accessToken = window._cachedAccessToken;
+      if (!accessToken) { toast('Session expirée', 'error'); return; }
       const idem = 'admin-credit:' + tenantId + ':' + Date.now();
       const res = await fetch(`${CENTRAL_URL}/functions/v1/finance-bridge/record-real-payment`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${accessToken}`,
           'apikey': CENTRAL_KEY,
           'Content-Type': 'application/json'
         },
