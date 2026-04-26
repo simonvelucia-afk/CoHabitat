@@ -52,69 +52,22 @@ BEGIN
     'exported_by',           auth.uid(),
     'schema_version',        '1.0'::text,
 
-    'profile', (
-      SELECT to_jsonb(p) FROM profiles p WHERE p.id = p_user_id
-    ),
-
-    'dependents', COALESCE((
-      SELECT jsonb_agg(to_jsonb(d) ORDER BY d.created_at)
-      FROM dependents d WHERE d.parent_id = p_user_id
-    ), '[]'::jsonb),
-
-    'transactions', COALESCE((
-      SELECT jsonb_agg(to_jsonb(t) ORDER BY t.created_at DESC)
-      FROM transactions t WHERE t.user_id = p_user_id
-    ), '[]'::jsonb),
-
-    'space_reservations', COALESCE((
-      SELECT jsonb_agg(to_jsonb(r) ORDER BY r.start_time DESC)
-      FROM space_reservations r WHERE r.tenant_id = p_user_id
-    ), '[]'::jsonb),
-
-    'trips_as_driver', COALESCE((
-      SELECT jsonb_agg(to_jsonb(t) ORDER BY t.departure_time DESC)
-      FROM trips t WHERE t.driver_id = p_user_id
-    ), '[]'::jsonb),
-
-    'trip_bookings', COALESCE((
-      SELECT jsonb_agg(to_jsonb(b) ORDER BY b.created_at DESC)
-      FROM trip_bookings b WHERE b.passenger_id = p_user_id
-    ), '[]'::jsonb),
-
-    'trip_cargo_usage', COALESCE((
-      SELECT jsonb_agg(to_jsonb(c) ORDER BY c.created_at DESC)
-      FROM trip_cargo_usage c WHERE c.user_id = p_user_id
-    ), '[]'::jsonb),
-
-    'driver_dependent_seats', COALESCE((
-      SELECT jsonb_agg(to_jsonb(s) ORDER BY s.created_at DESC)
-      FROM driver_dependent_seats s WHERE s.driver_id = p_user_id
-    ), '[]'::jsonb),
-
-    'real_payments_received', COALESCE((
-      SELECT jsonb_agg(to_jsonb(r) ORDER BY r.created_at DESC)
-      FROM real_payments r WHERE r.tenant_id = p_user_id
-    ), '[]'::jsonb),
-
-    'reservation_requests', COALESCE((
-      SELECT jsonb_agg(to_jsonb(r) ORDER BY r.created_at DESC)
-      FROM reservation_requests r WHERE r.user_id = p_user_id
-    ), '[]'::jsonb),
-
-    'notifications', COALESCE((
-      SELECT jsonb_agg(to_jsonb(n) ORDER BY n.created_at DESC)
-      FROM notifications n WHERE n.user_id = p_user_id
-    ), '[]'::jsonb),
-
-    'lunch_transactions', COALESCE((
-      SELECT jsonb_agg(to_jsonb(lt) ORDER BY lt.created_at DESC)
-      FROM lunch_transactions lt WHERE lt.user_id = p_user_id
-    ), '[]'::jsonb),
-
-    'deletion_requests', COALESCE((
-      SELECT jsonb_agg(to_jsonb(dr) ORDER BY dr.created_at DESC)
-      FROM deletion_requests dr WHERE dr.user_id = p_user_id
-    ), '[]'::jsonb)
+    -- ORDER BY retire : les noms de colonnes "created_at" varient
+    -- selon les tables (deletion_requests utilise requested_at, etc).
+    -- Le consommateur trie comme il veut a partir du JSON.
+    'profile',               (SELECT to_jsonb(p) FROM profiles p WHERE p.id = p_user_id),
+    'dependents',            COALESCE((SELECT jsonb_agg(to_jsonb(d))  FROM dependents d            WHERE d.parent_id   = p_user_id), '[]'::jsonb),
+    'transactions',          COALESCE((SELECT jsonb_agg(to_jsonb(t))  FROM transactions t          WHERE t.user_id     = p_user_id), '[]'::jsonb),
+    'space_reservations',    COALESCE((SELECT jsonb_agg(to_jsonb(r))  FROM space_reservations r    WHERE r.tenant_id   = p_user_id), '[]'::jsonb),
+    'trips_as_driver',       COALESCE((SELECT jsonb_agg(to_jsonb(t))  FROM trips t                 WHERE t.driver_id   = p_user_id), '[]'::jsonb),
+    'trip_bookings',         COALESCE((SELECT jsonb_agg(to_jsonb(b))  FROM trip_bookings b         WHERE b.passenger_id= p_user_id), '[]'::jsonb),
+    'trip_cargo_usage',      COALESCE((SELECT jsonb_agg(to_jsonb(c))  FROM trip_cargo_usage c      WHERE c.user_id     = p_user_id), '[]'::jsonb),
+    'driver_dependent_seats',COALESCE((SELECT jsonb_agg(to_jsonb(s))  FROM driver_dependent_seats s WHERE s.driver_id  = p_user_id), '[]'::jsonb),
+    'real_payments_received',COALESCE((SELECT jsonb_agg(to_jsonb(r))  FROM real_payments r         WHERE r.tenant_id   = p_user_id), '[]'::jsonb),
+    'reservation_requests',  COALESCE((SELECT jsonb_agg(to_jsonb(r))  FROM reservation_requests r  WHERE r.user_id     = p_user_id), '[]'::jsonb),
+    'notifications',         COALESCE((SELECT jsonb_agg(to_jsonb(n))  FROM notifications n         WHERE n.user_id     = p_user_id), '[]'::jsonb),
+    'lunch_transactions',    COALESCE((SELECT jsonb_agg(to_jsonb(lt)) FROM lunch_transactions lt   WHERE lt.user_id    = p_user_id), '[]'::jsonb),
+    'deletion_requests',     COALESCE((SELECT jsonb_agg(to_jsonb(dr)) FROM deletion_requests dr    WHERE dr.user_id    = p_user_id), '[]'::jsonb)
   ) INTO v_result;
 
   -- Note : les tables qui n'existent pas sur certaines instances (ex:
