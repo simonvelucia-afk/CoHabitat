@@ -2280,7 +2280,22 @@ const SUPABASE_URL = 'https://uwyhrdjlwetcbtskijrs.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3eWhyZGpsd2V0Y2J0c2tpanJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NzMxNjYsImV4cCI6MjA4ODE0OTE2Nn0.NHo_RY4DjTmtkFcjOJ3dFPzNRN1rCwBCDXyIixOSrn4';
 
 const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Configuration auth.lock : on remplace le navigatorLock (Web Locks API)
+// par un lock no-op. Le navigatorLock peut rester bloque indefiniment
+// si une operation auth lance un fetch qui hang (cas observe : sb.from
+// pendant que l'onglet est en background, Chrome throttle le fetch
+// IndexedDB, le verrou n'est jamais relache, tous les sb.from suivants
+// hang en Promise pending forever).
+//
+// CoHabitat tourne dans un seul onglet (le kiosque LunchMachine est sur
+// un autre origine, donc pas de partage de Web Locks), donc on n'a pas
+// besoin de coordination cross-tab. Le lock no-op execute juste fn()
+// directement, sans serialiser. supabase-js gere les concurrences via
+// son state interne (latest write wins sur le storage).
+const _noOpLock = (_name, _acquireTimeout, fn) => fn();
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { lock: _noOpLock }
+});
 
 // ── MODULIMO CENTRAL ─────────────────────────────────────────────────
 const CENTRAL_URL = 'https://bpxscgrbxjscicpnheep.supabase.co';
