@@ -4639,17 +4639,23 @@ async function lunchQueueLeave(machineId) {
 // lunch_sessions cote CoHabitat. Le kiosque la lit puis la supprime
 // (chsession one-shot).
 //
-// CHANGEMENT (fix popup blanc 2e clic) : on ouvre le popup directement
-// avec l'URL finale du kiosque, sans etape about:blank intermediaire.
-// L'ancien pattern "open about:blank puis tab.location.href = url"
-// echouait sur le 2e clic — apres plusieurs awaits le setter location
-// ne navigue pas reellement (popup detache). Le kiosque cote
-// LunchMachine retry deja la lecture lunch_sessions jusqu'a 2 s, donc
-// la course entre l'ouverture du popup et l'INSERT est tolere.
+// Sequence (revisee apres bug "popup blanc 2e clic" + bug "pas de J'ai
+// termine au 2e clic") :
+//   1. INSERT lunch_sessions await (fast ~200-500ms typiquement). Les
+//      navigateurs modernes preservent l'user activation du clic sur
+//      ~5s, donc window.open apres un await reste autorise.
+//   2. window.open(url, '_blank') avec l'URL finale (pas d'about:blank).
+//      Le kiosque trouve sa row immediatement, lunchSession est setup,
+//      "J'ai termine" visible.
+//
+// L'ancien pattern "open about:blank d'abord, INSERT en arriere-plan"
+// echouait : a la 2e ouverture, l'onglet CoHabitat passe en background
+// des le focus du popup, Chrome throttle les fetches IndexedDB de
+// supabase-js (sb.auth.getSession pend), l'INSERT n'aboutit jamais.
 async function openKiosk(machineId, _ignoredPreOpenedTab) {
   // Sans centrale joignable, le kiosque ne pourra pas debiter — on refuse
   // d'ouvrir l'onglet plutot que de laisser l'usager arriver devant un
-  // bouton "Acheter" qui echouera (cf. LunchMachine startPurchase).
+  // bouton "Acheter" qui echouera.
   if (!ensureCentralOnline('kiosque lunch')) return;
   if (!currentUser || !currentProfile) {
     console.warn('[openKiosk] pas de currentUser/currentProfile');
@@ -4657,29 +4663,40 @@ async function openKiosk(machineId, _ignoredPreOpenedTab) {
     return;
   }
 
-  // Tout ce qui suit jusqu'au window.open est synchrone : l'user
-  // activation du clic est preservee, popup non bloque.
   const sessionId = (crypto && crypto.randomUUID)
     ? crypto.randomUUID()
     : (Date.now() + '-' + Math.random().toString(16).slice(2));
   const url = LM_KIOSK_BASE + '?machine=' + machineId + '&chsession=' + sessionId;
   console.log('[openKiosk] user:', currentProfile.full_name, 'machine:', machineId, 'chsession:', sessionId);
-  const opened = window.open(url, '_blank');
-  if (!opened) console.warn('[openKiosk] popup bloque par le navigateur');
 
-  // INSERT en arriere-plan : le kiosque retry la lecture jusqu'a 2 s.
-  insertLunchSession(sessionId, machineId).catch(function(e) {
-    console.error('[openKiosk] insert lunch_sessions failed (kiosk navigated, mais sans token):', e);
-  });
+  // INSERT d'abord pendant que l'onglet a encore le focus (auth IndexedDB
+  // pas throttlee). Chrome conserve l'user activation pour ~5s apres le
+  // clic, plus que largement pour l'INSERT (~200-500ms).
+  try {
+    await insertLunchSession(sessionId, machineId);
+  } catch (e) {
+    console.error('[openKiosk] INSERT lunch_sessions echoue, popup non ouvert:', e);
+    typeof toast === 'function' && toast('Erreur ouverture kiosque — reessayez', 'error');
+    return;
+  }
+
+  // Maintenant que la row est en DB, on ouvre le popup. Le kiosque trouve
+  // immediatement sa session des le 1er retry.
+  const opened = window.open(url, '_blank');
+  if (!opened) {
+    console.warn('[openKiosk] popup bloque par le navigateur — supprime la row orpheline');
+    cohFetch('lunch_sessions?id=eq.' + sessionId, { method: 'DELETE' }).catch(function(_){});
+    typeof toast === 'function' && toast('Popup bloque — autorisez les popups pour CoHabitat', 'error');
+  }
 }
 
 // Insere la row lunch_sessions one-shot. Sortie de openKiosk pour pouvoir
-// la lancer en parallele du window.open sans bloquer l'ouverture du popup.
+// la awaiter explicitement et detecter les echecs avant d'ouvrir le popup.
 async function insertLunchSession(sessionId, machineId) {
   const { data: { session: authSession } } = await sb.auth.getSession();
   const accessToken = authSession?.access_token || null;
   const expires = new Date(Date.now() + 2 * 60000).toISOString();
-  await cohFetch('lunch_sessions', {
+  const rows = await cohFetch('lunch_sessions', {
     method: 'POST',
     body: JSON.stringify({
       id:                       sessionId,
@@ -4694,16 +4711,18 @@ async function insertLunchSession(sessionId, machineId) {
       finance_central_enabled:  !!window._financeCentralEnabled
     })
   });
+  if (!rows || (Array.isArray(rows) && !rows.length)) {
+    throw new Error('lunch_sessions INSERT a renvoye une reponse vide (RLS ?)');
+  }
   console.log('[openKiosk] inserted', sessionId, 'token=', accessToken ? 'yes' : 'no');
 }
 
 // Rejoindre la file ET ouvrir le kiosque (machine libre). Le queue join
-// se fait en arriere-plan : pas besoin d'attendre avant d'ouvrir le
-// popup, ca permet de garder l'user activation fraiche du clic et evite
-// le popup blanc qui survenait apres l'await sur lunchQueueJoin.
+// se fait en arriere-plan : pas besoin d'attendre avant openKiosk, ca
+// permet de garder l'user activation fraiche du clic.
 async function lunchQueueJoinAndOpen(machineId) {
   // Lance le queue join en arriere-plan (le kiosque verra son entree
-  // active des qu'il se connecte). Pas d'await avant le window.open.
+  // active des qu'il se connecte). Pas d'await avant openKiosk.
   lunchQueueJoin(machineId, null).catch(function(e) {
     console.warn('[lunchQueueJoinAndOpen] queue join failed:', e);
   });
