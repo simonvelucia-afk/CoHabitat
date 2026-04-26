@@ -1423,6 +1423,16 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         </div>
       </div>
 
+      <!-- Loi 25 : Telecharger mes donnees -->
+      <div id="loi25-self-section" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:24px;display:none;">
+        <h3 style="font-size:1rem;color:var(--text);margin-bottom:8px;">📥 Mes données personnelles (Loi 25)</h3>
+        <p style="font-size:0.85rem;color:var(--text2);margin-bottom:14px;line-height:1.5;">Conformément à la Loi 25 (Québec), vous pouvez obtenir une copie complète de vos données personnelles à tout moment. Le rapport couvre votre profil, vos transactions, vos réservations, vos trajets et l'historique de la machine lunch.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" type="button" onclick="loi25SelfExportHTML()">📄 Voir / imprimer mon rapport</button>
+          <button class="btn btn-secondary btn-sm" type="button" onclick="loi25SelfExportJSON()">📥 Télécharger en JSON</button>
+        </div>
+      </div>
+
       <!-- Demande de suppression de compte -->
       <div id="deletion-request-section" style="background:var(--surface);border:1px solid var(--accent3);border-radius:var(--radius);padding:20px;margin-bottom:24px;display:none;">
         <h3 style="font-size:1rem;color:var(--accent3);margin-bottom:8px;">⚠️ Suppression du compte</h3>
@@ -3173,6 +3183,198 @@ async function requestAccountDeletion() {
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
   toast('Demande enregistrée — un administrateur la traitera prochainement', 'success');
   loadProfile();
+}
+
+// ── LOI 25 : Self-service export ─────────────────────────────────────────────
+// Appelle la RPC export_client_data (sql/004) avec son propre user_id et
+// retourne un JSONB complet de toutes les donnees CoHabitat du resident.
+async function _loi25SelfFetch() {
+  if (!currentProfile?.id) throw new Error('Session manquante');
+  const { data, error } = await sb.rpc('export_client_data', { p_user_id: currentProfile.id });
+  if (error) throw new Error(error.message || 'export_client_data a echoue');
+  return data;
+}
+
+// Rapport HTML imprimable cote resident. Format adapte aux tables
+// CoHabitat (profiles, dependents, transactions, space_reservations,
+// trips, lunch_transactions, etc.). Le resident peut sauver en PDF
+// via Ctrl+P.
+function _loi25SelfBuildHtml(data) {
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+  function fmt(v) {
+    if (v == null || v === '') return '—';
+    if (typeof v === 'boolean') return v ? 'Oui' : 'Non';
+    return esc(v);
+  }
+  function fmtMoney(n) {
+    if (n == null) return '—';
+    return Number(n).toFixed(2) + ' $';
+  }
+  function fmtDate(s) {
+    if (!s) return '—';
+    try { return new Date(s).toLocaleString('fr-CA'); } catch(_) { return esc(s); }
+  }
+  const p = data.profile || {};
+  const deps = data.dependents || [];
+  const tx = data.transactions || [];
+  const rsv = data.space_reservations || [];
+  const tripsDriver = data.trips_as_driver || [];
+  const tripBookings = data.trip_bookings || [];
+  const lunchTx = data.lunch_transactions || [];
+  const realPayments = data.real_payments_received || [];
+  const reqs = data.reservation_requests || [];
+
+  let h = '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">';
+  h += '<title>Mes donnees CoHabitat — Loi 25</title>';
+  h += '<style>';
+  h += 'body{font-family:system-ui,-apple-system,sans-serif;max-width:850px;margin:30px auto;padding:0 20px;color:#222;line-height:1.5;}';
+  h += 'h1{font-size:24px;margin:0 0 4px;color:#1a1a1a;border-bottom:2px solid #c8a96e;padding-bottom:8px;}';
+  h += 'h2{font-size:16px;margin:32px 0 12px;color:#444;border-bottom:1px solid #ddd;padding-bottom:4px;}';
+  h += '.meta{font-size:12px;color:#777;margin-bottom:24px;}';
+  h += 'table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13px;}';
+  h += 'th,td{padding:6px 10px;text-align:left;border-bottom:1px solid #eee;vertical-align:top;}';
+  h += 'th{background:#f7f5ef;font-weight:600;width:35%;}';
+  h += '.list-tbl th{background:#222;color:#fff;width:auto;}';
+  h += '.empty{font-style:italic;color:#999;font-size:12px;padding:8px 0;}';
+  h += '.amount{text-align:right;font-variant-numeric:tabular-nums;}';
+  h += '.note{font-size:11px;color:#888;margin-top:24px;border-top:1px solid #ddd;padding-top:12px;}';
+  h += '@media print{body{margin:0;}table{page-break-inside:avoid;}.no-print{display:none;}}';
+  h += '</style></head><body>';
+  h += '<button class="no-print" onclick="window.print()" style="float:right;padding:6px 12px;cursor:pointer;">🖨 Imprimer / PDF</button>';
+  h += '<h1>📄 Mes donnees personnelles — CoHabitat</h1>';
+  h += '<div class="meta">Genere le ' + fmtDate(data.exported_at) + '<br>Sujet : <strong>' + esc(p.full_name || data.subject_user_id) + '</strong></div>';
+
+  // Profil
+  h += '<h2>1. Mon profil</h2><table>';
+  h += '<tr><th>Nom complet</th><td>' + fmt(p.full_name) + '</td></tr>';
+  h += '<tr><th>Courriel</th><td>' + fmt(p.email) + '</td></tr>';
+  h += '<tr><th>Telephone</th><td>' + fmt(p.phone) + '</td></tr>';
+  h += '<tr><th>Unite</th><td>' + fmt(p.unit) + '</td></tr>';
+  h += '<tr><th>Role</th><td>' + fmt(p.role) + '</td></tr>';
+  h += '<tr><th>Solde virtuel</th><td>' + fmtMoney(p.virtual_balance) + '</td></tr>';
+  h += '<tr><th>Membre depuis</th><td>' + fmtDate(p.created_at) + '</td></tr>';
+  h += '</table>';
+
+  // Dependants
+  h += '<h2>2. Mes dependants (' + deps.length + ')</h2>';
+  if (deps.length === 0) h += '<p class="empty">Aucun dependant.</p>';
+  else {
+    h += '<table class="list-tbl"><thead><tr><th>Nom</th><th>Age</th><th>Solde</th><th>Inscrit le</th></tr></thead><tbody>';
+    deps.forEach(d => {
+      h += '<tr><td>' + fmt(d.name) + '</td><td>' + fmt(d.age) + '</td><td class="amount">' + fmtMoney(d.virtual_balance) + '</td><td>' + fmtDate(d.created_at) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+
+  // Transactions
+  h += '<h2>3. Mouvements de solde (' + tx.length + ')</h2>';
+  if (tx.length === 0) h += '<p class="empty">Aucun mouvement.</p>';
+  else {
+    h += '<table class="list-tbl"><thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="amount">Montant</th><th class="amount">Solde apres</th></tr></thead><tbody>';
+    tx.forEach(t => {
+      const amt = Number(t.amount || 0);
+      const color = amt < 0 ? 'color:#a44;' : 'color:#2a7;';
+      h += '<tr><td>' + fmtDate(t.created_at) + '</td><td>' + fmt(t.type) + '</td><td>' + fmt(t.description) + '</td><td class="amount" style="' + color + '">' + (amt >= 0 ? '+' : '') + fmtMoney(amt) + '</td><td class="amount">' + fmtMoney(t.balance_after) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+
+  // Reservations d'espaces
+  h += '<h2>4. Mes reservations d\'espaces (' + rsv.length + ')</h2>';
+  if (rsv.length === 0) h += '<p class="empty">Aucune reservation.</p>';
+  else {
+    h += '<table class="list-tbl"><thead><tr><th>Debut</th><th>Fin</th><th class="amount">Cout</th><th>Statut</th></tr></thead><tbody>';
+    rsv.forEach(r => {
+      h += '<tr><td>' + fmtDate(r.start_time) + '</td><td>' + fmtDate(r.end_time) + '</td><td class="amount">' + fmtMoney(r.total_cost) + '</td><td>' + fmt(r.status) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+
+  // Trajets comme chauffeur
+  h += '<h2>5. Mes trajets en tant que chauffeur (' + tripsDriver.length + ')</h2>';
+  if (tripsDriver.length === 0) h += '<p class="empty">Aucun trajet conduit.</p>';
+  else {
+    h += '<table class="list-tbl"><thead><tr><th>Date</th><th>Titre</th><th>Statut</th></tr></thead><tbody>';
+    tripsDriver.forEach(t => {
+      h += '<tr><td>' + fmtDate(t.departure_time) + '</td><td>' + fmt(t.title) + '</td><td>' + fmt(t.status) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+
+  // Trajets comme passager
+  h += '<h2>6. Mes trajets en tant que passager (' + tripBookings.length + ')</h2>';
+  if (tripBookings.length === 0) h += '<p class="empty">Aucune reservation passager.</p>';
+  else {
+    h += '<table class="list-tbl"><thead><tr><th>Date demande</th><th>Pickup</th><th>Dropoff</th><th>Places</th><th>Statut</th><th class="amount">Cout</th></tr></thead><tbody>';
+    tripBookings.forEach(b => {
+      h += '<tr><td>' + fmtDate(b.created_at) + '</td><td>' + fmt(b.pickup_location) + '</td><td>' + fmt(b.dropoff_location) + '</td><td>' + fmt(b.seats_requested) + '</td><td>' + fmt(b.status) + '</td><td class="amount">' + fmtMoney(b.total_cost) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+
+  // Lunch
+  h += '<h2>7. Mes achats Machine Lunch (' + lunchTx.length + ')</h2>';
+  if (lunchTx.length === 0) h += '<p class="empty">Aucun achat lunch.</p>';
+  else {
+    h += '<table class="list-tbl"><thead><tr><th>Date</th><th>Acheteur</th><th class="amount">Montant</th></tr></thead><tbody>';
+    lunchTx.forEach(lt => {
+      h += '<tr><td>' + fmtDate(lt.created_at) + '</td><td>' + fmt(lt.buyer_name) + '</td><td class="amount">' + fmtMoney(lt.price) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+
+  // Paiements recus
+  h += '<h2>8. Paiements recus par l\'admin (' + realPayments.length + ')</h2>';
+  if (realPayments.length === 0) h += '<p class="empty">Aucun paiement enregistre.</p>';
+  else {
+    h += '<table class="list-tbl"><thead><tr><th>Date</th><th>Methode</th><th class="amount">Montant</th></tr></thead><tbody>';
+    realPayments.forEach(rp => {
+      h += '<tr><td>' + fmtDate(rp.received_at || rp.created_at) + '</td><td>' + fmt(rp.method) + '</td><td class="amount">' + fmtMoney(rp.amount) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+
+  h += '<div class="note">Ce rapport est genere conformement a la <strong>Loi 25 du Quebec</strong> (droit d\'acces aux renseignements personnels). Il couvre les donnees de votre immeuble CoHabitat. Les donnees centrales Modulimo (contrats, factures) peuvent etre obtenues sur demande aupres de l\'administrateur.</div>';
+  h += '</body></html>';
+  return h;
+}
+
+async function loi25SelfExportHTML() {
+  try {
+    toast('Generation du rapport...', 'info');
+    const data = await _loi25SelfFetch();
+    const html = _loi25SelfBuildHtml(data);
+    const w = window.open('', '_blank');
+    if (!w) { toast('Popup bloque par le navigateur', 'error'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    toast('Rapport ouvert', 'success');
+  } catch (e) {
+    toast('Echec : ' + (e.message || e), 'error');
+  }
+}
+
+async function loi25SelfExportJSON() {
+  try {
+    const data = await _loi25SelfFetch();
+    const filename = 'mes-donnees-cohabitat-' + Date.now() + '.json';
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+    toast('Telecharge : ' + filename, 'success');
+  } catch (e) {
+    toast('Echec : ' + (e.message || e), 'error');
+  }
 }
 
 // ── GESTION DES ACCÈS DÉPENDANTS PAR RESSOURCE ──────────────────────────────
@@ -7403,6 +7605,12 @@ async function loadProfilePage() {
     const el = document.getElementById(id);
     if (el) { el.disabled = isDemo; el.style.opacity = isDemo ? '0.6' : '1'; }
   });
+  // Loi 25 : section "telecharger mes donnees" visible pour tout
+  // resident non-demo (le bouton appelle export_client_data).
+  if (!isDemo) {
+    const loi25Sec = document.getElementById('loi25-self-section');
+    if (loi25Sec) loi25Sec.style.display = 'block';
+  }
   // Charger statut demande suppression
   if (!isDemo) {
     const { data: dr } = await sb.from('deletion_requests')
