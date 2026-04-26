@@ -2282,20 +2282,64 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const { createClient } = supabase;
 // Configuration auth.lock : on remplace le navigatorLock (Web Locks API)
 // par un lock no-op. Le navigatorLock peut rester bloque indefiniment
-// si une operation auth lance un fetch qui hang (cas observe : sb.from
-// pendant que l'onglet est en background, Chrome throttle le fetch
-// IndexedDB, le verrou n'est jamais relache, tous les sb.from suivants
-// hang en Promise pending forever).
-//
-// CoHabitat tourne dans un seul onglet (le kiosque LunchMachine est sur
-// un autre origine, donc pas de partage de Web Locks), donc on n'a pas
-// besoin de coordination cross-tab. Le lock no-op execute juste fn()
-// directement, sans serialiser. supabase-js gere les concurrences via
-// son state interne (latest write wins sur le storage).
+// si une operation auth lance un fetch qui hang.
 const _noOpLock = (_name, _acquireTimeout, fn) => fn();
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { lock: _noOpLock }
-});
+
+// Cache du token : declare avant le client pour que les helpers globaux
+// (fetchCentralBalance, getLmToken, etc.) puissent y acceder. Mis a jour
+// par _attachAuthListener a chaque event auth.
+window._cachedAccessToken = null;
+function _setAccessTokenFromSession(session) {
+  window._cachedAccessToken = (session && session.access_token) || null;
+}
+
+// Le client supabase peut se retrouver dans un etat corrompu apres
+// certaines sequences (visite page lunch + plusieurs cycles kiosque) :
+// sb.from(...) hang indefiniment alors qu'un raw fetch vers la meme URL
+// fonctionne. Reproduit avec un nouveau client supabase.createClient(...)
+// qui repond instantanement -> le bug est dans l'etat interne du client,
+// pas dans le serveur ni le reseau.
+//
+// Workaround : sb est mutable (let), on le recree via recreateSb() au
+// bon moment (avant chaque navigateTo). _attachAuthListener re-attache
+// l'observer auth sur le nouveau client pour garder le cache a jour.
+let sb = _createSbClient();
+_attachAuthListener(sb);
+
+function _createSbClient() {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { lock: _noOpLock }
+  });
+}
+
+function _attachAuthListener(client) {
+  client.auth.onAuthStateChange((event, session) => {
+    _setAccessTokenFromSession(session);
+    if (typeof isDemo !== 'undefined' && isDemo) return;
+    if (event === 'PASSWORD_RECOVERY') {
+      if (typeof showResetPasswordModal === 'function') showResetPasswordModal();
+    } else if (event === 'SIGNED_IN' && session) {
+      if (document.getElementById('reset-password-modal')?.style.display === 'flex') return;
+      currentUser = session.user;
+      if (typeof initApp === 'function') initApp().then(() => typeof _resetAutoLogout === 'function' && _resetAutoLogout()).catch(()=>{});
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      currentProfile = null;
+      if (typeof isDemo !== 'undefined') isDemo = false;
+      if (typeof _autoLogoutTimer !== 'undefined') { clearTimeout(_autoLogoutTimer); _autoLogoutTimer = null; }
+      if (typeof showLogin === 'function') showLogin();
+    }
+  });
+}
+
+function recreateSb() {
+  // Stoppe l'auto-refresh de l'ancien client pour eviter le warning
+  // "Multiple GoTrueClient instances" et les races sur localStorage.
+  try { sb.auth.stopAutoRefresh && sb.auth.stopAutoRefresh().catch(()=>{}); } catch(_) {}
+  sb = _createSbClient();
+  _attachAuthListener(sb);
+  console.info('[sb] client supabase recree (workaround wedge state)');
+}
 
 // ── MODULIMO CENTRAL ─────────────────────────────────────────────────
 const CENTRAL_URL = 'https://bpxscgrbxjscicpnheep.supabase.co';
@@ -2588,44 +2632,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // trajets, transferts, kiosque). Le probe est independant de l'auth.
   startCentralHealthProbe();
 
-  // ── CACHE ACCESS TOKEN ─────────────────────────────────────────────
-  // sb.auth.getSession() est protege par un verrou (Web Locks API) qui
-  // peut rester bloque indefiniment si une requete est lancee pendant
-  // que l'onglet est en background (Chrome throttle, getSession pend,
-  // verrou jamais libere). Symptome : tous les sb.from(...) deviennent
-  // muets — Promise pending forever, page "Chargement..." sans fin.
-  //
-  // Solution : cacher le token a chaque event auth, et fournir un
-  // accessor synchrone qui n'utilise pas le verrou. Les paths qui
-  // n'ont besoin que du JWT (raw fetch vers central, INSERT
-  // lunch_sessions) utilisent ce cache plutot que sb.auth.getSession.
-  window._cachedAccessToken = null;
-  function _setAccessTokenFromSession(session) {
-    window._cachedAccessToken = (session && session.access_token) || null;
-  }
-
-  // Enregistrer onAuthStateChange EN PREMIER pour ne manquer aucun event
-  sb.auth.onAuthStateChange(async (event, session) => {
-    _setAccessTokenFromSession(session);
-    if (isDemo) return;
-    if (event === 'PASSWORD_RECOVERY') {
-      showResetPasswordModal();
-    } else if (event === 'SIGNED_IN' && session) {
-      if (document.getElementById('reset-password-modal').style.display === 'flex') return;
-      currentUser = session.user;
-      await initApp();
-      _resetAutoLogout();
-    } else if (event === 'SIGNED_OUT') {
-      currentUser = null;
-      currentProfile = null;
-      isDemo = false;
-      clearTimeout(_autoLogoutTimer);
-      _autoLogoutTimer = null;
-      showLogin();
-    }
-  });
-
-  // Check existing session on load (après onAuthStateChange)
+  // L'observer auth est deja attache au moment de la creation de sb
+  // (cf. _attachAuthListener au top du script). Ici on lit juste la
+  // session existante pour bootstrap le cache token + currentUser.
   const { data: { session } } = await sb.auth.getSession();
   _setAccessTokenFromSession(session);
 
@@ -4275,6 +4284,12 @@ function buildNav() {
 function navigateTo(page) {
   if (page === 'trips' && !window.appModules.trips) { toast('Module Auto-partage non activé', 'info'); return; }
   if (page === 'lunch' && !window.appModules.lunch) { toast('Module Machine Lunch non activé', 'info'); return; }
+  // Workaround sb wedge state : on recree le client supabase avant
+  // chaque navigation pour s'assurer que sb.from(...) ne hang pas a
+  // cause d'un etat interne corrompu. Cf. console verbose [sb] client
+  // supabase recree. Couterait theoriquement quelques objets a GC, mais
+  // bien moins cher qu'un hard refresh complet de l'app.
+  recreateSb();
   closeMobileMenu();
   document.querySelectorAll('.page').forEach(p => {
     p.classList.remove('active');
