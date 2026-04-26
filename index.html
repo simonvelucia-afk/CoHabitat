@@ -2572,8 +2572,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   // trajets, transferts, kiosque). Le probe est independant de l'auth.
   startCentralHealthProbe();
 
+  // ── CACHE ACCESS TOKEN ─────────────────────────────────────────────
+  // sb.auth.getSession() est protege par un verrou (Web Locks API) qui
+  // peut rester bloque indefiniment si une requete est lancee pendant
+  // que l'onglet est en background (Chrome throttle, getSession pend,
+  // verrou jamais libere). Symptome : tous les sb.from(...) deviennent
+  // muets — Promise pending forever, page "Chargement..." sans fin.
+  //
+  // Solution : cacher le token a chaque event auth, et fournir un
+  // accessor synchrone qui n'utilise pas le verrou. Les paths qui
+  // n'ont besoin que du JWT (raw fetch vers central, INSERT
+  // lunch_sessions) utilisent ce cache plutot que sb.auth.getSession.
+  window._cachedAccessToken = null;
+  function _setAccessTokenFromSession(session) {
+    window._cachedAccessToken = (session && session.access_token) || null;
+  }
+
   // Enregistrer onAuthStateChange EN PREMIER pour ne manquer aucun event
   sb.auth.onAuthStateChange(async (event, session) => {
+    _setAccessTokenFromSession(session);
     if (isDemo) return;
     if (event === 'PASSWORD_RECOVERY') {
       showResetPasswordModal();
@@ -2594,6 +2611,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Check existing session on load (après onAuthStateChange)
   const { data: { session } } = await sb.auth.getSession();
+  _setAccessTokenFromSession(session);
 
   // Si session de récupération détectée via le flag (injecté par le snippet en haut de page)
   if (session && sessionStorage.getItem('pw_recovery') === '1') {
@@ -3219,12 +3237,19 @@ async function toggleDepResourceAccess(type, resourceId, grant, name) {
 // connue plutot que d'afficher 0$ qui serait trompeur).
 async function fetchCentralBalance(depExternalId) {
   try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session?.access_token) return null;
+    // BUG FIX : on utilise window._cachedAccessToken au lieu de
+    // sb.auth.getSession(). Cette derniere prend un verrou Web Locks
+    // qui peut rester bloque indefiniment si une requete est lancee
+    // pendant que l'onglet est en background (cas typique : lunch-done
+    // event qui declenche syncCentralBalanceToProfile pendant que le
+    // popup kiosque a le focus). Symptome : tous les sb.from(...)
+    // suivants restent en Promise pending forever.
+    const accessToken = window._cachedAccessToken;
+    if (!accessToken) return null;
     const res = await fetch(`${CENTRAL_URL}/functions/v1/finance-bridge/get-balance`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.access_token}`,
+        'Authorization': `Bearer ${accessToken}`,
         'apikey': CENTRAL_KEY,
         'Content-Type': 'application/json'
       },
@@ -4693,8 +4718,9 @@ async function openKiosk(machineId, _ignoredPreOpenedTab) {
 // Insere la row lunch_sessions one-shot. Sortie de openKiosk pour pouvoir
 // la awaiter explicitement et detecter les echecs avant d'ouvrir le popup.
 async function insertLunchSession(sessionId, machineId) {
-  const { data: { session: authSession } } = await sb.auth.getSession();
-  const accessToken = authSession?.access_token || null;
+  // Utilise le token cache (synchrone, pas de verrou Web Locks) plutot
+  // que sb.auth.getSession() qui peut rester bloque dans certains cas.
+  const accessToken = window._cachedAccessToken;
   const expires = new Date(Date.now() + 2 * 60000).toISOString();
   const rows = await cohFetch('lunch_sessions', {
     method: 'POST',
@@ -8677,7 +8703,11 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && currentUser && !isDemo) {
     // Arrêter le polling lunch pour ne pas bloquer
     if(_lunchQueuePoll) { clearInterval(_lunchQueuePoll); _lunchQueuePoll = null; }
-    // Délai de 30 minutes avant déconnexion automatique
+    // BUG FIX : sans clearTimeout, l'ancien timer de 5min d'inactivite
+    // continuait a tourner pendant que l'usager etait dans le kiosque,
+    // et le deconnectait apres 5min — il devait re-saisir son mot de
+    // passe au retour. On clear avant de poser le 30min timer.
+    clearTimeout(_autoLogoutTimer);
     _autoLogoutTimer = setTimeout(_doAutoLogout, 30 * 60 * 1000);
   } else if (document.visibilityState === 'visible') {
     _resetAutoLogout();
