@@ -7671,6 +7671,23 @@ async function loadDependents() {
     el.innerHTML = '<div style="color:var(--text3);font-size:0.9rem;text-align:center;padding:20px;">Aucun dépendant ajouté</div>';
     return;
   }
+
+  // Phase 3C : dependents.virtual_balance est un cache stale ; les debits
+  // (lunch, espaces, transferts) ecrivent sur central uniquement. On
+  // re-aligne chaque solde depuis central avant le rendu, sinon le profil
+  // peut afficher 20$ alors que la machine lunch voit 0$ (verite centrale).
+  // Si central est injoignable, on garde la valeur locale (le banner
+  // "CENTRALE HORS-LIGNE" signale a l'usager que les soldes sont peut-etre
+  // perimes).
+  if (!isDemo) {
+    await Promise.all(data.map(async (d) => {
+      const central = await fetchCentralBalance(d.id);
+      if (central && typeof central.virtual_balance === 'number') {
+        d.virtual_balance = central.virtual_balance;
+      }
+    }));
+  }
+
   el.innerHTML = data.map(d => {
     const svcs = [d.allow_spaces && '🏠 Espaces', d.allow_trips && '🚗 Auto-partage', d.allow_lunch && '🍱 Lunch'].filter(Boolean).join(' · ') || '<span style="color:var(--accent3)">Aucun service</span>';
     const age = d.age ? `${d.age} ans` : '';
