@@ -1625,6 +1625,13 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         <div id="lunch-machines-btns" style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:400px;">
           <div style="color:var(--text3);font-size:13px;">Chargement…</div>
         </div>
+        <div style="border-top:1px solid var(--border);padding-top:18px;margin-top:6px;width:100%;max-width:400px;display:flex;flex-direction:column;gap:8px;align-items:center;">
+          <div style="font-size:12px;color:var(--text3);text-align:center;">Pas de compte ou simple curiosité ?</div>
+          <button onclick="openLunchDemo()" class="btn btn-secondary" style="width:100%;">
+            🧪 Faire l'essai en mode démo
+          </button>
+          <div style="font-size:11px;color:var(--text3);text-align:center;line-height:1.4;">Données fictives, aucune transaction réelle.</div>
+        </div>
       </div>
     </div>
   </main>
@@ -5006,6 +5013,20 @@ async function lunchQueueJoinAndOpen(machineId) {
 
 function openLunchKiosk(machineId) {
   openKiosk(machineId || 'pointe-est-1');
+}
+
+// Ouvre le kiosque LunchMachine en mode demo (?demo=1) : aucune row
+// lunch_sessions inseree, aucune session DB consommee, aucun token relaye.
+// Le kiosque charge des fixtures locales (slots/profil/dependants/soldes
+// fictifs) et tourne en isolation. Sert de "try before you buy" pour les
+// visiteurs sans compte ou les residents qui veulent explorer le flow
+// sans toucher leur vrai solde.
+function openLunchDemo() {
+  const url = LM_KIOSK_BASE + '?demo=1';
+  const opened = window.open(url, '_blank');
+  if (!opened) {
+    typeof toast === 'function' && toast('Popup bloque — autorisez les popups pour CoHabitat', 'error');
+  }
 }
 
 // ==========================================
