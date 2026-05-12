@@ -988,6 +988,122 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   color: var(--text3);
   font-size: 0.95rem;
 }
+
+/* ===== BILLETS (TICKETS) ===== */
+.tk-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.tk-toolbar select,
+.tk-toolbar input[type="text"] {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 0.88rem;
+}
+.tk-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: border-color var(--transition);
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.tk-card:hover { border-color: var(--accent); }
+.tk-card-icon {
+  width: 38px; height: 38px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface2);
+  border-radius: 50%;
+  font-size: 1.1rem;
+}
+.tk-card-body { flex: 1; min-width: 0; }
+.tk-card-row {
+  display: flex; justify-content: space-between; gap: 10px;
+  align-items: flex-start;
+}
+.tk-card-subject {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tk-card-meta {
+  font-size: 0.78rem;
+  color: var(--text3);
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tk-card-preview {
+  font-size: 0.86rem;
+  color: var(--text2);
+  margin-top: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tk-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tk-status-open        { background: rgba(200,169,110,0.18); color: #d8b66a; }
+.tk-status-in_progress { background: rgba( 96,160,224,0.18); color: #6fb3e8; }
+.tk-status-resolved    { background: rgba(110,200,140,0.18); color: #82d2a0; }
+.tk-status-closed      { background: rgba(180,180,180,0.15); color: #aaa; }
+.tk-prio-low     { background: rgba(180,180,180,0.15); color: #aaa; }
+.tk-prio-normal  { background: rgba(200,169,110,0.12); color: #c8a96e; }
+.tk-prio-high    { background: rgba(224,150, 96,0.18); color: #e89c70; }
+.tk-prio-urgent  { background: rgba(224,112, 96,0.20); color: #e07060; }
+.tk-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 4px 2px;
+  margin-bottom: 14px;
+}
+.tk-msg {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tk-msg.mine { border-color: var(--accent); }
+.tk-msg.internal { background: rgba(200,169,110,0.10); border-color: rgba(200,169,110,0.4); }
+.tk-msg-head {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 0.76rem;
+  color: var(--text3);
+  margin-bottom: 6px;
+}
+.tk-msg-author { color: var(--accent); font-weight: 600; }
+
 /* ===== LANDING PAGE ===== */
 .landing-tagline { text-align:center; margin-bottom:48px; }
 .landing-tagline h2 { font-family:var(--font-serif); font-size:1.6rem; color:var(--text); font-weight:400; margin-bottom:10px; }
@@ -1236,6 +1352,31 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
       <div id="bb-feed"></div>
     </div>
 
+    <!-- ==================== TENANT: BILLETS ==================== -->
+    <div id="page-tickets" class="page">
+      <div class="section-header">
+        <div class="section-title">
+          <h2 data-pt="tkTitle">🎫 Billets</h2>
+          <p style="color:var(--text2);font-size:0.9rem" data-pt="tkSubtitle">Requêtes traitées par le concierge — suivez la résolution de vos demandes</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="tkOpenCreate()" data-pt="tkNew">+ Nouveau billet</button>
+      </div>
+
+      <div class="tk-toolbar">
+        <select id="tk-filter-status" onchange="renderTickets()">
+          <option value="open_active" data-pt="tkFilterActive">À suivre</option>
+          <option value="" data-pt="tkFilterAll">Tous</option>
+          <option value="open" data-pt="tkStatusOpen">Ouvert</option>
+          <option value="in_progress" data-pt="tkStatusInProgress">En cours</option>
+          <option value="resolved" data-pt="tkStatusResolved">Résolu</option>
+          <option value="closed" data-pt="tkStatusClosed">Fermé</option>
+        </select>
+        <input type="text" id="tk-filter-q" placeholder="Rechercher…" oninput="renderTickets()">
+      </div>
+
+      <div id="tk-list"></div>
+    </div>
+
     <!-- ==================== TENANT: DASHBOARD ==================== -->
     <div id="page-dashboard" class="page">
       <div id="dashboard-inactive-notice" style="display:none;background:rgba(224,112,96,0.12);border:1px solid rgba(224,112,96,0.35);border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:20px;color:var(--accent3);font-size:0.9rem;">
@@ -1463,7 +1604,8 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         </div>
       </div>
       <div class="admin-tabs">
-        <button class="admin-tab active" onclick="adminTab('tenants')" data-pt="Locataires">Locataires</button>
+        <button class="admin-tab active" id="admin-tab-tenants" onclick="adminTab('tenants')" data-pt="Locataires">Locataires</button>
+        <button class="admin-tab" id="admin-tab-tickets" onclick="adminTab('tickets')">🎫 <span data-pt="navTickets">Billets</span> <span id="tickets-pending-count" class="badge badge-yellow" style="display:none;font-size:10px;margin-left:4px;padding:1px 6px;"></span></button>
         <button class="admin-tab" id="demandes-tab" onclick="adminTab('demandes')" data-pt="Demandes">📋 Demandes <span id="demandes-pending-count" class="badge badge-yellow" style="display:none;font-size:10px;margin-left:4px;padding:1px 6px;"></span></button>
         <button class="admin-tab" onclick="adminTab('spaces-admin')" data-pt="Espaces">Espaces</button>
         <button class="admin-tab" onclick="adminTab('vehicles-admin')" data-pt="Véhicules">Véhicules</button>
@@ -1647,6 +1789,36 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
             <tbody id="logs-tbody"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- Billets (concierge / admin) -->
+      <div id="admin-tickets" class="admin-section" style="display:none">
+        <div class="section-header">
+          <div class="section-title"><h3 style="font-size:1.1rem" data-pt="tkAdminTitle">Billets à traiter</h3></div>
+          <button class="btn btn-secondary btn-sm" onclick="loadAdminTickets()">↻</button>
+        </div>
+        <div class="tk-toolbar">
+          <select id="tk-admin-filter-status" onchange="renderAdminTickets()">
+            <option value="open_active" data-pt="tkFilterActive">À traiter</option>
+            <option value="" data-pt="tkFilterAll">Tous</option>
+            <option value="open" data-pt="tkStatusOpen">Ouvert</option>
+            <option value="in_progress" data-pt="tkStatusInProgress">En cours</option>
+            <option value="resolved" data-pt="tkStatusResolved">Résolu</option>
+            <option value="closed" data-pt="tkStatusClosed">Fermé</option>
+          </select>
+          <select id="tk-admin-filter-cat" onchange="renderAdminTickets()">
+            <option value="" data-pt="tkFilterAllCats">Toutes catégories</option>
+            <option value="maintenance" data-pt="tkCatMaintenance">Entretien</option>
+            <option value="noise" data-pt="tkCatNoise">Bruit</option>
+            <option value="cleanliness" data-pt="tkCatCleanliness">Propreté</option>
+            <option value="security" data-pt="tkCatSecurity">Sécurité</option>
+            <option value="billing" data-pt="tkCatBilling">Facturation</option>
+            <option value="suggestion" data-pt="tkCatSuggestion">Suggestion</option>
+            <option value="other" data-pt="tkCatOther">Autre</option>
+          </select>
+          <input type="text" id="tk-admin-filter-q" placeholder="Rechercher…" oninput="renderAdminTickets()">
+        </div>
+        <div id="tk-admin-list"></div>
       </div>
 
       <!-- Machine Lunch — admin section (vide, géré via modulimo-admin) -->
@@ -2146,6 +2318,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         <label>Rôle</label>
         <select id="tenant-role">
           <option value="tenant">Locataire</option>
+          <option value="concierge">Concierge</option>
           <option value="admin">Administrateur</option>
           <option value="principal_admin">Admin Principal</option>
         </select>
@@ -4009,6 +4182,64 @@ const PT = {
     'bbConfirmDelete': 'Supprimer ce message ?',
     'bbErrDelete': 'Erreur : ',
     'bbAuthor': 'Locataire',
+    // Tickets
+    'navTickets': 'Billets',
+    'tkTitle': '🎫 Billets',
+    'tkSubtitle': 'Requêtes traitées par le concierge — suivez la résolution de vos demandes',
+    'tkNew': '+ Nouveau billet',
+    'tkNewTitle': 'Nouveau billet',
+    'tkSubject': 'Sujet',
+    'tkCategory': 'Catégorie',
+    'tkPriority': 'Priorité',
+    'tkDescription': 'Description',
+    'tkSubmit': 'Envoyer',
+    'tkSend': 'Envoyer',
+    'tkApply': 'Appliquer',
+    'tkChangeStatus': 'Statut',
+    'tkInternal': 'Note interne',
+    'tkInternalNote': 'Note interne',
+    'tkReplyLabel': 'Répondre',
+    'tkLoading': 'Chargement…',
+    'tkEmpty': 'Aucun billet pour le moment. Cliquez sur « + Nouveau billet » pour en créer un.',
+    'tkEmptyAdmin': 'Aucun billet à afficher avec ces filtres.',
+    'tkAdminTitle': 'Billets à traiter',
+    'tkAuthor': 'Locataire',
+    'tkCreatedOn': 'Créé le',
+    'tkUpdated': 'MAJ',
+    'tkFilterActive': 'À suivre',
+    'tkFilterAll': 'Tous',
+    'tkFilterAllCats': 'Toutes catégories',
+    'tkResolvedNotice': 'Ce billet est marqué comme résolu. Si la situation est réglée, vous pouvez le fermer.',
+    'tkCloseBtn': 'Fermer le billet',
+    'tkConfirmClose': 'Fermer définitivement ce billet ?',
+    'tkClosed': 'Billet fermé.',
+    'tkCreated': 'Billet créé !',
+    'tkReplied': 'Message envoyé.',
+    'tkStatusChanged': 'Statut mis à jour.',
+    'tkStatusOpen': 'Ouvert',
+    'tkStatusInProgress': 'En cours',
+    'tkStatusResolved': 'Résolu',
+    'tkStatusClosed': 'Fermé',
+    'tkPrioLow': 'Basse',
+    'tkPrioNormal': 'Normale',
+    'tkPrioHigh': 'Haute',
+    'tkPrioUrgent': 'Urgente',
+    'tkCatMaintenance': 'Entretien',
+    'tkCatNoise': 'Bruit',
+    'tkCatCleanliness': 'Propreté',
+    'tkCatSecurity': 'Sécurité',
+    'tkCatBilling': 'Facturation',
+    'tkCatSuggestion': 'Suggestion',
+    'tkCatOther': 'Autre',
+    'tkErrSubject': 'Le sujet doit faire au moins 3 caractères.',
+    'tkErrDescription': 'La description ne peut pas être vide.',
+    'tkErrCreate': 'Erreur lors de la création : ',
+    'tkErrReplyEmpty': 'Le message ne peut pas être vide.',
+    'tkErrReply': 'Erreur lors de l\'envoi : ',
+    'tkErrStatus': 'Erreur lors du changement de statut : ',
+    'tkErrLoad': 'Erreur de chargement. Vérifiez que les tables <code>tickets</code> existent (migration <code>sql/005_tickets.sql</code>).',
+    'tkErrNotFound': 'Billet introuvable.',
+    'tkDemoUnavail': 'Indisponible en mode démo.',
   },
   en: {
     'Solde disponible': 'Available balance',
@@ -4071,6 +4302,64 @@ const PT = {
     'bbConfirmDelete': 'Delete this message?',
     'bbErrDelete': 'Error: ',
     'bbAuthor': 'Tenant',
+    // Tickets
+    'navTickets': 'Tickets',
+    'tkTitle': '🎫 Tickets',
+    'tkSubtitle': 'Requests handled by the concierge — track your resolution',
+    'tkNew': '+ New ticket',
+    'tkNewTitle': 'New ticket',
+    'tkSubject': 'Subject',
+    'tkCategory': 'Category',
+    'tkPriority': 'Priority',
+    'tkDescription': 'Description',
+    'tkSubmit': 'Submit',
+    'tkSend': 'Send',
+    'tkApply': 'Apply',
+    'tkChangeStatus': 'Status',
+    'tkInternal': 'Internal note',
+    'tkInternalNote': 'Internal note',
+    'tkReplyLabel': 'Reply',
+    'tkLoading': 'Loading…',
+    'tkEmpty': 'No tickets yet. Click "+ New ticket" to create one.',
+    'tkEmptyAdmin': 'No tickets to show with these filters.',
+    'tkAdminTitle': 'Tickets to handle',
+    'tkAuthor': 'Tenant',
+    'tkCreatedOn': 'Created on',
+    'tkUpdated': 'Upd.',
+    'tkFilterActive': 'Active',
+    'tkFilterAll': 'All',
+    'tkFilterAllCats': 'All categories',
+    'tkResolvedNotice': 'This ticket has been marked as resolved. You can close it if the matter is settled.',
+    'tkCloseBtn': 'Close ticket',
+    'tkConfirmClose': 'Close this ticket permanently?',
+    'tkClosed': 'Ticket closed.',
+    'tkCreated': 'Ticket created!',
+    'tkReplied': 'Message sent.',
+    'tkStatusChanged': 'Status updated.',
+    'tkStatusOpen': 'Open',
+    'tkStatusInProgress': 'In progress',
+    'tkStatusResolved': 'Resolved',
+    'tkStatusClosed': 'Closed',
+    'tkPrioLow': 'Low',
+    'tkPrioNormal': 'Normal',
+    'tkPrioHigh': 'High',
+    'tkPrioUrgent': 'Urgent',
+    'tkCatMaintenance': 'Maintenance',
+    'tkCatNoise': 'Noise',
+    'tkCatCleanliness': 'Cleanliness',
+    'tkCatSecurity': 'Security',
+    'tkCatBilling': 'Billing',
+    'tkCatSuggestion': 'Suggestion',
+    'tkCatOther': 'Other',
+    'tkErrSubject': 'Subject must be at least 3 characters.',
+    'tkErrDescription': 'Description cannot be empty.',
+    'tkErrCreate': 'Error creating ticket: ',
+    'tkErrReplyEmpty': 'Message cannot be empty.',
+    'tkErrReply': 'Error sending message: ',
+    'tkErrStatus': 'Error changing status: ',
+    'tkErrLoad': 'Load error. Make sure the <code>tickets</code> tables exist (migration <code>sql/005_tickets.sql</code>).',
+    'tkErrNotFound': 'Ticket not found.',
+    'tkDemoUnavail': 'Unavailable in demo mode.',
   },
   es: {
     'Solde disponible': 'Saldo disponible',
@@ -4133,6 +4422,64 @@ const PT = {
     'bbConfirmDelete': '¿Eliminar este mensaje?',
     'bbErrDelete': 'Error: ',
     'bbAuthor': 'Inquilino',
+    // Tickets
+    'navTickets': 'Tickets',
+    'tkTitle': '🎫 Tickets',
+    'tkSubtitle': 'Solicitudes gestionadas por el conserje — siga la resolución',
+    'tkNew': '+ Nuevo ticket',
+    'tkNewTitle': 'Nuevo ticket',
+    'tkSubject': 'Asunto',
+    'tkCategory': 'Categoría',
+    'tkPriority': 'Prioridad',
+    'tkDescription': 'Descripción',
+    'tkSubmit': 'Enviar',
+    'tkSend': 'Enviar',
+    'tkApply': 'Aplicar',
+    'tkChangeStatus': 'Estado',
+    'tkInternal': 'Nota interna',
+    'tkInternalNote': 'Nota interna',
+    'tkReplyLabel': 'Responder',
+    'tkLoading': 'Cargando…',
+    'tkEmpty': 'Aún no hay tickets. Haga clic en "+ Nuevo ticket" para crear uno.',
+    'tkEmptyAdmin': 'No hay tickets para mostrar con estos filtros.',
+    'tkAdminTitle': 'Tickets a tratar',
+    'tkAuthor': 'Inquilino',
+    'tkCreatedOn': 'Creado el',
+    'tkUpdated': 'Act.',
+    'tkFilterActive': 'Activos',
+    'tkFilterAll': 'Todos',
+    'tkFilterAllCats': 'Todas las categorías',
+    'tkResolvedNotice': 'Este ticket está marcado como resuelto. Puede cerrarlo si el asunto está resuelto.',
+    'tkCloseBtn': 'Cerrar ticket',
+    'tkConfirmClose': '¿Cerrar este ticket definitivamente?',
+    'tkClosed': 'Ticket cerrado.',
+    'tkCreated': '¡Ticket creado!',
+    'tkReplied': 'Mensaje enviado.',
+    'tkStatusChanged': 'Estado actualizado.',
+    'tkStatusOpen': 'Abierto',
+    'tkStatusInProgress': 'En curso',
+    'tkStatusResolved': 'Resuelto',
+    'tkStatusClosed': 'Cerrado',
+    'tkPrioLow': 'Baja',
+    'tkPrioNormal': 'Normal',
+    'tkPrioHigh': 'Alta',
+    'tkPrioUrgent': 'Urgente',
+    'tkCatMaintenance': 'Mantenimiento',
+    'tkCatNoise': 'Ruido',
+    'tkCatCleanliness': 'Limpieza',
+    'tkCatSecurity': 'Seguridad',
+    'tkCatBilling': 'Facturación',
+    'tkCatSuggestion': 'Sugerencia',
+    'tkCatOther': 'Otro',
+    'tkErrSubject': 'El asunto debe tener al menos 3 caracteres.',
+    'tkErrDescription': 'La descripción no puede estar vacía.',
+    'tkErrCreate': 'Error al crear: ',
+    'tkErrReplyEmpty': 'El mensaje no puede estar vacío.',
+    'tkErrReply': 'Error al enviar: ',
+    'tkErrStatus': 'Error al cambiar el estado: ',
+    'tkErrLoad': 'Error de carga. Verifique que existan las tablas <code>tickets</code> (migración <code>sql/005_tickets.sql</code>).',
+    'tkErrNotFound': 'Ticket no encontrado.',
+    'tkDemoUnavail': 'No disponible en modo demo.',
   }
 };
 
@@ -4155,6 +4502,7 @@ function ptApply() {
   if (activePage && typeof navigateTo === 'function') {
     const map = {
       'page-dashboard': 'dashboard',
+      'page-tickets': 'tickets',
       'page-spaces': 'spaces',
       'page-trips': 'trips',
       'page-transactions': 'transactions',
@@ -4217,6 +4565,7 @@ const LANGS = {
     navDashboard: 'Tableau de bord',
     navConditions: 'Conditions',
     navBabillard: '📌 Babillard',
+    navTickets: 'Billets',
     navSpaces: 'Espaces',
     navTrips: 'Auto-partage',
     navLunch: '🍱 Lunch',
@@ -4310,6 +4659,7 @@ const LANGS = {
     navDashboard: 'Dashboard',
     navConditions: 'Terms',
     navBabillard: '📌 Bulletin board',
+    navTickets: 'Tickets',
     navSpaces: 'Spaces',
     navTrips: 'Carpooling',
     navLunch: '🍱 Lunch',
@@ -4390,6 +4740,7 @@ const LANGS = {
     navDashboard: 'Tablero',
     navConditions: 'Condiciones',
     navBabillard: '📌 Tablón',
+    navTickets: 'Tickets',
     navSpaces: 'Espacios',
     navTrips: 'Coche compartido',
     navLunch: '🍱 Comida',
@@ -4495,12 +4846,15 @@ setInterval(updateClock, 10000);
 
 function buildNav() {
   const tabs = document.getElementById('nav-tabs');
-  const isAdmin = currentProfile?.role === 'admin' || currentProfile?.role === 'principal_admin';
   const role = currentProfile?.role;
+  const isAdmin = role === 'admin' || role === 'principal_admin';
+  const isConcierge = role === 'concierge';
+  const canSeeAdminMenu = isAdmin || isConcierge;
 
   let html = '';
   html += `<button class="nav-tab" onclick="navigateTo('conditions')">📋 ${t('navConditions')}</button>`;
   html += `<button class="nav-tab" onclick="navigateTo('babillard')">${t('navBabillard')}</button>`;
+  html += `<button class="nav-tab" onclick="navigateTo('tickets')">🎫 ${t('navTickets')}</button>`;
   html += `<button class="nav-tab" onclick="navigateTo('dashboard')">${t('navDashboard')}</button>`;
   html += `<button class="nav-tab" onclick="navigateTo('spaces')">${t('navSpaces')}</button>`;
   if (window.appModules.trips) html += `<button class="nav-tab" onclick="navigateTo('trips')">${t('navTrips')}</button>`;
@@ -4508,7 +4862,7 @@ function buildNav() {
   html += `<button class="nav-tab" onclick="navigateTo('transactions')">${t('navTransactions')}</button>`;
   html += `<button class="nav-tab" onclick="navigateTo('contract')">📄 Mon contrat</button>`;
   html += `<button class="nav-tab" onclick="navigateTo('profile')">👤 ${t('navProfile')}</button>`;
-  if (isAdmin) {
+  if (canSeeAdminMenu) {
     html += `<button class="nav-tab" onclick="navigateTo('admin')">${t('navAdmin')}</button>`;
   }
   tabs.innerHTML = html;
@@ -4519,13 +4873,14 @@ function buildNav() {
     const pages = [
       { key: 'conditions', label: '📋 ' + t('navConditions') },
       { key: 'babillard',    label: '📌 ' + t('navBabillard') },
+      { key: 'tickets',   label: '🎫 ' + t('navTickets') },
       { key: 'dashboard', label: '🏠 ' + t('navDashboard') },
       { key: 'spaces',    label: '🏢 ' + t('navSpaces') },
       ...(window.appModules.trips ? [{ key: 'trips', label: '🚗 ' + t('navTrips') }] : []),
       ...(window.appModules.lunch ? [{ key: 'lunch', label: '🍱 ' + t('navLunch') }] : []),
       { key: 'transactions', label: '💳 ' + t('navTransactions') },
       { key: 'profile',   label: '👤 ' + t('navProfile') },
-      ...(isAdmin ? [{ key: 'admin', label: '⚙️ ' + t('navAdmin') }] : [])
+      ...(canSeeAdminMenu ? [{ key: 'admin', label: '⚙️ ' + t('navAdmin') }] : [])
     ];
     const balanceStr = `${(currentProfile?.virtual_balance || 0).toFixed(2)} $ CAD`;
     drawer.innerHTML = `
@@ -4610,6 +4965,7 @@ function navigateTo(page) {
     case 'dashboard': loadDashboard(); break;
     case 'conditions': loadConditions(); break;
     case 'babillard': loadBabillard(); break;
+    case 'tickets': loadTickets(); break;
     case 'spaces': loadSpaces(); break;
     case 'trips': loadTrips(); break;
     case 'transactions': loadTransactions(); break;
@@ -4625,7 +4981,7 @@ function navigateTo(page) {
 }
 
 function pageName(page) {
-  const map = { conditions: 'conditions', dashboard: 'tableau', babillard: 'babillard', spaces: 'espace', trips: 'auto', transactions: 'transaction', profile: 'profil', admin: 'admin', lunch: 'lunch' };
+  const map = { conditions: 'conditions', dashboard: 'tableau', babillard: 'babillard', tickets: 'billet', spaces: 'espace', trips: 'auto', transactions: 'transaction', profile: 'profil', admin: 'admin', lunch: 'lunch' };
   return map[page] || page;
 }
 
@@ -7916,19 +8272,43 @@ async function confirmTransfer() {
 let currentAdminTab = 'tenants';
 
 async function loadAdmin() {
-  await adminTab('tenants');
+  // Le concierge n'a acces qu'a l'onglet Billets dans le menu admin.
+  const isConciergeOnly = currentProfile?.role === 'concierge';
+  // Cacher tous les autres onglets pour le concierge
+  document.querySelectorAll('#page-admin .admin-tabs .admin-tab').forEach(btn => {
+    if (btn.id === 'admin-tab-tickets') {
+      btn.style.display = '';
+    } else if (isConciergeOnly) {
+      btn.style.display = 'none';
+    } else {
+      btn.style.display = '';
+    }
+  });
+  await adminTab(isConciergeOnly ? 'tickets' : 'tenants');
 }
 
 async function adminTab(tab) {
+  // Garde-fou : un concierge ne peut acceder qu'a l'onglet Billets.
+  if (currentProfile?.role === 'concierge' && tab !== 'tickets') {
+    tab = 'tickets';
+  }
   currentAdminTab = tab;
   document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none');
   document.querySelectorAll('#page-admin .admin-tab').forEach(t => t.classList.remove('active'));
   const el = document.getElementById(`admin-${tab}`);
   if (el) el.style.display = '';
   event?.target?.classList?.add('active');
+  // Sans evenement (cas charge direct via loadAdmin), surligner l'onglet correspondant
+  if (!event?.target) {
+    const id = (tab === 'tenants') ? 'admin-tab-tenants'
+             : (tab === 'tickets') ? 'admin-tab-tickets'
+             : null;
+    if (id) document.getElementById(id)?.classList.add('active');
+  }
 
   switch(tab) {
     case 'tenants': await loadTenants(); break;
+    case 'tickets': await loadAdminTickets(); break;
     case 'demandes': await loadBuildingDemandes(); break;
     case 'spaces-admin': await loadAdminSpaces(); break;
     case 'vehicles-admin': await loadAdminVehicles(); break;
@@ -8538,6 +8918,7 @@ async function loadTenants() {
     const tid = t.id;
     const roleIcon = t.role === 'principal_admin' ? '<span title="Principal Admin" style="margin-right:6px;font-size:1rem;">⭐</span>'
                    : t.role === 'admin'           ? '<span title="Admin" style="margin-right:6px;font-size:1rem;">👑</span>'
+                   : t.role === 'concierge'       ? '<span title="Concierge" style="margin-right:6px;font-size:1rem;">🎫</span>'
                    :                                '<span title="Locataire" style="margin-right:6px;font-size:1rem;">👤</span>';
     const isCentralPending = centralPendingIds.has(t.id);
     return `
@@ -9594,7 +9975,441 @@ async function bbDeletePost(id) {
   }
 }
 
+// ==========================================
+// BILLETS (TICKETS)
+// ==========================================
+let _tkCache       = [];
+let _tkAdminCache  = [];
+let _tkOpenId      = null;
+let _tkOpenIsAdmin = false;
+
+function tkIsStaff() {
+  const r = currentProfile?.role;
+  return r === 'concierge' || r === 'admin' || r === 'principal_admin';
+}
+
+function tkCategoryLabel(cat) {
+  const map = {
+    maintenance: pt('tkCatMaintenance'),
+    noise: pt('tkCatNoise'),
+    cleanliness: pt('tkCatCleanliness'),
+    security: pt('tkCatSecurity'),
+    billing: pt('tkCatBilling'),
+    suggestion: pt('tkCatSuggestion'),
+    other: pt('tkCatOther'),
+  };
+  return map[cat] || cat;
+}
+function tkCategoryIcon(cat) {
+  const map = { maintenance:'🔧', noise:'🔊', cleanliness:'🧹', security:'🛡️', billing:'💳', suggestion:'💡', other:'❓' };
+  return map[cat] || '❓';
+}
+function tkStatusLabel(s) {
+  return ({
+    open: pt('tkStatusOpen'),
+    in_progress: pt('tkStatusInProgress'),
+    resolved: pt('tkStatusResolved'),
+    closed: pt('tkStatusClosed'),
+  })[s] || s;
+}
+function tkPriorityLabel(p) {
+  return ({
+    low: pt('tkPrioLow'),
+    normal: pt('tkPrioNormal'),
+    high: pt('tkPrioHigh'),
+    urgent: pt('tkPrioUrgent'),
+  })[p] || p;
+}
+function tkFmtDate(iso) {
+  if (!iso) return '';
+  const locale = appLang === 'fr' ? 'fr-CA' : appLang === 'es' ? 'es-ES' : 'en-CA';
+  const d = new Date(iso);
+  return d.toLocaleDateString(locale, { day:'numeric', month:'short' }) + ' ' +
+         d.toLocaleTimeString(locale, { hour:'2-digit', minute:'2-digit' });
+}
+
+async function loadTickets() {
+  const list = document.getElementById('tk-list');
+  if (!list) return;
+  list.innerHTML = '<div class="bb-empty"><div class="empty-icon">⌛</div>' + pt('tkLoading') + '</div>';
+
+  if (isDemo) {
+    _tkCache = [
+      { id:'demo-1', subject:'Fuite sous l\'évier de la cuisine', category:'maintenance', priority:'high', status:'in_progress', created_at:new Date(Date.now()-2*86400000).toISOString(), updated_at:new Date(Date.now()-3600000).toISOString(), description:'Petite fuite depuis hier, une serviette ramasse l\'eau pour le moment.' },
+      { id:'demo-2', subject:'Suggestion : ajouter un support à vélo', category:'suggestion', priority:'low', status:'open', created_at:new Date(Date.now()-6*86400000).toISOString(), updated_at:new Date(Date.now()-6*86400000).toISOString(), description:'Un second support à vélo près de l\'entrée serait utile.' },
+      { id:'demo-3', subject:'Hall non balayé', category:'cleanliness', priority:'normal', status:'resolved', created_at:new Date(Date.now()-14*86400000).toISOString(), updated_at:new Date(Date.now()-10*86400000).toISOString(), description:'' },
+    ];
+    renderTickets();
+    return;
+  }
+
+  const { data, error } = await sb
+    .from('tickets')
+    .select('id, subject, category, priority, status, created_at, updated_at, resolved_at, closed_at, description')
+    .eq('user_id', currentProfile.id)
+    .order('updated_at', { ascending: false })
+    .limit(200);
+
+  if (error) {
+    list.innerHTML = '<div class="bb-empty"><div class="empty-icon">⚠️</div>' + pt('tkErrLoad') + '</div>';
+    console.error('tickets load error:', error);
+    return;
+  }
+  _tkCache = data || [];
+  renderTickets();
+}
+
+function renderTickets() {
+  const list = document.getElementById('tk-list');
+  if (!list) return;
+  const status = document.getElementById('tk-filter-status')?.value ?? 'open_active';
+  const q = (document.getElementById('tk-filter-q')?.value || '').toLowerCase().trim();
+  let rows = _tkCache.slice();
+  if (status === 'open_active') rows = rows.filter(t => t.status === 'open' || t.status === 'in_progress');
+  else if (status) rows = rows.filter(t => t.status === status);
+  if (q) rows = rows.filter(t => (t.subject||'').toLowerCase().includes(q) || (t.description||'').toLowerCase().includes(q));
+
+  if (!rows.length) {
+    list.innerHTML = '<div class="bb-empty"><div class="empty-icon">🎫</div>' + pt('tkEmpty') + '</div>';
+    return;
+  }
+  list.innerHTML = rows.map(t => tkRenderCard(t, false)).join('');
+}
+
+function tkRenderCard(t, isAdminView) {
+  const safeSubj = escHtml(t.subject || '');
+  const preview = escHtml((t.description || '').slice(0, 180));
+  const owner = isAdminView ? (t.profiles?.full_name ? `<span>👤 ${escHtml(isDemo ? anonName(t.user_id) : t.profiles.full_name)}</span>` : '') : '';
+  return `
+    <div class="tk-card" onclick="tkOpenDetail('${t.id}', ${isAdminView ? 'true' : 'false'})">
+      <div class="tk-card-icon">${tkCategoryIcon(t.category)}</div>
+      <div class="tk-card-body">
+        <div class="tk-card-row">
+          <div class="tk-card-subject">${safeSubj}</div>
+          <span class="tk-badge tk-status-${t.status}">${escHtml(tkStatusLabel(t.status))}</span>
+        </div>
+        ${preview ? `<div class="tk-card-preview">${preview}</div>` : ''}
+        <div class="tk-card-meta">
+          <span>${escHtml(tkCategoryLabel(t.category))}</span>
+          <span class="tk-badge tk-prio-${t.priority}">${escHtml(tkPriorityLabel(t.priority))}</span>
+          ${owner}
+          <span>${pt('tkUpdated')} ${tkFmtDate(t.updated_at)}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ----- Création -----
+function tkOpenCreate() {
+  if (isDemo) { toast(pt('tkDemoUnavail'), 'info'); return; }
+  document.getElementById('tk-create-subject').value = '';
+  document.getElementById('tk-create-description').value = '';
+  document.getElementById('tk-create-category').value = 'maintenance';
+  document.getElementById('tk-create-priority').value = 'normal';
+  openModal('modal-ticket-create');
+}
+
+async function tkSubmitCreate() {
+  const subject = document.getElementById('tk-create-subject').value.trim();
+  const description = document.getElementById('tk-create-description').value.trim();
+  const category = document.getElementById('tk-create-category').value;
+  const priority = document.getElementById('tk-create-priority').value;
+  if (subject.length < 3) { toast(pt('tkErrSubject'), 'error'); return; }
+  if (!description) { toast(pt('tkErrDescription'), 'error'); return; }
+
+  const { data, error } = await sb.from('tickets').insert({
+    user_id: currentProfile.id,
+    subject, description, category, priority,
+  }).select('id').single();
+  if (error) { toast(pt('tkErrCreate') + error.message, 'error'); return; }
+  closeModal('modal-ticket-create');
+  toast(pt('tkCreated'), 'success');
+  await loadTickets();
+  if (data?.id) tkOpenDetail(data.id, false);
+}
+
+// ----- Détail -----
+async function tkOpenDetail(id, isAdminView) {
+  _tkOpenId = id;
+  _tkOpenIsAdmin = !!isAdminView;
+  const cache = isAdminView ? _tkAdminCache : _tkCache;
+  const t = cache.find(x => x.id === id);
+  if (!t) { toast(pt('tkErrNotFound'), 'error'); return; }
+
+  document.getElementById('tk-detail-title').textContent = t.subject;
+  document.getElementById('tk-detail-cat').textContent = tkCategoryIcon(t.category) + ' ' + tkCategoryLabel(t.category);
+  const statusBadge = document.getElementById('tk-detail-status');
+  statusBadge.className = 'tk-badge tk-status-' + t.status;
+  statusBadge.textContent = tkStatusLabel(t.status);
+  const prioBadge = document.getElementById('tk-detail-prio');
+  prioBadge.className = 'tk-badge tk-prio-' + t.priority;
+  prioBadge.textContent = tkPriorityLabel(t.priority);
+  const author = t.profiles?.full_name || (t.user_id === currentProfile?.id ? (currentProfile.full_name || '') : '');
+  document.getElementById('tk-detail-author').textContent = author ? '👤 ' + (isDemo ? anonName(t.user_id) : author) : '';
+  document.getElementById('tk-detail-created').textContent = pt('tkCreatedOn') + ' ' + tkFmtDate(t.created_at);
+
+  // Actions selon role
+  const isStaff = tkIsStaff();
+  const staffActions = document.getElementById('tk-detail-staff-actions');
+  staffActions.style.display = isStaff ? '' : 'none';
+  if (isStaff) {
+    document.getElementById('tk-detail-status-select').value = t.status;
+    document.getElementById('tk-detail-internal-toggle').checked = false;
+  }
+  const ownerActions = document.getElementById('tk-detail-owner-actions');
+  const isOwner = t.user_id === currentProfile?.id;
+  ownerActions.style.display = (isOwner && !isStaff && t.status === 'resolved') ? '' : 'none';
+
+  document.getElementById('tk-detail-reply').value = '';
+
+  // Description initiale comme premier message virtuel
+  const thread = document.getElementById('tk-detail-thread');
+  thread.innerHTML = `
+    <div class="tk-msg ${isOwner ? 'mine' : ''}">
+      <div class="tk-msg-head">
+        <span class="tk-msg-author">${escHtml(isDemo ? anonName(t.user_id) : (author || pt('tkAuthor')))}</span>
+        <span>${tkFmtDate(t.created_at)}</span>
+      </div>
+      ${escHtml(t.description || '')}
+    </div>
+    <div class="bb-empty" id="tk-thread-loading" style="padding:20px"><div class="empty-icon">⌛</div>${pt('tkLoading')}</div>
+  `;
+
+  openModal('modal-ticket-detail');
+
+  if (isDemo) {
+    document.getElementById('tk-thread-loading')?.remove();
+    return;
+  }
+
+  const { data: msgs, error } = await sb
+    .from('ticket_messages')
+    .select('id, user_id, body, is_internal, created_at, profiles(full_name)')
+    .eq('ticket_id', id)
+    .order('created_at', { ascending: true });
+  document.getElementById('tk-thread-loading')?.remove();
+  if (error) {
+    thread.insertAdjacentHTML('beforeend', `<div class="bb-empty"><div class="empty-icon">⚠️</div>${pt('tkErrLoad')}</div>`);
+    return;
+  }
+  (msgs || []).forEach(m => thread.insertAdjacentHTML('beforeend', tkRenderMessage(m)));
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function tkRenderMessage(m) {
+  const mine = m.user_id === currentProfile?.id;
+  const name = m.profiles?.full_name || pt('tkAuthor');
+  const display = isDemo ? anonName(m.user_id) : name;
+  return `
+    <div class="tk-msg ${mine ? 'mine' : ''} ${m.is_internal ? 'internal' : ''}">
+      <div class="tk-msg-head">
+        <span class="tk-msg-author">${escHtml(display)}${m.is_internal ? ' · 🔒 ' + pt('tkInternal') : ''}</span>
+        <span>${tkFmtDate(m.created_at)}</span>
+      </div>
+      ${escHtml(m.body || '')}
+    </div>`;
+}
+
+async function tkSubmitReply() {
+  if (isDemo) { toast(pt('tkDemoUnavail'), 'info'); return; }
+  const body = document.getElementById('tk-detail-reply').value.trim();
+  if (!body) { toast(pt('tkErrReplyEmpty'), 'error'); return; }
+  const isStaff = tkIsStaff();
+  const isInternal = isStaff && document.getElementById('tk-detail-internal-toggle').checked;
+  const { error } = await sb.from('ticket_messages').insert({
+    ticket_id: _tkOpenId,
+    user_id: currentProfile.id,
+    body,
+    is_internal: isInternal,
+  });
+  if (error) { toast(pt('tkErrReply') + error.message, 'error'); return; }
+  document.getElementById('tk-detail-reply').value = '';
+  toast(pt('tkReplied'), 'success');
+  // Recharge le fil (sans tout refermer)
+  await tkOpenDetail(_tkOpenId, _tkOpenIsAdmin);
+  // Refresh listes en arriere-plan
+  if (_tkOpenIsAdmin) loadAdminTickets(); else loadTickets();
+}
+
+async function tkChangeStatus() {
+  if (!tkIsStaff() || isDemo) return;
+  const newStatus = document.getElementById('tk-detail-status-select').value;
+  const patch = { status: newStatus };
+  // Auto-assigner au concierge si on prend en charge
+  if (newStatus === 'in_progress') patch.assigned_to = currentProfile.id;
+  const { error } = await sb.from('tickets').update(patch).eq('id', _tkOpenId);
+  if (error) { toast(pt('tkErrStatus') + error.message, 'error'); return; }
+  toast(pt('tkStatusChanged'), 'success');
+  // Mettre a jour les caches
+  [_tkCache, _tkAdminCache].forEach(arr => {
+    const t = arr.find(x => x.id === _tkOpenId);
+    if (t) t.status = newStatus;
+  });
+  await tkOpenDetail(_tkOpenId, _tkOpenIsAdmin);
+  if (_tkOpenIsAdmin) renderAdminTickets(); else renderTickets();
+  _tkRefreshBadge();
+}
+
+async function tkCloseAsOwner() {
+  if (isDemo) { toast(pt('tkDemoUnavail'), 'info'); return; }
+  if (!confirm(pt('tkConfirmClose'))) return;
+  const { error } = await sb.from('tickets').update({ status: 'closed' }).eq('id', _tkOpenId);
+  if (error) { toast(pt('tkErrStatus') + error.message, 'error'); return; }
+  toast(pt('tkClosed'), 'success');
+  closeModal('modal-ticket-detail');
+  loadTickets();
+}
+
+// ----- Vue concierge / admin -----
+async function loadAdminTickets() {
+  const list = document.getElementById('tk-admin-list');
+  if (!list) return;
+  list.innerHTML = '<div class="bb-empty"><div class="empty-icon">⌛</div>' + pt('tkLoading') + '</div>';
+  const { data, error } = await sb
+    .from('tickets')
+    .select('id, user_id, subject, category, priority, status, created_at, updated_at, description, profiles(full_name)')
+    .order('updated_at', { ascending: false })
+    .limit(500);
+  if (error) {
+    list.innerHTML = '<div class="bb-empty"><div class="empty-icon">⚠️</div>' + pt('tkErrLoad') + '</div>';
+    console.error('admin tickets load error:', error);
+    return;
+  }
+  _tkAdminCache = data || [];
+  renderAdminTickets();
+  _tkRefreshBadge();
+}
+
+function renderAdminTickets() {
+  const list = document.getElementById('tk-admin-list');
+  if (!list) return;
+  const status = document.getElementById('tk-admin-filter-status')?.value ?? 'open_active';
+  const cat    = document.getElementById('tk-admin-filter-cat')?.value || '';
+  const q      = (document.getElementById('tk-admin-filter-q')?.value || '').toLowerCase().trim();
+  let rows = _tkAdminCache.slice();
+  if (status === 'open_active') rows = rows.filter(t => t.status === 'open' || t.status === 'in_progress');
+  else if (status) rows = rows.filter(t => t.status === status);
+  if (cat) rows = rows.filter(t => t.category === cat);
+  if (q) rows = rows.filter(t => (t.subject||'').toLowerCase().includes(q) || (t.description||'').toLowerCase().includes(q) || (t.profiles?.full_name||'').toLowerCase().includes(q));
+  if (!rows.length) {
+    list.innerHTML = '<div class="bb-empty"><div class="empty-icon">🎫</div>' + pt('tkEmptyAdmin') + '</div>';
+    return;
+  }
+  list.innerHTML = rows.map(t => tkRenderCard(t, true)).join('');
+}
+
+async function _tkRefreshBadge() {
+  const badge = document.getElementById('tickets-pending-count');
+  if (!badge) return;
+  if (!tkIsStaff() || isDemo) { badge.style.display = 'none'; return; }
+  const { data, error } = await sb.rpc('count_open_tickets');
+  if (error || data == null) { badge.style.display = 'none'; return; }
+  if (data > 0) { badge.style.display = ''; badge.textContent = data; }
+  else { badge.style.display = 'none'; }
+}
+
 </script>
+
+<!-- Modal création billet -->
+<div class="modal-overlay" id="modal-ticket-create">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h3 class="modal-title" data-pt="tkNewTitle">Nouveau billet</h3>
+      <button class="btn-icon btn-secondary" onclick="closeModal('modal-ticket-create')">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+      <div class="form-group">
+        <label data-pt="tkSubject">Sujet</label>
+        <input type="text" id="tk-create-subject" maxlength="200" placeholder="Décrivez brièvement…" autocomplete="off">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group" style="margin:0">
+          <label data-pt="tkCategory">Catégorie</label>
+          <select id="tk-create-category">
+            <option value="maintenance" data-pt="tkCatMaintenance">Entretien</option>
+            <option value="noise" data-pt="tkCatNoise">Bruit</option>
+            <option value="cleanliness" data-pt="tkCatCleanliness">Propreté</option>
+            <option value="security" data-pt="tkCatSecurity">Sécurité</option>
+            <option value="billing" data-pt="tkCatBilling">Facturation</option>
+            <option value="suggestion" data-pt="tkCatSuggestion">Suggestion</option>
+            <option value="other" data-pt="tkCatOther">Autre</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label data-pt="tkPriority">Priorité</label>
+          <select id="tk-create-priority">
+            <option value="low" data-pt="tkPrioLow">Basse</option>
+            <option value="normal" selected data-pt="tkPrioNormal">Normale</option>
+            <option value="high" data-pt="tkPrioHigh">Haute</option>
+            <option value="urgent" data-pt="tkPrioUrgent">Urgente</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label data-pt="tkDescription">Description</label>
+        <textarea id="tk-create-description" rows="5" maxlength="4000" placeholder="Détaillez la situation, l'emplacement, ce que vous avez essayé…" style="resize:vertical;min-height:100px;"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal('modal-ticket-create')" data-pt="Annuler">Annuler</button>
+        <button class="btn btn-primary" style="flex:1" onclick="tkSubmitCreate()" data-pt="tkSubmit">Envoyer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal détail billet -->
+<div class="modal-overlay" id="modal-ticket-detail">
+  <div class="modal" style="max-width:720px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <div style="min-width:0;flex:1">
+        <h3 class="modal-title" id="tk-detail-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></h3>
+        <div style="font-size:12px;color:var(--text2);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <span id="tk-detail-cat"></span>
+          <span class="tk-badge" id="tk-detail-status"></span>
+          <span class="tk-badge" id="tk-detail-prio"></span>
+          <span id="tk-detail-author"></span>
+          <span id="tk-detail-created"></span>
+        </div>
+      </div>
+      <button class="btn-icon btn-secondary" onclick="closeModal('modal-ticket-detail')">✕</button>
+    </div>
+    <div style="padding:18px 20px;overflow:auto;flex:1 1 auto;">
+      <div class="tk-thread" id="tk-detail-thread"></div>
+
+      <div id="tk-detail-staff-actions" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <label style="text-transform:none;font-size:0.82rem;color:var(--text2);margin:0;" data-pt="tkChangeStatus">Statut</label>
+          <select id="tk-detail-status-select" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:0.86rem;">
+            <option value="open" data-pt="tkStatusOpen">Ouvert</option>
+            <option value="in_progress" data-pt="tkStatusInProgress">En cours</option>
+            <option value="resolved" data-pt="tkStatusResolved">Résolu</option>
+            <option value="closed" data-pt="tkStatusClosed">Fermé</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="tkChangeStatus()" data-pt="tkApply">Appliquer</button>
+          <label style="margin-left:auto;display:flex;align-items:center;gap:6px;text-transform:none;font-size:0.82rem;color:var(--text2);cursor:pointer;">
+            <input type="checkbox" id="tk-detail-internal-toggle" style="width:auto;margin:0;"> 🔒 <span data-pt="tkInternalNote">Note interne</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="tk-detail-owner-actions" style="display:none;background:rgba(110,200,140,0.10);border:1px solid rgba(110,200,140,0.30);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;font-size:0.86rem;color:var(--text2);">
+        <span data-pt="tkResolvedNotice">Ce billet est marqué comme résolu. Si la situation est réglée, vous pouvez le fermer.</span>
+        <div style="margin-top:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="tkCloseAsOwner()" data-pt="tkCloseBtn">Fermer le billet</button>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:0;">
+        <label data-pt="tkReplyLabel">Répondre</label>
+        <textarea id="tk-detail-reply" rows="3" maxlength="4000" placeholder="Votre message…" style="resize:vertical;min-height:70px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-shrink:0;display:flex;gap:8px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--border);">
+      <button class="btn btn-secondary" onclick="closeModal('modal-ticket-detail')" data-pt="Fermer">Fermer</button>
+      <button class="btn btn-primary" onclick="tkSubmitReply()" data-pt="tkSend">Envoyer</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal réinitialisation mot de passe -->
 <div id="reset-password-modal" style="
