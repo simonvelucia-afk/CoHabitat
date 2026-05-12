@@ -1786,6 +1786,24 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
 </div>
 
 <!-- Add Dependent to Trip Modal -->
+<!-- Detail candidature (Demandes admin) -->
+<div class="modal-overlay" id="modal-demande-detail">
+  <div class="modal" style="max-width:780px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <div>
+        <h3 class="modal-title" id="dem-modal-title">Candidature</h3>
+        <div id="dem-modal-sub" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-secondary btn-sm" onclick="downloadDemandePdf()">📄 PDF</button>
+        <button class="btn-icon btn-secondary" onclick="closeModal('modal-demande-detail')">✕</button>
+      </div>
+    </div>
+    <div id="dem-modal-body" style="overflow:auto;padding:20px;flex:1 1 auto;font-size:13px;line-height:1.55;"></div>
+    <div class="modal-footer" id="dem-modal-footer" style="flex-shrink:0;display:flex;gap:8px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--border);"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-add-dep-trip">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
@@ -8001,10 +8019,13 @@ function renderBuildingDemandes() {
       ? `<span class="badge ${_demScoreClass(c.score_category)}">${c.score_total}/100${c.score_category ? ' · ' + _demScoreLabel(c.score_category) : ''}</span>`
       : '<span style="color:var(--text3)">—</span>';
     const isOpen = c.status === 'recu' || c.status === 'en_evaluation';
-    const actions = isOpen
-      ? `<button class="btn btn-success btn-sm" onclick="approveBuildingDemande('${c.id}')">✓ Approuver</button>
-         <button class="btn btn-danger btn-sm" onclick="rejectBuildingDemande('${c.id}')">✕ Refuser</button>`
-      : `<span style="font-size:11px;color:var(--text3);">${c.decision_at ? 'Décidée le ' + new Date(c.decision_at).toLocaleDateString('fr-CA') : '—'}</span>`;
+    const decisionTxt = c.decision_at ? '<span style="font-size:11px;color:var(--text3);display:block;margin-top:4px;">Décidée le ' + new Date(c.decision_at).toLocaleDateString('fr-CA') + '</span>' : '';
+    const actions = `
+      <button class="btn btn-secondary btn-sm" onclick="openDemandeDetail('${c.id}')">👁 Voir</button>
+      ${isOpen ? `<button class="btn btn-success btn-sm" onclick="approveBuildingDemande('${c.id}')">✓ Approuver</button>
+                  <button class="btn btn-danger btn-sm" onclick="rejectBuildingDemande('${c.id}')">✕ Refuser</button>` : ''}
+      ${!isOpen ? decisionTxt : ''}
+    `;
     return `<tr>
       <td><strong>${escHtml((c.applicant_name || '').trim() || '—')}</strong>${phone}</td>
       <td style="font-size:12px;">${escHtml(c.applicant_email || '—')}</td>
@@ -8090,6 +8111,242 @@ async function _decideBuildingDemande(id, decision, successMsg) {
   }
   toast(successMsg, 'success');
   loadBuildingDemandes();
+}
+
+// --- Detail candidature : modal de consultation + export PDF -----
+// Le formulaire /postuler/ pose des champs nommes (cf. postuler/index.html
+// dans modulimo-home). On les regroupe en sections pour un affichage
+// lisible et pour que l'export PDF reflete fidelement la candidature.
+const DEMANDE_FIELD_MAP = [
+  { title: 'Identité du demandeur principal', fields: [
+    ['last_name', 'Nom'], ['first_name', 'Prénom'], ['email', 'Courriel'],
+    ['phone_cell', 'Téléphone (cell.)'], ['phone_day', 'Téléphone (jour)'],
+    ['birth_year', 'Année de naissance'], ['status_canada', 'Statut au Canada']
+  ]},
+  { title: 'Co-demandeur', fields: [
+    ['co_name', 'Nom complet'], ['co_relation', 'Lien'],
+    ['co_email', 'Courriel'], ['co_phone', 'Téléphone']
+  ]},
+  { title: 'Occupants', fields: [
+    ['adults', 'Adultes'], ['children', 'Enfants'],
+    ['child_ages', 'Âges des enfants'], ['pets', 'Animaux']
+  ]},
+  { title: 'Logement actuel', fields: [
+    ['current_address', 'Adresse'], ['current_since', 'Depuis'],
+    ['current_rent', 'Loyer actuel ($)'], ['current_tenancy', 'Statut'],
+    ['current_landlord', 'Propriétaire'], ['current_landlord_phone', 'Tél. propriétaire'],
+    ['move_reason', 'Raison du déménagement']
+  ]},
+  { title: 'Emploi / finances — demandeur', fields: [
+    ['employer', 'Employeur'], ['position', 'Poste'],
+    ['employment_since', 'En poste depuis'], ['employment_type', "Type d'emploi"],
+    ['annual_income', 'Revenu annuel ($)'], ['employer_phone', 'Tél. employeur']
+  ]},
+  { title: 'Emploi / finances — co-demandeur', fields: [
+    ['co_employer', 'Employeur co-dem.'], ['co_income', 'Revenu annuel co-dem. ($)']
+  ]},
+  { title: 'Logement convoité', fields: [
+    ['target_rent', 'Loyer cible ($)'], ['move_in_date', "Date d'occupation souhaitée"]
+  ]},
+  { title: 'Référence 1', fields: [
+    ['ref1_name', 'Nom'], ['ref1_relation', 'Lien'],
+    ['ref1_phone', 'Téléphone'], ['ref1_email', 'Courriel']
+  ]},
+  { title: 'Référence 2', fields: [
+    ['ref2_name', 'Nom'], ['ref2_relation', 'Lien'],
+    ['ref2_phone', 'Téléphone'], ['ref2_email', 'Courriel']
+  ]},
+  { title: 'Vie avec CoHabitat', fields: [
+    ['digital_comfort', 'Aisance numérique (1-5)'],
+    ['payment_pref', 'Mode de paiement préféré'],
+    ['comm_pref', 'Communication préférée'],
+    ['ch_salle_commune', 'Salles communes'], ['ch_autopartage', 'Auto-partage'],
+    ['ch_babillard', 'Babillard'], ['ch_atelier', 'Atelier partagé'],
+    ['ch_reseau', 'Services réseau Modulimo'], ['ch_evenements', 'Participer aux événements']
+  ]},
+  { title: 'Valeurs — Environnement', fields: [
+    ['eco_importance', 'Importance (1-5)'],
+    ['eco_recyclage', 'Tri / recyclage'], ['eco_compost', 'Compostage'],
+    ['eco_transport', 'Transport collectif/vélo/marche'], ['eco_ve', 'Véhicule électrique/hybride'],
+    ['eco_local', 'Achats locaux'], ['eco_economie', 'Économie eau/énergie'],
+    ['eco_jardinage', 'Jardinage / agriculture urbaine'],
+    ['eco_motivation', 'Habitude écologique fière (libre)']
+  ]},
+  { title: 'Valeurs — Sécurité', fields: [
+    ['sec_importance', 'Importance (1-5)'],
+    ['sec_cameras', 'Position sur caméras communes'],
+    ['sec_behavior', 'Verrouillage / signalements (1-5)']
+  ]},
+  { title: 'Valeurs — Innovation', fields: [
+    ['inn_openness', 'Ouverture (1-5)'],
+    ['inn_mobilite', 'Mobilité partagée'], ['inn_iot', 'Maison intelligente / IoT'],
+    ['inn_agriculture', 'Agriculture urbaine'], ['inn_energie', 'Énergies renouvelables'],
+    ['inn_communaute', "Nouveaux modèles d'habitation"], ['inn_diy', 'Bricolage / fab labs'],
+    ['inn_idea', 'Idée / projet à proposer (libre)']
+  ]},
+  { title: 'Déclarations', fields: [
+    ['dec_tal', 'Procédure TAL antérieure'],
+    ['dec_eviction', 'Déjà expulsé(e) ?'],
+    ['dec_bankruptcy', 'Faillite / proposition'],
+    ['dec_lawsuit', 'Poursuites en cours'],
+    ['dec_explain', 'Explications (si Oui)']
+  ]},
+  { title: 'Consentements (Loi 25)', fields: [
+    ['consent_credit', 'Vérification crédit (Equifax/TransUnion)'],
+    ['consent_employer', 'Communication avec employeur'],
+    ['consent_landlord', 'Communication avec propriétaire(s)'],
+    ['consent_references', 'Communication avec références'],
+    ['consent_automated', 'Évaluation assistée par traitement automatisé']
+  ]},
+  { title: 'Déclaration finale', fields: [
+    ['declaration_truthful', 'Renseignements véridiques']
+  ]}
+];
+
+let currentDemandeDetail = null;
+
+function _demFmtVal(v) {
+  if (v === undefined || v === null || v === '') return '—';
+  if (v === true || v === 'true' || v === 'on') return 'Oui';
+  if (v === false || v === 'false') return 'Non';
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
+  return String(v);
+}
+
+function openDemandeDetail(id) {
+  const c = buildingDemandesCache.find(x => x.id === id);
+  if (!c) { toast('Candidature introuvable', 'error'); return; }
+  currentDemandeDetail = c;
+  const fd = c.form_data || {};
+  const name = (c.applicant_name || '').trim() || c.applicant_email || 'Candidature';
+
+  document.getElementById('dem-modal-title').textContent = name;
+  const subBits = [
+    'Reçue le ' + new Date(c.created_at).toLocaleDateString('fr-CA'),
+    c.applicant_email,
+    c.score_total != null ? `Score ${c.score_total}/100${c.score_category ? ' · ' + _demScoreLabel(c.score_category) : ''}` : null,
+    c.status ? 'Statut : ' + (_demStatusLabel(c.status)) : null
+  ].filter(Boolean);
+  document.getElementById('dem-modal-sub').innerHTML = subBits.map(escHtml).join(' · ');
+
+  const seenKeys = new Set();
+  let html = '';
+  for (const sec of DEMANDE_FIELD_MAP) {
+    const rows = sec.fields.map(([k, label]) => {
+      seenKeys.add(k);
+      const val = fd[k];
+      const empty = val === undefined || val === null || val === '';
+      return `<tr>
+        <td style="padding:6px 10px;color:var(--text2);width:42%;border-bottom:1px solid var(--border);vertical-align:top;">${escHtml(label)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid var(--border);${empty?'color:var(--text3);':''}">${escHtml(_demFmtVal(val))}</td>
+      </tr>`;
+    }).join('');
+    html += `<div style="margin-bottom:18px;">
+      <div style="font-weight:600;color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">${escHtml(sec.title)}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;">${rows}</table>
+    </div>`;
+  }
+
+  // Champs supplementaires inattendus (au cas ou le formulaire ajouterait des champs)
+  const extras = Object.keys(fd).filter(k => !seenKeys.has(k));
+  if (extras.length) {
+    const rows = extras.map(k => `<tr>
+      <td style="padding:6px 10px;color:var(--text2);width:42%;border-bottom:1px solid var(--border);vertical-align:top;"><code>${escHtml(k)}</code></td>
+      <td style="padding:6px 10px;border-bottom:1px solid var(--border);">${escHtml(_demFmtVal(fd[k]))}</td>
+    </tr>`).join('');
+    html += `<div style="margin-bottom:18px;">
+      <div style="font-weight:600;color:var(--text3);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Autres champs</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;">${rows}</table>
+    </div>`;
+  }
+
+  document.getElementById('dem-modal-body').innerHTML = html;
+
+  const isOpen = c.status === 'recu' || c.status === 'en_evaluation';
+  document.getElementById('dem-modal-footer').innerHTML = isOpen
+    ? `<button class="btn btn-success" onclick="closeModal('modal-demande-detail');approveBuildingDemande('${c.id}')">✓ Approuver</button>
+       <button class="btn btn-danger"  onclick="closeModal('modal-demande-detail');rejectBuildingDemande('${c.id}')">✕ Refuser</button>`
+    : `<button class="btn btn-secondary" onclick="closeModal('modal-demande-detail')">Fermer</button>`;
+
+  openModal('modal-demande-detail');
+}
+
+function _demStatusLabel(s) {
+  return ({recu:'Reçue', en_evaluation:'En évaluation', accepte:'Acceptée', refuse:'Refusée', retire:'Retirée', expire:'Expirée'})[s] || s || '—';
+}
+
+function downloadDemandePdf() {
+  const c = currentDemandeDetail;
+  if (!c) { toast('Aucune candidature ouverte', 'error'); return; }
+  if (!window.jspdf || !window.jspdf.jsPDF) { toast('Librairie PDF non chargée', 'error'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'letter' });
+
+  const fd = c.form_data || {};
+  const name = (c.applicant_name || '').trim() || c.applicant_email || 'Candidature';
+
+  // Logo Modulimo en haut a droite (helper deja defini ailleurs dans index.html)
+  if (typeof _getModulimoLogoDataURL === 'function') {
+    try {
+      const logo = _getModulimoLogoDataURL();
+      if (logo) doc.addImage(logo, 'JPEG', 470, 28, 102, 44);
+    } catch(e) { /* logo facultatif */ }
+  }
+
+  doc.setFontSize(16); doc.setTextColor(40);
+  doc.text('Candidature de location', 40, 50);
+  doc.setFontSize(11); doc.setTextColor(60);
+  doc.text(name, 40, 70);
+  doc.setFontSize(9); doc.setTextColor(110);
+  const sub = [
+    'Reçue le ' + new Date(c.created_at).toLocaleString('fr-CA'),
+    c.applicant_email || '',
+    c.score_total != null ? `Score ${c.score_total}/100${c.score_category ? ' (' + _demScoreLabel(c.score_category) + ')' : ''}` : '',
+    'Statut : ' + _demStatusLabel(c.status)
+  ].filter(Boolean).join(' · ');
+  doc.text(sub, 40, 86);
+  doc.text('Archivé le ' + new Date().toLocaleString('fr-CA'), 40, 100);
+
+  let y = 120;
+  const seenKeys = new Set();
+  for (const sec of DEMANDE_FIELD_MAP) {
+    const body = sec.fields.map(([k, label]) => { seenKeys.add(k); return [label, _demFmtVal(fd[k])]; });
+    doc.autoTable({
+      startY: y,
+      head: [[{ content: sec.title, colSpan: 2, styles: { fillColor:[45,90,74], textColor:255, fontStyle:'bold' } }]],
+      body,
+      styles: { fontSize: 9, cellPadding: 4, valign:'top' },
+      columnStyles: { 0: { cellWidth: 200, textColor:[80,80,80] }, 1: { cellWidth: 'auto' } },
+      margin: { left: 40, right: 40 },
+      theme: 'grid'
+    });
+    y = (doc.lastAutoTable?.finalY || y) + 14;
+  }
+
+  const extras = Object.keys(fd).filter(k => !seenKeys.has(k));
+  if (extras.length) {
+    doc.autoTable({
+      startY: y,
+      head: [[{ content: 'Autres champs', colSpan: 2, styles: { fillColor:[110,110,110], textColor:255, fontStyle:'bold' } }]],
+      body: extras.map(k => [k, _demFmtVal(fd[k])]),
+      styles: { fontSize: 9, cellPadding: 4 },
+      columnStyles: { 0: { cellWidth: 200, textColor:[80,80,80] }, 1: { cellWidth: 'auto' } },
+      margin: { left: 40, right: 40 },
+      theme: 'grid'
+    });
+  }
+
+  // Pied de page sur chaque page
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(150);
+    doc.text(`Modulimo · CoHabitat — Candidature ${c.id}`, 40, 760);
+    doc.text(`Page ${i} / ${pages}`, 540, 760, { align:'right' });
+  }
+
+  const slug = name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'candidature';
+  doc.save(`Modulimo-candidature-${slug}-${new Date().toISOString().slice(0,10)}.pdf`);
 }
 
 // --- Demandes de suppression ---
