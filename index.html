@@ -1464,6 +1464,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
       </div>
       <div class="admin-tabs">
         <button class="admin-tab active" onclick="adminTab('tenants')" data-pt="Locataires">Locataires</button>
+        <button class="admin-tab" id="demandes-tab" onclick="adminTab('demandes')" data-pt="Demandes">📋 Demandes <span id="demandes-pending-count" class="badge badge-yellow" style="display:none;font-size:10px;margin-left:4px;padding:1px 6px;"></span></button>
         <button class="admin-tab" onclick="adminTab('spaces-admin')" data-pt="Espaces">Espaces</button>
         <button class="admin-tab" onclick="adminTab('vehicles-admin')" data-pt="Véhicules">Véhicules</button>
         <button class="admin-tab" onclick="adminTab('payments')" data-pt="Paiements">Paiements</button>
@@ -1485,6 +1486,42 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
               <th>Nom</th><th>Unité</th><th>Rôle</th><th>Chauffeur</th><th>Forfait</th><th>Solde</th><th>Actions</th>
             </tr></thead>
             <tbody id="tenants-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Demandes (candidatures locataires de l'immeuble) -->
+      <div id="admin-demandes" class="admin-section" style="display:none">
+        <div class="section-header">
+          <div class="section-title"><h3 style="font-size:1.1rem">Demandes de location pour cet immeuble</h3></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="demandes-status-filter" onchange="renderBuildingDemandes()" style="padding:6px 10px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:13px;">
+              <option value="ouvertes" selected>À traiter</option>
+              <option value="">Toutes</option>
+              <option value="recu">Reçues</option>
+              <option value="en_evaluation">En évaluation</option>
+              <option value="accepte">Acceptées</option>
+              <option value="refuse">Refusées</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="loadBuildingDemandes()">↻</button>
+          </div>
+        </div>
+        <div id="demandes-empty-hint" style="display:none;color:var(--text2);font-size:13px;padding:12px 16px;background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.25);border-radius:8px;margin-bottom:16px;">
+          Aucun <code>building_id</code> configuré dans <strong>Paramètres → system_settings</strong>. Les candidatures de la page <code>/postuler/</code> sont rattachées à un immeuble — sans cette clé, elles ne peuvent pas être affichées ici.
+        </div>
+        <div class="table-container">
+          <table>
+            <thead><tr>
+              <th>Candidat</th>
+              <th>Courriel</th>
+              <th style="text-align:right">Loyer cible</th>
+              <th style="text-align:right">Revenu annuel</th>
+              <th>Score</th>
+              <th>Statut</th>
+              <th>Reçue le</th>
+              <th>Actions</th>
+            </tr></thead>
+            <tbody id="demandes-tbody-cohab"><tr><td colspan="8" style="text-align:center;color:var(--text3)">Chargement…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -7874,6 +7911,7 @@ async function adminTab(tab) {
 
   switch(tab) {
     case 'tenants': await loadTenants(); break;
+    case 'demandes': await loadBuildingDemandes(); break;
     case 'spaces-admin': await loadAdminSpaces(); break;
     case 'vehicles-admin': await loadAdminVehicles(); break;
     case 'payments': await loadAdminPayments(); break;
@@ -7882,6 +7920,176 @@ async function adminTab(tab) {
     case 'deletions': await loadDeletionRequests(); break;
     case 'stats': await loadStats(); break;
   }
+}
+
+// --- Demandes de location (candidatures) ---
+// Lit/decide via les RPC publiques exposees par modulimo central
+// (sql/024_candidatures_building_management.sql). Le scoping est fait
+// par building_id (cle "building_id" de system_settings) — chaque
+// CoHabitat ne voit et ne decide que pour son propre immeuble.
+let buildingDemandesCache = [];
+let buildingIdCache = null;
+
+async function _getBuildingId() {
+  if (buildingIdCache) return buildingIdCache;
+  try {
+    const { data } = await sb.from('system_settings').select('value').eq('key', 'building_id').maybeSingle();
+    buildingIdCache = data?.value || null;
+  } catch (e) { buildingIdCache = null; }
+  return buildingIdCache;
+}
+
+async function loadBuildingDemandes() {
+  const tbody = document.getElementById('demandes-tbody-cohab');
+  const hint  = document.getElementById('demandes-empty-hint');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text3)">Chargement…</td></tr>';
+  hint.style.display = 'none';
+
+  const buildingId = await _getBuildingId();
+  if (!buildingId) {
+    hint.style.display = '';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px;">—</td></tr>';
+    _updateDemandesPendingBadge(0);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${CENTRAL_URL}/rest/v1/rpc/list_candidatures_for_building`, {
+      method: 'POST',
+      headers: {
+        'apikey': CENTRAL_KEY,
+        'Authorization': 'Bearer ' + CENTRAL_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ p_building_id: buildingId })
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error('HTTP ' + res.status + ' — ' + txt);
+    }
+    buildingDemandesCache = await res.json();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--accent3);padding:18px;">Erreur de chargement : ${escHtml(e.message)}</td></tr>`;
+    return;
+  }
+
+  renderBuildingDemandes();
+}
+
+function renderBuildingDemandes() {
+  const tbody = document.getElementById('demandes-tbody-cohab');
+  const statusFilter = document.getElementById('demandes-status-filter')?.value ?? 'ouvertes';
+
+  const rows = (buildingDemandesCache || []).filter(c => {
+    if (statusFilter === 'ouvertes') return c.status === 'recu' || c.status === 'en_evaluation';
+    if (statusFilter && c.status !== statusFilter) return false;
+    return true;
+  });
+
+  const pending = (buildingDemandesCache || []).filter(c => c.status === 'recu' || c.status === 'en_evaluation').length;
+  _updateDemandesPendingBadge(pending);
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px;">Aucune demande</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(c => {
+    const fd = c.form_data || {};
+    const phone = fd.phone ? `<br><span style="font-size:11px;color:var(--text3);">${escHtml(fd.phone)}</span>` : '';
+    const score = c.score_total != null
+      ? `<span class="badge ${_demScoreClass(c.score_category)}">${c.score_total}/100${c.score_category ? ' · ' + _demScoreLabel(c.score_category) : ''}</span>`
+      : '<span style="color:var(--text3)">—</span>';
+    const isOpen = c.status === 'recu' || c.status === 'en_evaluation';
+    const actions = isOpen
+      ? `<button class="btn btn-success btn-sm" onclick="approveBuildingDemande('${c.id}')">✓ Approuver</button>
+         <button class="btn btn-danger btn-sm" onclick="rejectBuildingDemande('${c.id}')">✕ Refuser</button>`
+      : `<span style="font-size:11px;color:var(--text3);">${c.decision_at ? 'Décidée le ' + new Date(c.decision_at).toLocaleDateString('fr-CA') : '—'}</span>`;
+    return `<tr>
+      <td><strong>${escHtml((c.applicant_name || '').trim() || '—')}</strong>${phone}</td>
+      <td style="font-size:12px;">${escHtml(c.applicant_email || '—')}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;">${c.target_rent != null ? Number(c.target_rent).toFixed(0) + ' $' : '—'}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;">${c.annual_income ? Number(c.annual_income).toLocaleString('fr-CA') + ' $' : '—'}</td>
+      <td>${score}</td>
+      <td>${_demStatusBadge(c.status)}</td>
+      <td style="font-size:12px;">${new Date(c.created_at).toLocaleDateString('fr-CA')}</td>
+      <td class="td-actions">${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+function _updateDemandesPendingBadge(n) {
+  const el = document.getElementById('demandes-pending-count');
+  if (!el) return;
+  if (n > 0) { el.textContent = String(n); el.style.display = ''; }
+  else { el.style.display = 'none'; }
+}
+
+function _demScoreClass(cat) {
+  if (cat === 'excellent' || cat === 'bon') return 'badge-green';
+  if (cat === 'a_evaluer') return 'badge-yellow';
+  if (cat === 'a_risque') return 'badge-red';
+  return 'badge-gray';
+}
+function _demScoreLabel(cat) {
+  return { excellent: 'Excellent', bon: 'Bon', a_evaluer: 'À évaluer', a_risque: 'À risque' }[cat] || cat;
+}
+function _demStatusBadge(status) {
+  const map = {
+    recu:          ['badge-yellow', 'Reçue'],
+    en_evaluation: ['badge-yellow', 'En évaluation'],
+    accepte:       ['badge-green',  'Acceptée'],
+    refuse:        ['badge-red',    'Refusée'],
+    retire:        ['badge-gray',   'Retirée'],
+    expire:        ['badge-gray',   'Expirée']
+  };
+  const [cls, lbl] = map[status] || ['badge-gray', status || '—'];
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+
+async function approveBuildingDemande(id) {
+  const c = buildingDemandesCache.find(x => x.id === id);
+  if (!c) { toast('Candidature introuvable', 'error'); return; }
+  const who = (c.applicant_name || '').trim() || c.applicant_email || 'ce candidat';
+  if (!confirm('Approuver la candidature de ' + who + ' ?')) return;
+  await _decideBuildingDemande(id, 'accepte', 'Candidature approuvée ✓');
+}
+
+async function rejectBuildingDemande(id) {
+  const c = buildingDemandesCache.find(x => x.id === id);
+  if (!c) { toast('Candidature introuvable', 'error'); return; }
+  const who = (c.applicant_name || '').trim() || c.applicant_email || 'ce candidat';
+  if (!confirm('Refuser la candidature de ' + who + ' ?')) return;
+  await _decideBuildingDemande(id, 'refuse', 'Candidature refusée');
+}
+
+async function _decideBuildingDemande(id, decision, successMsg) {
+  const buildingId = await _getBuildingId();
+  if (!buildingId) { toast('building_id manquant dans system_settings', 'error'); return; }
+  try {
+    const res = await fetch(`${CENTRAL_URL}/rest/v1/rpc/decide_candidature_for_building`, {
+      method: 'POST',
+      headers: {
+        'apikey': CENTRAL_KEY,
+        'Authorization': 'Bearer ' + CENTRAL_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        p_candidature_id: id,
+        p_decision: decision,
+        p_building_id: buildingId
+      })
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error('HTTP ' + res.status + ' — ' + txt);
+    }
+  } catch (e) {
+    toast('Erreur: ' + e.message, 'error');
+    return;
+  }
+  toast(successMsg, 'success');
+  loadBuildingDemandes();
 }
 
 // --- Demandes de suppression ---
