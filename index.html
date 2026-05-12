@@ -10267,7 +10267,7 @@ async function loadAdminTickets() {
   list.innerHTML = '<div class="bb-empty"><div class="empty-icon">⌛</div>' + pt('tkLoading') + '</div>';
   const { data, error } = await sb
     .from('tickets')
-    .select('id, user_id, subject, category, priority, status, created_at, updated_at, description, profiles!tickets_user_id_fkey(full_name)')
+    .select('id, user_id, subject, category, priority, status, created_at, updated_at, description, profiles!user_id(full_name)')
     .order('updated_at', { ascending: false })
     .limit(500);
   if (error) {
