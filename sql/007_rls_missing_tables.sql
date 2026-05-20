@@ -38,11 +38,11 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'bulletin_board' AND policyname = 'bb_select'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY bb_select ON bulletin_board
           FOR SELECT TO authenticated
           USING (TRUE)
-      $$;
+      $pol$;
     END IF;
 
     -- Un resident ne peut publier que pour lui-meme.
@@ -50,11 +50,11 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'bulletin_board' AND policyname = 'bb_insert'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY bb_insert ON bulletin_board
           FOR INSERT TO authenticated
           WITH CHECK (user_id = auth.uid())
-      $$;
+      $pol$;
     END IF;
 
     -- Le proprietaire du message ou un admin peut le supprimer.
@@ -62,7 +62,7 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'bulletin_board' AND policyname = 'bb_delete'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY bb_delete ON bulletin_board
           FOR DELETE TO authenticated
           USING (
@@ -70,10 +70,10 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
-      $$;
+      $pol$;
     END IF;
 
     RAISE NOTICE 'RLS active sur bulletin_board';
@@ -86,8 +86,6 @@ END $do_bb$;
 -- ============================================================
 -- 2) passenger_requests
 --    Demandes de covoiturage publiees par les passagers.
---    Tous les conducteurs approuves peuvent voir les demandes
---    ouvertes ; le demandeur gere les siennes.
 --    Colonnes attendues : id UUID, requester_id UUID -> profiles(id),
 --    departure_point TEXT, destination TEXT, desired_datetime TIMESTAMPTZ,
 --    seats_requested INT, luggage_ft3 NUMERIC, status TEXT,
@@ -110,19 +108,19 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'passenger_requests' AND policyname = 'pr_select'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY pr_select ON passenger_requests
           FOR SELECT TO authenticated
           USING (
-            status = ''open''
+            status = 'open'
             OR requester_id = auth.uid()
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
-      $$;
+      $pol$;
     END IF;
 
     -- Chaque resident cree ses propres demandes.
@@ -130,11 +128,11 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'passenger_requests' AND policyname = 'pr_insert'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY pr_insert ON passenger_requests
           FOR INSERT TO authenticated
           WITH CHECK (requester_id = auth.uid())
-      $$;
+      $pol$;
     END IF;
 
     -- Le demandeur peut modifier/annuler sa propre demande ; admins aussi.
@@ -142,7 +140,7 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'passenger_requests' AND policyname = 'pr_update'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY pr_update ON passenger_requests
           FOR UPDATE TO authenticated
           USING (
@@ -150,10 +148,10 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
-      $$;
+      $pol$;
     END IF;
 
     -- Le demandeur peut supprimer sa propre demande ; admins aussi.
@@ -161,7 +159,7 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'passenger_requests' AND policyname = 'pr_delete'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY pr_delete ON passenger_requests
           FOR DELETE TO authenticated
           USING (
@@ -169,10 +167,10 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
-      $$;
+      $pol$;
     END IF;
 
     RAISE NOTICE 'RLS active sur passenger_requests';
@@ -186,9 +184,9 @@ END $do_pr$;
 -- 3) driver_offers
 --    Propositions de covoiturage faites par des conducteurs
 --    en reponse a une passenger_request.
---    Colonnes attendues : id UUID, request_id UUID -> passenger_requests(id),
---    driver_id UUID -> profiles(id), driver_name TEXT, vehicle_id UUID,
---    luggage_accepted_ft3 NUMERIC, message TEXT.
+--    Colonnes attendues : id UUID, request_id UUID,
+--    driver_id UUID -> profiles(id), driver_name TEXT,
+--    vehicle_id UUID, luggage_accepted_ft3 NUMERIC, message TEXT.
 -- ============================================================
 DO $do_do$
 BEGIN
@@ -201,13 +199,13 @@ BEGIN
     EXECUTE 'ALTER TABLE driver_offers ENABLE ROW LEVEL SECURITY';
 
     -- Le chauffeur voit ses propres offres.
-    -- Le passager voit les offres pour ses propres demandes.
+    -- Le passager voit les offres sur ses propres demandes.
     -- Les admins voient tout.
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE tablename = 'driver_offers' AND policyname = 'do_select'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY do_select ON driver_offers
           FOR SELECT TO authenticated
           USING (
@@ -220,10 +218,10 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
-      $$;
+      $pol$;
     END IF;
 
     -- Seuls les conducteurs approuves peuvent publier une offre pour eux-memes.
@@ -231,7 +229,7 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'driver_offers' AND policyname = 'do_insert'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY do_insert ON driver_offers
           FOR INSERT TO authenticated
           WITH CHECK (
@@ -242,7 +240,7 @@ BEGIN
                 AND p.is_approved_driver = TRUE
             )
           )
-      $$;
+      $pol$;
     END IF;
 
     -- Le chauffeur peut modifier sa propre offre.
@@ -250,7 +248,7 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'driver_offers' AND policyname = 'do_update'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY do_update ON driver_offers
           FOR UPDATE TO authenticated
           USING (
@@ -258,10 +256,10 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
-      $$;
+      $pol$;
     END IF;
 
     -- Le chauffeur peut retirer sa propre offre ; admins aussi.
@@ -269,7 +267,7 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'driver_offers' AND policyname = 'do_delete'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY do_delete ON driver_offers
           FOR DELETE TO authenticated
           USING (
@@ -277,10 +275,10 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
-      $$;
+      $pol$;
     END IF;
 
     RAISE NOTICE 'RLS active sur driver_offers';
@@ -317,7 +315,7 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'resource_access' AND policyname = 'ra_select'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY ra_select ON resource_access
           FOR SELECT TO authenticated
           USING (
@@ -330,10 +328,10 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
-      $$;
+      $pol$;
     END IF;
 
     -- Les admins accordent l'acces a un resident.
@@ -342,14 +340,14 @@ BEGIN
       SELECT 1 FROM pg_policies
       WHERE tablename = 'resource_access' AND policyname = 'ra_insert'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY ra_insert ON resource_access
           FOR INSERT TO authenticated
           WITH CHECK (
             EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
             OR (
               dependent_id IS NOT NULL
@@ -360,23 +358,23 @@ BEGIN
               )
             )
           )
-      $$;
+      $pol$;
     END IF;
 
-    -- Les admins revoques l'acces a un resident.
-    -- Un parent peut revoquer l'acces a ses propres dependants.
+    -- Les admins revoquent l'acces d'un resident.
+    -- Un parent peut revoquer l'acces de ses propres dependants.
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE tablename = 'resource_access' AND policyname = 'ra_delete'
     ) THEN
-      EXECUTE $$
+      EXECUTE $pol$
         CREATE POLICY ra_delete ON resource_access
           FOR DELETE TO authenticated
           USING (
             EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
             OR (
               dependent_id IS NOT NULL
@@ -387,7 +385,7 @@ BEGIN
               )
             )
           )
-      $$;
+      $pol$;
     END IF;
 
     RAISE NOTICE 'RLS active sur resource_access';
@@ -399,9 +397,8 @@ END $do_ra$;
 
 -- ============================================================
 -- 5) stats_spaces / stats_tenants / stats_vehicles
---    Tables de statistiques admin (si ce sont des BASE TABLEs
---    et non des vues). Les vues sont ignorees automatiquement
---    grace au filtre table_type = 'BASE TABLE'.
+--    Tables de statistiques admin (ignorees si ce sont des vues
+--    grace au filtre table_type = 'BASE TABLE').
 -- ============================================================
 DO $do_stats$
 DECLARE
@@ -422,15 +419,15 @@ BEGIN
         WHERE tablename = v_tbl AND policyname = v_tbl || '_admin_select'
       ) THEN
         EXECUTE format(
-          $$CREATE POLICY %I ON %I
+          $fmt$CREATE POLICY %I ON %I
             FOR SELECT TO authenticated
             USING (
               EXISTS (
                 SELECT 1 FROM profiles p
                 WHERE p.id = auth.uid()
-                  AND p.role IN (''principal_admin'', ''admin'')
+                  AND p.role IN ('principal_admin', 'admin')
               )
-            )$$,
+            )$fmt$,
           v_tbl || '_admin_select', v_tbl
         );
       END IF;
@@ -455,20 +452,20 @@ COMMIT;
 -- ALTER TABLE driver_offers       DISABLE ROW LEVEL SECURITY;
 -- ALTER TABLE resource_access     DISABLE ROW LEVEL SECURITY;
 --
--- DROP POLICY IF EXISTS bb_select                ON bulletin_board;
--- DROP POLICY IF EXISTS bb_insert                ON bulletin_board;
--- DROP POLICY IF EXISTS bb_delete                ON bulletin_board;
+-- DROP POLICY IF EXISTS bb_select   ON bulletin_board;
+-- DROP POLICY IF EXISTS bb_insert   ON bulletin_board;
+-- DROP POLICY IF EXISTS bb_delete   ON bulletin_board;
 --
--- DROP POLICY IF EXISTS pr_select                ON passenger_requests;
--- DROP POLICY IF EXISTS pr_insert                ON passenger_requests;
--- DROP POLICY IF EXISTS pr_update                ON passenger_requests;
--- DROP POLICY IF EXISTS pr_delete                ON passenger_requests;
+-- DROP POLICY IF EXISTS pr_select   ON passenger_requests;
+-- DROP POLICY IF EXISTS pr_insert   ON passenger_requests;
+-- DROP POLICY IF EXISTS pr_update   ON passenger_requests;
+-- DROP POLICY IF EXISTS pr_delete   ON passenger_requests;
 --
--- DROP POLICY IF EXISTS do_select                ON driver_offers;
--- DROP POLICY IF EXISTS do_insert                ON driver_offers;
--- DROP POLICY IF EXISTS do_update                ON driver_offers;
--- DROP POLICY IF EXISTS do_delete                ON driver_offers;
+-- DROP POLICY IF EXISTS do_select   ON driver_offers;
+-- DROP POLICY IF EXISTS do_insert   ON driver_offers;
+-- DROP POLICY IF EXISTS do_update   ON driver_offers;
+-- DROP POLICY IF EXISTS do_delete   ON driver_offers;
 --
--- DROP POLICY IF EXISTS ra_select                ON resource_access;
--- DROP POLICY IF EXISTS ra_insert                ON resource_access;
--- DROP POLICY IF EXISTS ra_delete                ON resource_access;
+-- DROP POLICY IF EXISTS ra_select   ON resource_access;
+-- DROP POLICY IF EXISTS ra_insert   ON resource_access;
+-- DROP POLICY IF EXISTS ra_delete   ON resource_access;
