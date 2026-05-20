@@ -44,7 +44,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $pol$;
@@ -62,7 +62,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $pol$;
@@ -80,7 +80,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $pol$;
@@ -98,7 +98,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $pol$;
@@ -181,7 +181,7 @@ BEGIN
             EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $pol$;
@@ -223,7 +223,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $pol$;
@@ -253,7 +253,7 @@ BEGIN
             EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $pol$;
