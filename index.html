@@ -5997,8 +5997,16 @@ async function confirmBookSpace() {
     idempotency_key: `space-resv:${res.id}`
   });
   if (!debit.ok && !debit.queued) {
-    // Erreur metier definitive : rollback la resa pour ne pas garder un trou.
-    await sb.from('space_reservations').delete().eq('id', res.id);
+    // Erreur metier definitive : annuler la resa pour ne pas garder un trou.
+    // UPDATE et non DELETE : aucune policy RLS DELETE n'existe sur
+    // space_reservations (le delete supprimait 0 ligne en silence et la
+    // resa restait 'confirmed'). check_space_availability ignore les
+    // statuts 'cancelled', le creneau est donc bien libere.
+    await sb.from('space_reservations').update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancel_reason: 'Débit central refusé — annulation automatique'
+    }).eq('id', res.id);
     if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant (central)', 'error');
     else toast(`Erreur debit central (${debit.error || 'inconnue'}) — reservation annulee`, 'error');
     return;
@@ -6953,7 +6961,14 @@ async function saveTripData(tripId, andConfirm) {
           toast(`Crédit chauffeur central échoué (${credit.error || 'inconnue'})`, 'error');
         }
       } else {
-        await sb.rpc('adjust_balance', { p_user_id: tripRow.driver_id, p_amount: driverCredit, p_description: desc, p_type: 'trip_driver_reduction' }).catch(() => {});
+        // 'trip_driver_earning' : seul type accepte par transactions_type_check
+        // ('trip_driver_reduction' violait la contrainte et le credit etait
+        // perdu en silence).
+        const { error: redErr } = await sb.rpc('adjust_balance', { p_user_id: tripRow.driver_id, p_amount: driverCredit, p_description: desc, p_type: 'trip_driver_earning' });
+        if (redErr) {
+          console.warn('[trip] crédit chauffeur local échoué:', redErr.message);
+          toast(`Crédit chauffeur échoué (${redErr.message})`, 'error');
+        }
       }
     }
 
