@@ -26,7 +26,7 @@ create table if not exists serre_zones (
   position int not null,                -- 1 à 10
   largeur_pi numeric default 2,
   longueur_pi numeric default 3,
-  frais_mensuel numeric not null default 5,  -- petit frais mensuel de location ($ CAD)
+  frais_mensuel numeric not null default 1,  -- petit frais mensuel de location ($ CAD)
   is_active boolean not null default true,
   created_at timestamptz default now()
 );
@@ -40,7 +40,7 @@ create table if not exists serre_locations (
   tenant_id uuid not null references profiles(id) on delete restrict,
   date_debut date not null default current_date,
   date_fin date,
-  frais_mensuel numeric not null default 5,  -- snapshot du tarif au moment de la location
+  frais_mensuel numeric not null default 1,  -- snapshot du tarif au moment de la location
   derniere_facturation date,                 -- dernier mois facturé (1er du mois)
   statut text not null default 'active'
     check (statut in ('active', 'terminee', 'annulee')),
@@ -207,6 +207,12 @@ insert into serre_zones (code, planche, position)
 select 'P' || p || '-Z' || z, p, z
 from generate_series(1, 2) as p, generate_series(1, 10) as z
 on conflict (code) do nothing;
+
+-- Tarif mensuel de base : 1 $ CAD par zone.
+-- Idempotent : réaligne aussi le défaut si une version antérieure (5 $) a été jouée.
+alter table serre_zones     alter column frais_mensuel set default 1;
+alter table serre_locations alter column frais_mensuel set default 1;
+update serre_zones set frais_mensuel = 1 where frais_mensuel = 5;
 
 insert into serre_reservoirs (nom, ordre)
 values ('Réservoir 1', 1), ('Réservoir 2', 2), ('Réservoir 3', 3)

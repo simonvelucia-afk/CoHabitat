@@ -60,7 +60,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 ### Serre communautaire
 - Section dédiée en bas de la page **Espaces communs**
 - 20 zones de culture (2 planches × 10 zones de 2 × 3 pi)
-- Location d'une zone **au mois** contre un petit frais mensuel (débité via le solde virtuel)
+- Serre commune + 20 zones attribuables, louables **au mois** (frais de base **1 $/mois** par zone, débité via le solde virtuel)
 - Suivi par zone : culture, semis, récolte, statut, rendement, irrigation, fertilisation, notes
 - Historique des cultures par location + export CSV
 - Suivi des conditions : températures air/eau et niveaux des 3 réservoirs
