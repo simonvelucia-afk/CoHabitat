@@ -1406,17 +1406,25 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
 
     <!-- ==================== TENANT: ESPACES ==================== -->
     <div id="page-spaces" class="page">
-      <div class="section-header">
-        <div class="section-title">
-          <h2 data-pt="Espaces communs">Espaces communs</h2>
-          <p data-pt="Réservez par tranches de 15 minutes">Réservez par tranches de 15 minutes</p>
+      <!-- Vue par défaut : grille des espaces communs -->
+      <div id="spaces-default">
+        <div class="section-header">
+          <div class="section-title">
+            <h2 data-pt="Espaces communs">Espaces communs</h2>
+            <p data-pt="Réservez par tranches de 15 minutes">Réservez par tranches de 15 minutes</p>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <input type="text" id="spaces-search" placeholder="Rechercher un espace…" oninput="filterSpaces()">
+          <input type="date" id="spaces-date" onchange="filterSpaces()">
+        </div>
+        <div class="cards-grid" id="spaces-grid">
+          <div class="loading"><div class="spinner"></div> Chargement…</div>
         </div>
       </div>
-      <div class="filter-bar">
-        <input type="text" id="spaces-search" placeholder="Rechercher un espace…" oninput="filterSpaces()">
-        <input type="date" id="spaces-date" onchange="filterSpaces()">
-      </div>
-      <div class="cards-grid" id="spaces-grid">
+
+      <!-- Section dédiée : Serre communautaire (zones de culture louables au mois) -->
+      <div id="serre-section" style="margin-top:36px;padding-top:28px;border-top:1px solid var(--border);">
         <div class="loading"><div class="spinner"></div> Chargement…</div>
       </div>
     </div>
@@ -2810,7 +2818,7 @@ let vehiclesCache = [];
 let tripsCache = [];
 let tenantsCache = [];
 let settingsCache = {};
-window.appModules = { trips: true, lunch: true }; // chargé depuis system_settings
+window.appModules = { trips: true, lunch: true, serre: true }; // chargé depuis system_settings
 window.networkData = { network: null, members: [], sharedSpaces: [], sharedTrips: [] };
 let currentBookingSpaceId = null;
 let currentBookingTripId = null;
@@ -3762,9 +3770,10 @@ async function loadAppModules() {
   // 1. Lire les préférences locales (admin local peut désactiver dans son enveloppe)
   const { data: localSettings } = await sb.from('system_settings')
     .select('key, value')
-    .in('key', ['module_trips', 'module_lunch', 'finance_central_enabled']);
+    .in('key', ['module_trips', 'module_lunch', 'module_serre', 'finance_central_enabled']);
   const localTrips = localSettings?.find(s => s.key === 'module_trips')?.value !== 'false';
   const localLunch = localSettings?.find(s => s.key === 'module_lunch')?.value !== 'false';
+  const localSerre = localSettings?.find(s => s.key === 'module_serre')?.value !== 'false';
   // Phase 3C : si finance_central_enabled=true, l'UI lit le solde depuis
   // la centrale Modulimo via finance-bridge au lieu de profiles.virtual_balance.
   window._financeCentralEnabled = localSettings?.find(s => s.key === 'finance_central_enabled')?.value === 'true';
@@ -3775,6 +3784,7 @@ async function loadAppModules() {
   // 3. Résultat = intersection licence centrale ET préférences locales
   window.appModules.trips = (licence?.modules?.trips !== false) && localTrips;
   window.appModules.lunch = (licence?.modules?.lunch !== false) && localLunch;
+  window.appModules.serre = (licence?.modules?.serre !== false) && localSerre;
 
   // 4. Si licence invalide ou expirée — bloquer l'app
   if (licence === null) {
@@ -5688,6 +5698,13 @@ async function loadSpaces() {
   renderSpaces(spacesCache);
   // Ajouter les espaces réseau après les espaces locaux
   document.getElementById('spaces-grid').innerHTML += renderNetworkSpaces();
+  // Charger la section dédiée « Serre communautaire » en bas de page
+  if (window.appModules.serre !== false) {
+    loadSerre();
+  } else {
+    const ss = document.getElementById('serre-section');
+    if (ss) ss.style.display = 'none';
+  }
   // Déléguer les clics sur les boutons réseau
   document.getElementById('spaces-grid').addEventListener('click', function(e) {
     const btn = e.target.closest('.net-book-space');
@@ -5774,6 +5791,477 @@ function renderNetworkSpaces() {
 function filterSpaces() {
   const q = document.getElementById('spaces-search').value.toLowerCase();
   renderSpaces(spacesCache.filter(s => !q || s.name.toLowerCase().includes(q) || (s.location || '').toLowerCase().includes(q)));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SERRE COMMUNAUTAIRE — zones de culture louables au mois (module serre_*)
+//  Section dédiée affichée en bas de la page « Espaces communs ».
+// ═══════════════════════════════════════════════════════════════════════
+const SERRE_CULTURES = ["", "Tomate", "Concombre", "Laitue", "Poivron", "Basilic", "Haricot", "Radis", "Épinard", "Fine herbes", "Fraise", "Autre"];
+const SERRE_STATUT_LABELS = { vide: "Vide", croissance: "En croissance", recolte: "Récolté" };
+const SERRE_UNITES = ["kg", "lb", "unités", "bottes"];
+const SERRE_SYSTEMES = ["Goutte-à-goutte", "Aspersion", "Manuel", "Sandponique (recirculation)"];
+const SERRE_FREQ = ["Quotidien", "Aux 2 jours", "2x/semaine", "1x/semaine", "Selon besoin"];
+const SERRE_FERT = [
+  { v: 'compost', l: 'Compost' },
+  { v: 'backwash_sandponique', l: 'Backwash sandponique' },
+  { v: 'compost_backwash', l: 'Compost + backwash' },
+  { v: 'autre', l: 'Autre' }
+];
+
+let _serre = { zones: [], occ: {}, locByZone: {}, culturesByZone: {}, irrigByZone: {}, fertByZone: {}, lecture: null, isAdmin: false };
+
+function serreOpt(list, val) {
+  return list.map(c => `<option value="${c}"${val === c ? ' selected' : ''}>${c || '—'}</option>`).join('');
+}
+function serreStatutBadge(st) {
+  const map = {
+    vide: 'background:var(--surface2);color:var(--text3)',
+    croissance: 'background:rgba(126,184,160,.15);color:var(--accent2)',
+    recolte: 'background:rgba(200,120,80,.15);color:#d08a5a'
+  };
+  return `<span class="serre-badge" style="${map[st] || map.vide}">${SERRE_STATUT_LABELS[st] || '—'}</span>`;
+}
+function serreFlash(msg) {
+  const el = document.getElementById('serre-status');
+  if (!el) return;
+  el.textContent = msg;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.textContent = ''; }, 1600);
+}
+
+async function loadSerre() {
+  const root = document.getElementById('serre-section');
+  if (!root) return;
+  root.style.display = '';
+  root.innerHTML = `<div class="loading"><div class="spinner"></div> ${pt('Chargement de la serre…')}</div>`;
+
+  _serre.isAdmin = ['admin', 'principal_admin'].includes(currentProfile?.role);
+
+  const [zonesRes, occRes, curRes, irrigRes, fertRes, lectureRes, myLocsRes] = await Promise.all([
+    sb.from('serre_zones').select('*').eq('is_active', true).order('planche').order('position'),
+    sb.rpc('serre_occupancy'),
+    sb.from('serre_cultures').select('*').order('created_at', { ascending: false }),
+    sb.from('serre_irrigation_config').select('*'),
+    sb.from('serre_fertilisations').select('*').order('date_application', { ascending: false }),
+    sb.from('serre_lectures').select('*').order('horodatage', { ascending: false }).limit(1),
+    sb.from('serre_locations').select('*, profiles(full_name)').eq('statut', 'active')
+  ]);
+
+  if (zonesRes.error) {
+    root.innerHTML = `<div class="empty-state"><div class="empty-icon">🌱</div><p>${pt('Serre indisponible')}${isDemo ? ' — ' + zonesRes.error.message : ''}</p></div>`;
+    return;
+  }
+
+  _serre.zones = zonesRes.data || [];
+  _serre.occ = {};
+  (occRes.data || []).forEach(o => { _serre.occ[o.zone_id] = o; });
+  _serre.locByZone = {};
+  (myLocsRes.data || []).forEach(l => { _serre.locByZone[l.zone_id] = l; });
+  // Cultures groupées par zone (déjà triées du plus récent au plus ancien).
+  // Le scope par location_id se fait à l'affichage (historique par location).
+  _serre.culturesByZone = {};
+  (curRes.data || []).forEach(c => { (_serre.culturesByZone[c.zone_id] = _serre.culturesByZone[c.zone_id] || []).push(c); });
+  _serre.irrigByZone = {};
+  (irrigRes.data || []).forEach(i => { _serre.irrigByZone[i.zone_id] = i; });
+  _serre.fertByZone = {};
+  (fertRes.data || []).forEach(f => { if (!_serre.fertByZone[f.zone_id]) _serre.fertByZone[f.zone_id] = f; });
+  _serre.lecture = (lectureRes.data && lectureRes.data[0]) || null;
+
+  renderSerre();
+
+  // Facturation mensuelle rattrapage (frais des mois échus non encore débités)
+  serreChargeDueFees(myLocsRes.data || []);
+}
+
+function renderSerre() {
+  const root = document.getElementById('serre-section');
+  const L = _serre.lecture || {};
+  const mine = Object.values(_serre.locByZone).filter(l => l.tenant_id === currentProfile?.id).length;
+
+  const planche = (p) => _serre.zones.filter(z => z.planche === p)
+    .map(z => serreZoneCard(z)).join('');
+
+  root.innerHTML = `
+    <style>
+      .serre-field{margin-bottom:8px}
+      .serre-field label{display:block;font-size:11px;color:var(--text3);margin-bottom:3px}
+      .serre-field select,.serre-field input,.serre-field textarea{width:100%;font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-family:inherit}
+      .serre-row{display:flex;gap:8px}.serre-row .serre-field{flex:1}
+      .serre-sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:10px 0 4px}
+      .serre-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+      .serre-hist{margin-top:8px}.serre-hist summary{font-size:11px;color:var(--text3);cursor:pointer}
+      .serre-hist .hi{font-size:11px;color:var(--text2);background:var(--surface2);padding:4px 8px;border-radius:6px;margin-top:4px}
+      .serre-badge{font-size:11px;padding:2px 8px;border-radius:10px;white-space:nowrap}
+      .serre-zone textarea[data-f=notes]{resize:vertical;min-height:34px}
+      .serre-planche{font-size:13px;font-weight:600;color:var(--text2);margin:18px 0 10px;display:flex;align-items:center;gap:8px}
+      .serre-planche .b{font-size:11px;font-weight:400;color:var(--text3);background:var(--surface2);padding:2px 8px;border-radius:10px}
+      .serre-global{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
+      .serre-global .serre-field{min-width:120px;margin:0}
+    </style>
+
+    <div class="section-header" style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div class="section-title">
+        <h2>🌱 ${pt('Serre communautaire')}</h2>
+        <p style="color:var(--text3);font-size:13px;margin:0;">${pt('Serre 10 × 20 pi — 2 planches de 10 zones (2 × 3 pi). Louez une zone au mois pour y cultiver.')}</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="serre-status" style="font-size:12px;color:var(--accent2);min-height:16px;"></span>
+        <button class="btn btn-secondary btn-sm" onclick="exportSerreCSV()">📄 ${pt('Exporter CSV')}</button>
+      </div>
+    </div>
+
+    ${mine ? `<div style="font-size:12px;color:var(--text2);margin-bottom:14px;">${pt('Vous louez actuellement')} <strong>${mine}</strong> ${mine > 1 ? pt('zones') : pt('zone')}.</div>` : ''}
+
+    <div class="serre-sec" style="margin-top:0;">${pt('Conditions de la serre')}</div>
+    <div class="serre-global">
+      <div class="serre-field"><label>${pt("Température air (°C)")}</label><input type="number" step="0.1" id="serre-tair" value="${L.temp_air ?? ''}"></div>
+      <div class="serre-field"><label>${pt("Température eau (°C)")}</label><input type="number" step="0.1" id="serre-teau" value="${L.temp_eau ?? ''}"></div>
+      <div class="serre-field"><label>${pt("Réservoir 1 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r1" value="${L.reservoir1_pct ?? ''}"></div>
+      <div class="serre-field"><label>${pt("Réservoir 2 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r2" value="${L.reservoir2_pct ?? ''}"></div>
+      <div class="serre-field"><label>${pt("Réservoir 3 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r3" value="${L.reservoir3_pct ?? ''}"></div>
+      <button class="btn btn-primary btn-sm" onclick="serreSaveLecture()">${pt('Enregistrer la lecture')}</button>
+      ${_serre.lecture ? `<span style="font-size:11px;color:var(--text3);align-self:center;">${pt('Dernière lecture')} : ${new Date(_serre.lecture.horodatage).toLocaleString('fr-CA')}</span>` : ''}
+    </div>
+
+    <div class="serre-planche">${pt('Planche 1')} <span class="b">10 ${pt('zones')}</span></div>
+    <div class="cards-grid">${planche(1)}</div>
+    <div class="serre-planche">${pt('Planche 2')} <span class="b">10 ${pt('zones')}</span></div>
+    <div class="cards-grid">${planche(2)}</div>
+  `;
+
+  // Attacher les auto-sauvegardes sur les champs des zones gérables
+  root.querySelectorAll('.serre-zone[data-manage="1"]').forEach(card => {
+    card.querySelectorAll('[data-save]').forEach(inp => {
+      inp.addEventListener('change', () => {
+        const kind = inp.dataset.save;
+        if (kind === 'culture') serreSaveCulture(card);
+        else if (kind === 'irrigation') serreSaveIrrigation(card);
+        else if (kind === 'fert') serreSaveFert(card);
+      });
+    });
+  });
+}
+
+function serreZoneCard(zone) {
+  const occ = _serre.occ[zone.id] || { is_occupied: false, frais_mensuel: zone.frais_mensuel };
+  const loc = _serre.locByZone[zone.id];             // ma location (ou toute location si admin)
+  const canManage = !!loc || (_serre.isAdmin && occ.is_occupied);
+  const allCul = _serre.culturesByZone[zone.id] || [];
+  const cur = allCul[0];                             // dernière culture (résumé lecture seule)
+  const frais = Number(occ.frais_mensuel ?? zone.frais_mensuel ?? 0);
+
+  // Zone libre → proposer la location
+  if (!occ.is_occupied) {
+    return `
+    <div class="card serre-zone" data-zone="${zone.id}">
+      <div class="card-header">
+        <div class="card-title">${zone.code}</div>
+        <span class="badge badge-green">${pt('Disponible')}</span>
+      </div>
+      <div class="card-meta"><span class="meta-item">📐 ${zone.largeur_pi}×${zone.longueur_pi} pi</span></div>
+      <div class="card-price">${frais.toFixed(2)} $ <small style="font-size:.75rem;color:var(--text2)">/ ${pt('mois')}</small></div>
+      <div class="card-actions">
+        ${isDemo
+          ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:.5;cursor:not-allowed;">🔒 ${pt('Connexion requise')}</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="serreRentZone('${zone.id}','${zone.code}',${frais})">${pt('Louer cette zone')}</button>`}
+      </div>
+    </div>`;
+  }
+
+  // Zone occupée mais non gérable par moi → résumé en lecture seule
+  if (!canManage) {
+    const irr = _serre.irrigByZone[zone.id];
+    const fert = _serre.fertByZone[zone.id];
+    return `
+    <div class="card serre-zone" data-zone="${zone.id}">
+      <div class="card-header">
+        <div class="card-title">${zone.code}</div>
+        ${serreStatutBadge(cur?.statut || 'vide')}
+      </div>
+      <div class="card-meta" style="flex-direction:column;align-items:flex-start;gap:4px;">
+        <span class="meta-item">🌿 ${cur?.culture ? escHtml(cur.culture) : pt('Zone louée')}</span>
+        ${cur?.date_semis ? `<span class="meta-item">🌱 ${pt('Semis')} ${cur.date_semis}</span>` : ''}
+        ${irr?.systeme ? `<span class="meta-item">💧 ${escHtml(irr.systeme)}</span>` : ''}
+        ${fert?.type ? `<span class="meta-item">🧪 ${(SERRE_FERT.find(f => f.v === fert.type) || {}).l || fert.type}</span>` : ''}
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;">${pt('Occupée par un autre locataire')}</div>
+    </div>`;
+  }
+
+  // Zone gérable (la mienne, ou admin) → éditeur complet
+  const irr = _serre.irrigByZone[zone.id] || {};
+  const fert = _serre.fertByZone[zone.id] || {};
+  // Cultures scopées à la location courante (l'historique de la zone
+  // physique reste propre à chaque locataire successif).
+  const locCul = loc ? allCul.filter(c => c.location_id === loc.id) : allCul;
+  const curM = locCul[0];
+  const hist = locCul.slice(1).filter(c => c.culture);
+  const st = curM?.statut || 'vide';
+  const owner = (_serre.isAdmin && loc?.tenant_id !== currentProfile?.id) ? (loc?.profiles?.full_name || '') : '';
+
+  return `
+  <div class="card serre-zone" data-zone="${zone.id}" data-loc="${loc?.id || ''}" data-culture="${curM?.id || ''}" data-manage="1">
+    <div class="card-header">
+      <div class="card-title">${zone.code}${owner ? ` <span style="font-weight:400;color:var(--text3);font-size:12px;">· ${escHtml(owner)}</span>` : ''}</div>
+      ${serreStatutBadge(st)}
+    </div>
+
+    <div class="serre-field"><label>${pt('Culture')}</label>
+      <select data-f="culture" data-save="culture">${serreOpt(SERRE_CULTURES, curM?.culture || '')}</select></div>
+    <div class="serre-row">
+      <div class="serre-field"><label>${pt('Semis')}</label><input type="date" data-f="semis" data-save="culture" value="${curM?.date_semis || ''}"></div>
+      <div class="serre-field"><label>${pt('Récolte prévue')}</label><input type="date" data-f="recolte" data-save="culture" value="${curM?.date_recolte_prevue || ''}"></div>
+    </div>
+    <div class="serre-field"><label>${pt('Statut')}</label>
+      <select data-f="statut" data-save="culture">
+        ${['vide', 'croissance', 'recolte'].map(s => `<option value="${s}"${st === s ? ' selected' : ''}>${SERRE_STATUT_LABELS[s]}</option>`).join('')}
+      </select></div>
+
+    <div class="serre-sec">${pt('Rendement')}</div>
+    <div class="serre-row">
+      <div class="serre-field"><label>${pt('Quantité')}</label><input type="number" step="0.1" min="0" data-f="rqty" data-save="culture" value="${curM?.rendement_qty ?? ''}"></div>
+      <div class="serre-field"><label>${pt('Unité')}</label><select data-f="runite" data-save="culture">${serreOpt(SERRE_UNITES, curM?.rendement_unite || 'kg')}</select></div>
+    </div>
+
+    <div class="serre-sec">${pt('Irrigation')}</div>
+    <div class="serre-row">
+      <div class="serre-field"><label>${pt('Fréquence')}</label><select data-f="ifreq" data-save="irrigation">${serreOpt(['', ...SERRE_FREQ], irr.frequence || '')}</select></div>
+      <div class="serre-field"><label>${pt('Système')}</label><select data-f="isys" data-save="irrigation">${serreOpt(['', ...SERRE_SYSTEMES], irr.systeme || '')}</select></div>
+    </div>
+
+    <div class="serre-sec">${pt('Fertilisation')}</div>
+    <div class="serre-row">
+      <div class="serre-field"><label>${pt('Type')}</label>
+        <select data-f="ftype" data-save="fert">
+          <option value="">—</option>
+          ${SERRE_FERT.map(f => `<option value="${f.v}"${fert.type === f.v ? ' selected' : ''}>${f.l}</option>`).join('')}
+        </select></div>
+      <div class="serre-field"><label>${pt('Dernière application')}</label><input type="date" data-f="fdate" data-save="fert" value="${fert.date_application || ''}"></div>
+    </div>
+
+    <div class="serre-field"><label>${pt('Notes')}</label><textarea data-f="notes" data-save="culture">${escHtml(curM?.notes || '')}</textarea></div>
+
+    ${hist.length ? `<details class="serre-hist"><summary>${pt('Historique')} (${hist.length})</summary>
+      ${hist.map(h => `<div class="hi">${h.culture ? escHtml(h.culture) : '—'} · ${pt('semé')} ${h.date_semis || '?'} → ${pt('récolté')} ${h.date_recolte_reelle || '?'} · ${h.rendement_qty || '0'} ${h.rendement_unite || ''}</div>`).join('')}
+    </details>` : ''}
+
+    <div class="serre-actions">
+      <button class="btn btn-secondary btn-sm" onclick="serreArchiveCulture('${zone.id}')">${pt('Archiver & recommencer')}</button>
+      ${loc?.tenant_id === currentProfile?.id ? `<button class="btn btn-danger btn-sm" onclick="serreReleaseZone('${loc.id}','${zone.code}')">${pt('Libérer la zone')}</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function serreReadCard(card) {
+  const g = f => card.querySelector('[data-f="' + f + '"]');
+  return { g };
+}
+
+async function serreSaveCulture(card) {
+  const cultureId = card.dataset.culture;
+  const zoneId = card.dataset.zone;
+  const locId = card.dataset.loc;
+  const g = f => card.querySelector('[data-f="' + f + '"]');
+  const payload = {
+    culture: g('culture').value || null,
+    date_semis: g('semis').value || null,
+    date_recolte_prevue: g('recolte').value || null,
+    statut: g('statut').value,
+    rendement_qty: g('rqty').value ? Number(g('rqty').value) : null,
+    rendement_unite: g('runite').value || null,
+    notes: g('notes').value || null
+  };
+  let res;
+  if (cultureId) res = await sb.from('serre_cultures').update(payload).eq('id', cultureId).select().single();
+  else res = await sb.from('serre_cultures').insert(Object.assign({ zone_id: zoneId, location_id: locId || null }, payload)).select().single();
+  if (res.error) { toast('Erreur : ' + res.error.message, 'error'); return; }
+  if (!cultureId && res.data) card.dataset.culture = res.data.id;
+  // Rafraîchir le badge de statut
+  const badge = card.querySelector('.serre-badge');
+  if (badge) badge.outerHTML = serreStatutBadge(payload.statut);
+  serreFlash('Enregistré ✓');
+}
+
+async function serreSaveIrrigation(card) {
+  const zoneId = card.dataset.zone;
+  const g = f => card.querySelector('[data-f="' + f + '"]');
+  const { error } = await sb.from('serre_irrigation_config').upsert({
+    zone_id: zoneId,
+    frequence: g('ifreq').value || null,
+    systeme: g('isys').value || null,
+    updated_at: new Date().toISOString()
+  });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  serreFlash('Enregistré ✓');
+}
+
+async function serreSaveFert(card) {
+  const zoneId = card.dataset.zone;
+  const g = f => card.querySelector('[data-f="' + f + '"]');
+  const type = g('ftype').value;
+  if (!type) return;
+  const { error } = await sb.from('serre_fertilisations').insert({
+    zone_id: zoneId,
+    type: type,
+    date_application: g('fdate').value || new Date().toISOString().split('T')[0]
+  });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  serreFlash('Fertilisation enregistrée ✓');
+}
+
+async function serreArchiveCulture(zoneId) {
+  const card = document.querySelector('.serre-zone[data-zone="' + zoneId + '"]');
+  if (!card) return;
+  const cultureId = card.dataset.culture;
+  const locId = card.dataset.loc || null;
+  const cultureVal = card.querySelector('[data-f="culture"]')?.value;
+  if (!cultureId || !cultureVal) { toast('Rien à archiver', 'info'); return; }
+  // Sauver l'état courant, marquer récolté, puis créer un nouveau cycle vide
+  await serreSaveCulture(card);
+  const today = new Date().toISOString().split('T')[0];
+  const cur = (_serre.culturesByZone[zoneId] || []).find(c => c.id === cultureId);
+  await sb.from('serre_cultures').update({ statut: 'recolte', date_recolte_reelle: cur?.date_recolte_reelle || today }).eq('id', cultureId);
+  await sb.from('serre_cultures').insert({ zone_id: zoneId, location_id: locId, statut: 'vide' });
+  toast('Culture archivée', 'success');
+  loadSerre();
+}
+
+async function serreRentZone(zoneId, code, frais) {
+  if (!checkActive()) return;
+  if (isDemo) { toast('Indisponible en mode démo', 'info'); return; }
+  const fee = Number(frais) || 0;
+  if (!confirm(`Louer la zone ${code} pour ${fee.toFixed(2)} $ / mois ?\nLe premier mois est facturé maintenant.`)) return;
+  if ((currentProfile.virtual_balance || 0) < fee) { toast('Solde insuffisant pour le premier mois', 'error'); return; }
+
+  const today = new Date();
+  const todayIso = today.toISOString().split('T')[0];
+  const monthIso = todayIso.slice(0, 7) + '-01';
+
+  const { data: loc, error } = await sb.from('serre_locations').insert({
+    zone_id: zoneId, tenant_id: currentProfile.id, date_debut: todayIso,
+    frais_mensuel: fee, derniere_facturation: monthIso, statut: 'active'
+  }).select().single();
+  if (error) {
+    // 23505 = unique_violation : la zone vient d'être louée par quelqu'un d'autre
+    toast(error.code === '23505' ? 'Cette zone vient d\'être louée par un autre locataire' : 'Erreur : ' + error.message, 'error');
+    loadSerre(); return;
+  }
+
+  // Cycle de culture vide initial
+  await sb.from('serre_cultures').insert({ zone_id: zoneId, location_id: loc.id, statut: 'vide' });
+
+  // Débit du premier mois (type whitelisté finance-bridge : space_reservation)
+  if (fee > 0) {
+    const ym = monthIso.slice(0, 7);
+    const debit = await _balanceOps.commit({
+      amount: -fee, type: 'space_reservation',
+      description: `Serre — location zone ${code} (frais mensuel ${ym})`,
+      reference_id: loc.id, reference_type: 'serre_location',
+      idempotency_key: `serre-fee:${loc.id}:${ym}`
+    });
+    if (!debit.ok && !debit.queued) {
+      await sb.from('serre_locations').update({ statut: 'annulee', date_fin: todayIso }).eq('id', loc.id);
+      toast(debit.error === 'INSUFFICIENT_FUNDS' ? 'Solde insuffisant (central) — location annulée' : `Débit refusé (${debit.error || 'inconnue'}) — location annulée`, 'error');
+      loadSerre(); return;
+    }
+    if (typeof debit.virtual_balance === 'number') currentProfile.virtual_balance = debit.virtual_balance;
+  }
+
+  toast(`Zone ${code} louée ✓`, 'success');
+  const nb = document.getElementById('nav-balance');
+  if (nb) nb.textContent = `${(currentProfile.virtual_balance || 0).toFixed(2)} $ CAD`;
+  if (typeof buildNav === 'function') buildNav();
+  loadSerre();
+}
+
+async function serreReleaseZone(locId, code) {
+  if (!confirm(`Libérer la zone ${code} ?\nLa location prendra fin. Aucun remboursement du mois en cours.`)) return;
+  const todayIso = new Date().toISOString().split('T')[0];
+  const { error } = await sb.from('serre_locations').update({ statut: 'terminee', date_fin: todayIso }).eq('id', locId);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  toast('Zone libérée', 'success');
+  loadSerre();
+}
+
+async function serreSaveLecture() {
+  const num = id => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
+  const { error } = await sb.from('serre_lectures').insert({
+    temp_air: num('serre-tair'), temp_eau: num('serre-teau'),
+    reservoir1_pct: num('serre-r1'), reservoir2_pct: num('serre-r2'), reservoir3_pct: num('serre-r3'),
+    created_by: currentProfile?.id || null
+  });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  serreFlash('Lecture enregistrée ✓');
+  loadSerre();
+}
+
+// Facturation mensuelle : débite les mois échus non encore facturés pour MES
+// locations actives. Idempotent via idempotency_key = serre-fee:<loc>:<AAAA-MM>,
+// donc rejouable sans double débit même si la page est rechargée.
+async function serreChargeDueFees(myLocs) {
+  if (isDemo || !currentProfile || !_balanceOps) return;
+  const now = new Date();
+  const curMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  let charged = false;
+
+  for (const loc of myLocs) {
+    if (loc.tenant_id !== currentProfile.id || loc.statut !== 'active') continue;
+    const fee = Number(loc.frais_mensuel) || 0;
+    const last = loc.derniere_facturation ? new Date(loc.derniere_facturation + 'T00:00:00') : null;
+    let cursor = last
+      ? new Date(last.getFullYear(), last.getMonth() + 1, 1)
+      : (() => { const d = new Date(loc.date_debut + 'T00:00:00'); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+    let newLast = last;
+
+    while (cursor <= curMonth) {
+      const ym = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0');
+      if (fee > 0) {
+        if ((currentProfile.virtual_balance || 0) < fee) { toast(`Solde insuffisant pour le frais serre ${ym}`, 'error'); break; }
+        const debit = await _balanceOps.commit({
+          amount: -fee, type: 'space_reservation',
+          description: `Serre — frais mensuel ${ym}`,
+          reference_id: loc.id, reference_type: 'serre_location',
+          idempotency_key: `serre-fee:${loc.id}:${ym}`
+        });
+        if (!debit.ok && !debit.queued) { toast(`Frais serre ${ym} non débité (${debit.error || '?'})`, 'error'); break; }
+        if (typeof debit.virtual_balance === 'number') currentProfile.virtual_balance = debit.virtual_balance;
+        charged = true;
+      }
+      newLast = new Date(cursor);
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+
+    if (newLast && (!last || newLast > last)) {
+      const iso = newLast.getFullYear() + '-' + String(newLast.getMonth() + 1).padStart(2, '0') + '-01';
+      await sb.from('serre_locations').update({ derniere_facturation: iso }).eq('id', loc.id);
+      loc.derniere_facturation = iso;
+    }
+  }
+
+  if (charged) {
+    const nb = document.getElementById('nav-balance');
+    if (nb) nb.textContent = `${(currentProfile.virtual_balance || 0).toFixed(2)} $ CAD`;
+    if (typeof buildNav === 'function') buildNav();
+  }
+}
+
+async function exportSerreCSV() {
+  let csv = "Zone,Statut location,Culture,Semis,Recolte prevue,Statut culture,Rendement,Unite,Irrigation freq,Irrigation systeme,Fertilisation,Frais mensuel,Notes\n";
+  for (const z of _serre.zones) {
+    const occ = _serre.occ[z.id] || {};
+    const cur = (_serre.culturesByZone[z.id] || [])[0] || {};
+    const irr = _serre.irrigByZone[z.id] || {};
+    const fert = _serre.fertByZone[z.id] || {};
+    const fertL = fert.type ? ((SERRE_FERT.find(f => f.v === fert.type) || {}).l || fert.type) : '';
+    const notes = (cur.notes || '').replace(/"/g, '""');
+    csv += `${z.code},${occ.is_occupied ? 'Louée' : 'Libre'},${cur.culture || ''},${cur.date_semis || ''},${cur.date_recolte_prevue || ''},${SERRE_STATUT_LABELS[cur.statut] || ''},${cur.rendement_qty || ''},${cur.rendement_unite || ''},${irr.frequence || ''},${irr.systeme || ''},${fertL},${z.frais_mensuel || ''},"${notes}"\n`;
+  }
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'serre-zones-culture.csv'; a.click();
+  URL.revokeObjectURL(url);
 }
 
 function openBookSpace(spaceId, spaceName) {
@@ -9708,10 +10196,11 @@ async function loadSettings() {
   if (!form) return;
 
   // Modules activables — affichés en premier avec des toggles
-  const moduleKeys = ['module_trips', 'module_lunch'];
+  const moduleKeys = ['module_trips', 'module_lunch', 'module_serre'];
   const moduleLabels = {
     module_trips: '🚗 Module Auto-partage (covoiturage + véhicules)',
-    module_lunch: '🍱 Module Machine Lunch (kiosque + commandes)'
+    module_lunch: '🍱 Module Machine Lunch (kiosque + commandes)',
+    module_serre: '🌱 Module Serre (zones de culture louables au mois)'
   };
   const moduleData = (data || []).filter(s => moduleKeys.includes(s.key));
   const moduleHtml = moduleData.length ? `
@@ -9757,6 +10246,12 @@ async function saveModuleSetting(key, enabled) {
   // Mettre à jour appModules en temps réel
   if (key === 'module_trips') window.appModules.trips = enabled;
   if (key === 'module_lunch') window.appModules.lunch = enabled;
+  if (key === 'module_serre') {
+    window.appModules.serre = enabled;
+    // Rafraîchir la section Serre si on est sur la page Espaces
+    const ss = document.getElementById('serre-section');
+    if (ss) { if (enabled) { if (typeof loadSerre === 'function') loadSerre(); } else { ss.style.display = 'none'; } }
+  }
 
   // Reconstruire la nav
   buildNav();
