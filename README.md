@@ -59,10 +59,10 @@ Dans Supabase → **Authentication → URL Configuration**:
 
 ### Serre communautaire
 - Section dédiée en bas de la page **Espaces communs**
-- 20 zones de culture (2 planches × 10 zones de 2 × 3 pi)
-- Serre commune + 20 zones attribuables, louables **au mois** (frais de base **1 $/mois** par zone, débité via le solde virtuel)
-- Chaque zone se divise en **3 sections** (ex. P1-Z4-1/-2/-3, numérotées depuis l'allée) pour cultiver **des plantes différentes** — une seule location par zone
-- Suivi par section : culture, semis, récolte, statut, rendement, notes ; irrigation et fertilisation gérées à l'échelle de la zone
+- Serre commune : **2 rangées × 10 colonnes = 20 zones** (2 × 3 pi), attribuables et louables **au mois** (frais de base **1 $/mois** par zone, débité via le solde virtuel)
+- Chaque zone se divise en **3 sections indépendantes** numérotées depuis l'allée — codage **R1C4S2** (Rangée 1, Colonne 4, Section 2)
+- Chaque section a **sa propre culture, irrigation et fertilisation** (plantes et traitements différents), pour une seule location par zone
+- Suivi par section : culture, semis, récolte, statut, rendement, irrigation (fréquence/système), fertilisation, notes
 - Historique des cultures **par section** + export CSV (une ligne par section)
 - Suivi des conditions : températures air/eau et niveaux des 3 réservoirs
 - Activable/désactivable par l'admin (module optionnel `module_serre`)
@@ -107,7 +107,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 | `serre_zones` | Zones de culture de la serre (fixes) |
 | `serre_locations` | Locations mensuelles d'une zone par un locataire |
 | `serre_cultures` | Cycles de culture par section (1-3) d'une zone |
-| `serre_fertilisations` | Applications de fertilisant par zone |
-| `serre_irrigation_config` | Config d'irrigation par zone |
+| `serre_fertilisations` | Applications de fertilisant par section |
+| `serre_irrigation_config` | Config d'irrigation par section (zone_id, section) |
 | `serre_reservoirs` | Réservoirs d'eau de la serre |
 | `serre_lectures` | Lectures de capteurs (températures, niveaux) |
