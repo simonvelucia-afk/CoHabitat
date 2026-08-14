@@ -5864,7 +5864,7 @@ function serreFlash(msg) {
 function serreDemoLoad() {
   const zones = [];
   for (let p = 1; p <= 2; p++) for (let z = 1; z <= 10; z++) {
-    zones.push({ id: `demo-R${p}C${z}`, code: `R${p}C${z}`, planche: p, position: z, largeur_pi: 2, longueur_pi: 3, frais_mensuel: 1, is_active: true });
+    zones.push({ id: `demo-R${p}C${z}`, code: `R${p}C${z}`, planche: p, position: z, largeur_pi: 2, longueur_pi: 3, frais_mensuel: 0.5, is_active: true });
   }
   const demoSet = [
     { i: 0,  culture: 'Tomate',      statut: 'croissance', semis: '2026-05-02', prevue: '2026-08-20', rq: 3.5, ru: 'kg',      freq: 'Aux 2 jours', sys: 'Goutte-à-goutte',              fert: 'compost' },
@@ -5885,7 +5885,7 @@ function serreDemoLoad() {
   _serre.isDemo = true;
   _serre.locByZone = {};
   _serre.occ = {}; _serre.culturesByZone = {}; _serre.irrigBySec = {}; _serre.fertBySec = {};
-  zones.forEach(z => { _serre.occ[z.id] = { zone_id: z.id, is_occupied: false, is_mine: false, frais_mensuel: 1 }; });
+  zones.forEach(z => { _serre.occ[z.id] = { zone_id: z.id, is_occupied: false, is_mine: false, frais_mensuel: 0.5 }; });
   const plantPool = ['Tomate', 'Laitue', 'Basilic', 'Concombre', 'Fraise', 'Radis', 'Poivron', 'Épinard', 'Fine herbes', 'Haricot', ''];
   const sysPool = SERRE_SYSTEMES, freqPool = SERRE_FREQ, fertPool = ['compost', 'backwash_sandponique', 'compost_backwash', 'autre'];
   demoSet.forEach((d, k) => {
@@ -9196,22 +9196,24 @@ async function elevageDelCout(module, id) {
 //  SERRE (admin) — attribution des zones aux locataires + frais d'exploitation
 // ═══════════════════════════════════════════════════════════════════════
 const SERRE_COUT_CATS = ['Semences', 'Terreau / substrat', 'Eau', 'Électricité', 'Équipement', 'Entretien', 'Autre'];
-let _serreAdmin = { zones: [], locByZone: {}, tenants: [], couts: [] };
+let _serreAdmin = { zones: [], locByZone: {}, tenants: [], couts: [], basePrice: 0.5 };
 
 async function loadSerreAdmin() {
   const root = document.getElementById('admin-serre');
   if (!root) return;
   root.innerHTML = `<div class="loading"><div class="spinner"></div> Chargement…</div>`;
-  const [zRes, lRes, tRes, cRes] = await Promise.all([
+  const [zRes, lRes, tRes, cRes, sRes] = await Promise.all([
     sb.from('serre_zones').select('*').eq('is_active', true).order('planche').order('position'),
     sb.from('serre_locations').select('id, zone_id, tenant_id, date_debut, frais_mensuel, profiles(full_name, unit)').eq('statut', 'active'),
     sb.from('profiles').select('id, full_name, unit, role').neq('role', 'demo').order('full_name'),
-    sb.from('elevage_couts').select('*').eq('module', 'serre').order('date_cout', { ascending: false })
+    sb.from('elevage_couts').select('*').eq('module', 'serre').order('date_cout', { ascending: false }),
+    sb.from('system_settings').select('value').eq('key', 'serre_frais_mensuel').maybeSingle()
   ]);
   if (zRes.error) {
     root.innerHTML = `<div class="empty-state"><p>Erreur de chargement — vérifiez les migrations serre.<br>${escHtml(zRes.error.message)}</p></div>`;
     return;
   }
+  _serreAdmin.basePrice = Number(sRes.data?.value ?? 0.5);
   _serreAdmin.zones = zRes.data || [];
   _serreAdmin.locByZone = {};
   (lRes.data || []).forEach(l => { _serreAdmin.locByZone[l.zone_id] = l; });
@@ -9265,6 +9267,13 @@ function renderSerreAdmin() {
         <div style="text-align:right"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Revenu mensuel</div><div style="font-size:1.3rem;font-weight:700">${revenu.toFixed(2)} $</div></div>
         <div style="text-align:right"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Coûts ${year}</div><div style="font-size:1.3rem;font-weight:700">${totalCoutYear.toFixed(2)} $</div></div>
       </div>
+    </div>
+
+    <div class="sa-sec">Tarif</div>
+    <div class="sa-form" style="align-items:flex-end">
+      <div class="sa-field" style="min-width:200px"><label>Frais mensuel de base par zone ($ / mois)</label><input type="number" step="0.05" min="0" id="sa-price" value="${Number(_serreAdmin.basePrice || 0).toFixed(2)}"></div>
+      <button class="btn btn-primary btn-sm" onclick="serreAdminSavePrice()">Appliquer à toutes les zones</button>
+      <span style="font-size:11px;color:var(--text3);align-self:center">Les locations en cours gardent leur tarif jusqu'à réattribution.</span>
     </div>
 
     <div class="sa-sec">Attribution des zones</div>
@@ -9327,6 +9336,20 @@ async function serreAdminAssign(zoneId) {
   // 3 sections vides pour le nouveau locataire
   await sb.from('serre_cultures').insert([1, 2, 3].map(s => ({ zone_id: zoneId, location_id: loc.id, section: s, statut: 'vide' })));
   toast(`Zone ${zone.code} attribuée à ${tName} ✓`, 'success');
+  loadSerreAdmin();
+}
+
+async function serreAdminSavePrice() {
+  const v = Number(document.getElementById('sa-price').value);
+  if (!(v >= 0)) { toast('Prix invalide', 'error'); return; }
+  if (!confirm(`Fixer le frais mensuel de base à ${v.toFixed(2)} $ pour toutes les zones ?`)) return;
+  // 1. Variable globale
+  const { error: sErr } = await sb.from('system_settings').update({ value: String(v), updated_by: currentProfile.id, updated_at: new Date().toISOString() }).eq('key', 'serre_frais_mensuel');
+  if (sErr) { toast('Erreur : ' + sErr.message, 'error'); return; }
+  // 2. Appliquer aux zones (tarif affiché + futures locations/attributions)
+  const { error: zErr } = await sb.from('serre_zones').update({ frais_mensuel: v }).eq('is_active', true);
+  if (zErr) { toast('Erreur : ' + zErr.message, 'error'); return; }
+  toast('Frais mensuel de base mis à jour ✓', 'success');
   loadSerreAdmin();
 }
 

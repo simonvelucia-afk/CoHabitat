@@ -59,16 +59,16 @@ Dans Supabase → **Authentication → URL Configuration**:
 
 ### Serre communautaire
 - Section dédiée en bas de la page **Espaces communs**
-- Serre commune : **2 rangées × 10 colonnes = 20 zones** (2 × 3 pi), attribuables et louables **au mois** (frais de base **1 $/mois** par zone, débité via le solde virtuel)
+- Serre commune : **2 rangées × 10 colonnes = 20 zones** (2 × 3 pi), attribuables et louables **au mois** (frais de base **0,50 $/mois** par zone, **modifiable par l'admin** via la variable `serre_frais_mensuel`, débité via le solde virtuel)
 - Chaque zone se divise en **3 sections indépendantes** numérotées depuis l'allée — codage **R1C4S2** (Rangée 1, Colonne 4, Section 2)
 - Chaque section a **sa propre culture, irrigation et fertilisation** (plantes et traitements différents), pour une seule location par zone
 - **Plan visuel de la serre** : les 20 zones sur 2 rangées avec allée centrale ; chaque section montre en direct **ce qui pousse (emoji) et son stade** (couleur). Clic sur une zone → détails + historique
 - Suivi par section : culture, semis, récolte, statut, rendement, irrigation (fréquence/système), fertilisation, notes
 - Historique des cultures **par section** + export CSV (une ligne par section)
 - Suivi des conditions : température de l'air + **niveau et température propres à chacun des 3 réservoirs**
-- **Panneau admin** (onglet 🌱 Serre) : attribution des zones aux locataires (revenu mensuel, zones occupées) + **frais d'exploitation** de la serre (semences, terreau, eau, électricité…)
+- **Panneau admin** (onglet 🌱 Serre) : **frais mensuel de base modifiable** (appliqué à toutes les zones) + attribution des zones aux locataires (revenu mensuel, zones occupées) + **frais d'exploitation** de la serre (semences, terreau, eau, électricité…)
 - Activable/désactivable par l'admin (module optionnel `module_serre`)
-- Migrations : `sql/009_serre.sql`, `sql/010_serre_reservoir_temps.sql`, `sql/012_serre_couts_module.sql`
+- Migrations : `sql/009_serre.sql`, `sql/010_serre_reservoir_temps.sql`, `sql/012_serre_couts_module.sql`, `sql/013_serre_frais_base.sql`
 
 ### Administration
 - Gestion des locataires et unités
