@@ -5897,7 +5897,7 @@ function serreDemoLoad() {
       };
     });
   });
-  _serre.lecture = { horodatage: new Date().toISOString(), temp_air: 24.5, temp_eau: 19.2, reservoir1_pct: 78, reservoir2_pct: 64, reservoir3_pct: 90 };
+  _serre.lecture = { horodatage: new Date().toISOString(), temp_air: 24.5, reservoir1_pct: 78, reservoir2_pct: 64, reservoir3_pct: 90, reservoir1_temp: 18.5, reservoir2_temp: 19.2, reservoir3_temp: 17.8 };
 }
 
 async function loadSerre() {
@@ -5970,8 +5970,11 @@ function renderSerre() {
       .serre-zone textarea[data-f=notes]{resize:vertical;min-height:34px}
       .serre-planche{font-size:13px;font-weight:600;color:var(--text2);margin:18px 0 10px;display:flex;align-items:center;gap:8px}
       .serre-planche .b{font-size:11px;font-weight:400;color:var(--text3);background:var(--surface2);padding:2px 8px;border-radius:10px}
-      .serre-global{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
-      .serre-global .serre-field{min-width:120px;margin:0}
+      .serre-global{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
+      .serre-global > .serre-field{min-width:120px;margin:0}
+      .serre-resv{border:1px solid var(--border);border-radius:8px;padding:8px 10px;min-width:170px;background:var(--surface)}
+      .serre-resv-h{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:5px}
+      .serre-resv .serre-row{gap:8px}.serre-resv .serre-field{margin:0}
       /* Plan de la serre */
       .serre-plan{overflow-x:auto;padding:4px 0 8px}
       .serre-plan-inner{min-width:640px}
@@ -6015,10 +6018,14 @@ function renderSerre() {
     <div class="serre-sec" style="margin-top:0;">${pt('Conditions de la serre')}</div>
     <div class="serre-global">
       <div class="serre-field"><label>${pt("Température air (°C)")}</label><input type="number" step="0.1" id="serre-tair" value="${L.temp_air ?? ''}"${isDemo ? ' disabled' : ''}></div>
-      <div class="serre-field"><label>${pt("Température eau (°C)")}</label><input type="number" step="0.1" id="serre-teau" value="${L.temp_eau ?? ''}"${isDemo ? ' disabled' : ''}></div>
-      <div class="serre-field"><label>${pt("Réservoir 1 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r1" value="${L.reservoir1_pct ?? ''}"${isDemo ? ' disabled' : ''}></div>
-      <div class="serre-field"><label>${pt("Réservoir 2 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r2" value="${L.reservoir2_pct ?? ''}"${isDemo ? ' disabled' : ''}></div>
-      <div class="serre-field"><label>${pt("Réservoir 3 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r3" value="${L.reservoir3_pct ?? ''}"${isDemo ? ' disabled' : ''}></div>
+      ${[1, 2, 3].map(n => `
+      <div class="serre-resv">
+        <div class="serre-resv-h">💧 ${pt('Réservoir')} ${n}</div>
+        <div class="serre-row">
+          <div class="serre-field"><label>${pt('Niveau (%)')}</label><input type="number" step="1" min="0" max="100" id="serre-r${n}" value="${L['reservoir' + n + '_pct'] ?? ''}"${isDemo ? ' disabled' : ''}></div>
+          <div class="serre-field"><label>${pt('Temp. (°C)')}</label><input type="number" step="0.1" id="serre-rt${n}" value="${L['reservoir' + n + '_temp'] ?? ''}"${isDemo ? ' disabled' : ''}></div>
+        </div>
+      </div>`).join('')}
       ${isDemo
         ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:.5;cursor:not-allowed;">🔒 ${pt('Connexion requise')}</button>`
         : `<button class="btn btn-primary btn-sm" onclick="serreSaveLecture()">${pt('Enregistrer la lecture')}</button>`}
@@ -6365,10 +6372,11 @@ async function serreReleaseZone(locId, code) {
 
 async function serreSaveLecture() {
   if (isDemo) { toast('Indisponible en mode démo', 'info'); return; }
-  const num = id => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
+  const num = id => { const el = document.getElementById(id); const v = el ? el.value : ''; return v === '' ? null : Number(v); };
   const { error } = await sb.from('serre_lectures').insert({
-    temp_air: num('serre-tair'), temp_eau: num('serre-teau'),
+    temp_air: num('serre-tair'),
     reservoir1_pct: num('serre-r1'), reservoir2_pct: num('serre-r2'), reservoir3_pct: num('serre-r3'),
+    reservoir1_temp: num('serre-rt1'), reservoir2_temp: num('serre-rt2'), reservoir3_temp: num('serre-rt3'),
     created_by: currentProfile?.id || null
   });
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }

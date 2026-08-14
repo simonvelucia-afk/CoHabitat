@@ -134,12 +134,19 @@ create table if not exists serre_lectures (
   id uuid primary key default gen_random_uuid(),
   horodatage timestamptz not null default now(),
   temp_air numeric,
-  temp_eau numeric,
+  temp_eau numeric,                 -- (hérité) température d'eau globale — remplacée par les temp. par réservoir
   reservoir1_pct numeric,
   reservoir2_pct numeric,
   reservoir3_pct numeric,
+  reservoir1_temp numeric,          -- température propre au réservoir 1 (°C)
+  reservoir2_temp numeric,
+  reservoir3_temp numeric,
   created_by uuid references profiles(id) on delete set null
 );
+-- Colonnes de température par réservoir pour installs antérieures
+alter table serre_lectures add column if not exists reservoir1_temp numeric;
+alter table serre_lectures add column if not exists reservoir2_temp numeric;
+alter table serre_lectures add column if not exists reservoir3_temp numeric;
 create index if not exists idx_serre_lectures_horodatage on serre_lectures(horodatage desc);
 
 -- ============================================================

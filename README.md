@@ -65,7 +65,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 - **Plan visuel de la serre** : les 20 zones sur 2 rangées avec allée centrale ; chaque section montre en direct **ce qui pousse (emoji) et son stade** (couleur). Clic sur une zone → détails + historique
 - Suivi par section : culture, semis, récolte, statut, rendement, irrigation (fréquence/système), fertilisation, notes
 - Historique des cultures **par section** + export CSV (une ligne par section)
-- Suivi des conditions : températures air/eau et niveaux des 3 réservoirs
+- Suivi des conditions : température de l'air + **niveau et température propres à chacun des 3 réservoirs**
 - Activable/désactivable par l'admin (module optionnel `module_serre`)
 - Migration : `sql/009_serre.sql`
 
