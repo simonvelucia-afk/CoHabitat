@@ -65,7 +65,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 - **Plan visuel de la serre** : les 20 zones sur 2 rangées avec allée centrale ; chaque section montre en direct **ce qui pousse (emoji) et son stade** (couleur). Clic sur une zone → détails + historique
 - Suivi par section : culture, semis, récolte, statut, rendement, irrigation (fréquence/système), fertilisation, notes
 - Historique des cultures **par section** + export CSV (une ligne par section)
-- Suivi des conditions : température de l'air + **niveau et température propres à chacun des 3 réservoirs**
+- Suivi des conditions : température de l'air + **niveau et température propres à chacun des 3 réservoirs** (saisie manuelle, ou **acquisition automatique** via un Raspberry Pi 5 + MQTT — voir `serre-iot/`)
 - **Panneau admin** (onglet 🌱 Serre) : **frais mensuel de base modifiable** (appliqué à toutes les zones) + attribution des zones aux locataires (revenu mensuel, zones occupées) + **frais d'exploitation** de la serre (semences, terreau, eau, électricité…)
 - Activable/désactivable par l'admin (module optionnel `module_serre`)
 - Migrations : `sql/009_serre.sql`, `sql/010_serre_reservoir_temps.sql`, `sql/012_serre_couts_module.sql`, `sql/013_serre_frais_base.sql`

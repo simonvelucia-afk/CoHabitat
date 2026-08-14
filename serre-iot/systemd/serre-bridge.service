@@ -1,0 +1,15 @@
+[Unit]
+Description=Serre IoT — pont MQTT vers Supabase
+After=network-online.target mosquitto.service serre-sensors.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/CoHabitat/serre-iot
+ExecStart=/home/pi/CoHabitat/serre-iot/.venv/bin/python mqtt_to_supabase.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

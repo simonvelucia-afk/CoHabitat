@@ -1,0 +1,5 @@
+paho-mqtt>=2.0
+adafruit-circuitpython-ads1x15>=2.2   # ADC I2C ADS1115 (capteurs de pression)
+adafruit-blinka>=8.0                  # couche CircuitPython pour Raspberry Pi
+requests>=2.31
+python-dotenv>=1.0
