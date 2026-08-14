@@ -1617,6 +1617,8 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         <button class="admin-tab" id="demandes-tab" onclick="adminTab('demandes')" data-pt="Demandes">📋 Demandes <span id="demandes-pending-count" class="badge badge-yellow" style="display:none;font-size:10px;margin-left:4px;padding:1px 6px;"></span></button>
         <button class="admin-tab" onclick="adminTab('spaces-admin')" data-pt="Espaces">Espaces</button>
         <button class="admin-tab" onclick="adminTab('vehicles-admin')" data-pt="Véhicules">Véhicules</button>
+        <button class="admin-tab" onclick="adminTab('poulailler')">🐔 Poulailler</button>
+        <button class="admin-tab" onclick="adminTab('poissons')">🐟 Poissons</button>
         <button class="admin-tab" onclick="adminTab('payments')" data-pt="Paiements">Paiements</button>
         <button class="admin-tab" onclick="adminTab('settings')" id="settings-tab" style="display:none" data-pt="Paramètres">Paramètres</button>
         <button class="admin-tab" onclick="adminTab('logs')" data-pt="Logs">Logs</button>
@@ -1707,6 +1709,10 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
           </table>
         </div>
       </div>
+
+      <!-- Élevages : poulailler & sablonponie (rempli par renderElevage) -->
+      <div id="admin-poulailler" class="admin-section" style="display:none"></div>
+      <div id="admin-poissons" class="admin-section" style="display:none"></div>
 
       <!-- Demandes de suppression -->
       <div id="admin-deletions" class="admin-section" style="display:none">
@@ -9007,12 +9013,172 @@ async function adminTab(tab) {
     case 'demandes': await loadBuildingDemandes(); break;
     case 'spaces-admin': await loadAdminSpaces(); break;
     case 'vehicles-admin': await loadAdminVehicles(); break;
+    case 'poulailler': await loadElevage('poulailler'); break;
+    case 'poissons': await loadElevage('sablonponie'); break;
     case 'payments': await loadAdminPayments(); break;
     case 'settings': await loadSettings(); break;
     case 'logs': await loadLogs(); break;
     case 'deletions': await loadDeletionRequests(); break;
     case 'stats': await loadStats(); break;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ÉLEVAGES (admin) — poulailler (poules) & sablonponie (poissons)
+//  Historique + coûts d'exploitation, avec publication des faits saillants
+//  au babillard (bulletin_board).
+// ═══════════════════════════════════════════════════════════════════════
+const ELEVAGE_META = {
+  poulailler:  { container: 'admin-poulailler', icon: '🐔', titre: 'Poulailler', animal: 'poule', lieu: 'poulailler', prod: 'ponte', adj1: 'nouvelle', adjN: 'nouvelles' },
+  sablonponie: { container: 'admin-poissons', icon: '🐟', titre: 'Poissons (sablonponie)', animal: 'poisson', lieu: 'bassin de sablonponie', prod: 'recolte', adj1: 'nouveau', adjN: 'nouveaux' }
+};
+const ELEVAGE_COUT_CATS = ['Nourriture', 'Équipement', 'Vétérinaire', 'Litière', 'Énergie', 'Autre'];
+const ELEVAGE_TYPE_LABELS = { ajout: 'Ajout', perte: 'Perte / Mortalité', ponte: 'Ponte (œufs)', recolte: 'Récolte', sante: 'Santé', note: 'Note' };
+let _elevage = {};
+
+async function loadElevage(module) {
+  const meta = ELEVAGE_META[module];
+  const root = document.getElementById(meta.container);
+  if (!root) return;
+  root.innerHTML = `<div class="loading"><div class="spinner"></div> Chargement…</div>`;
+  const [hRes, cRes] = await Promise.all([
+    sb.from('elevage_historique').select('*').eq('module', module).order('date_evenement', { ascending: false }).order('created_at', { ascending: false }),
+    sb.from('elevage_couts').select('*').eq('module', module).order('date_cout', { ascending: false })
+  ]);
+  if (hRes.error || cRes.error) {
+    root.innerHTML = `<div class="empty-state"><p>Erreur de chargement — vérifiez la migration <code>sql/011_elevages.sql</code>.<br>${escHtml((hRes.error || cRes.error).message)}</p></div>`;
+    return;
+  }
+  _elevage[module] = { hist: hRes.data || [], couts: cRes.data || [] };
+  renderElevage(module);
+}
+
+function renderElevage(module) {
+  const meta = ELEVAGE_META[module];
+  const root = document.getElementById(meta.container);
+  const st = _elevage[module] || { hist: [], couts: [] };
+  const cheptel = st.hist.reduce((n, e) => n + (e.type_evenement === 'ajout' ? Number(e.quantite || 0) : e.type_evenement === 'perte' ? -Number(e.quantite || 0) : 0), 0);
+  const totalCout = st.couts.reduce((s, c) => s + Number(c.montant || 0), 0);
+  const year = new Date().getFullYear();
+  const totalCoutYear = st.couts.filter(c => (c.date_cout || '').slice(0, 4) === String(year)).reduce((s, c) => s + Number(c.montant || 0), 0);
+  const today = new Date().toISOString().split('T')[0];
+  const typeOptions = ['ajout', 'perte', meta.prod, 'sante', 'note'].map(t => `<option value="${t}">${ELEVAGE_TYPE_LABELS[t]}</option>`).join('');
+  const catOptions = ELEVAGE_COUT_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+
+  root.innerHTML = `
+    <style>
+      .el-form{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px}
+      .el-field{display:flex;flex-direction:column;gap:3px}
+      .el-field label{font-size:11px;color:var(--text3)}
+      .el-field input,.el-field select{font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit;width:100%}
+      .el-sec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin:8px 0 8px}
+      .el-stat{text-align:right}.el-stat .l{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}.el-stat .v{font-size:1.3rem;font-weight:700}
+    </style>
+    <div class="section-header">
+      <div class="section-title"><h3 style="font-size:1.15rem">${meta.icon} ${meta.titre}</h3></div>
+      <div style="display:flex;gap:20px;align-items:center;">
+        <div class="el-stat"><div class="l">Cheptel actuel</div><div class="v" style="color:var(--accent2)">${cheptel} ${meta.animal}${cheptel > 1 ? 's' : ''}</div></div>
+        <div class="el-stat"><div class="l">Coûts ${year}</div><div class="v">${totalCoutYear.toFixed(2)} $</div></div>
+      </div>
+    </div>
+
+    <div class="el-sec">Historique des ${meta.animal}s</div>
+    <div class="el-form">
+      <div class="el-field" style="min-width:130px"><label>Date</label><input type="date" id="el-h-date-${module}" value="${today}"></div>
+      <div class="el-field" style="min-width:150px"><label>Type d'événement</label><select id="el-h-type-${module}">${typeOptions}</select></div>
+      <div class="el-field" style="width:90px"><label>Quantité</label><input type="number" step="1" min="0" id="el-h-qty-${module}"></div>
+      <div class="el-field" style="flex:1;min-width:150px"><label>Description</label><input type="text" id="el-h-desc-${module}" placeholder="race, cause…"></div>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);white-space:nowrap"><input type="checkbox" id="el-h-bb-${module}" checked style="width:auto"> 📌 Babillard</label>
+      <button class="btn btn-primary btn-sm" onclick="elevageAddHist('${module}')">+ Ajouter</button>
+    </div>
+    <div class="table-container" style="margin-bottom:26px">
+      <table><thead><tr><th>Date</th><th>Type</th><th>Qté</th><th>Description</th><th></th></tr></thead>
+      <tbody>${st.hist.length ? st.hist.map(e => `
+        <tr><td>${e.date_evenement || ''}</td><td>${ELEVAGE_TYPE_LABELS[e.type_evenement] || e.type_evenement}</td><td>${e.quantite ?? ''}</td><td>${escHtml(e.description || '')}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="elevageDelHist('${module}','${e.id}')">✕</button></td></tr>`).join('')
+        : '<tr><td colspan="5" style="text-align:center;color:var(--text3)">Aucun événement</td></tr>'}</tbody></table>
+    </div>
+
+    <div class="el-sec">Coûts d'exploitation</div>
+    <div class="el-form">
+      <div class="el-field" style="min-width:130px"><label>Date</label><input type="date" id="el-c-date-${module}" value="${today}"></div>
+      <div class="el-field" style="min-width:150px"><label>Catégorie</label><select id="el-c-cat-${module}">${catOptions}</select></div>
+      <div class="el-field" style="width:110px"><label>Montant ($)</label><input type="number" step="0.01" min="0" id="el-c-amt-${module}"></div>
+      <div class="el-field" style="flex:1;min-width:150px"><label>Description</label><input type="text" id="el-c-desc-${module}" placeholder="fournisseur, détail…"></div>
+      <button class="btn btn-primary btn-sm" onclick="elevageAddCout('${module}')">+ Ajouter</button>
+    </div>
+    <div class="table-container">
+      <table><thead><tr><th>Date</th><th>Catégorie</th><th>Montant</th><th>Description</th><th></th></tr></thead>
+      <tbody>${st.couts.length ? st.couts.map(c => `
+        <tr><td>${c.date_cout || ''}</td><td>${escHtml(c.categorie || '')}</td><td>${Number(c.montant || 0).toFixed(2)} $</td><td>${escHtml(c.description || '')}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="elevageDelCout('${module}','${c.id}')">✕</button></td></tr>`).join('')
+        : '<tr><td colspan="5" style="text-align:center;color:var(--text3)">Aucun coût</td></tr>'}
+        <tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="2">Total</td><td>${totalCout.toFixed(2)} $</td><td colspan="2"></td></tr>
+      </tbody></table>
+    </div>
+  `;
+}
+
+function elevageBabillardText(module, type, qty, desc) {
+  const m = ELEVAGE_META[module];
+  const q = qty ? Math.abs(Number(qty)) : null;
+  if (type === 'ajout') {
+    const adj = (q && q > 1) ? m.adjN : m.adj1;
+    const plural = (q && q > 1) ? 's' : '';
+    return `${m.icon} ${q ? q + ' ' + adj + ' ' + m.animal + plural : 'Un ' + m.adj1 + ' ' + m.animal} au ${m.lieu} !${desc ? ' — ' + desc : ''}`;
+  }
+  if (type === 'ponte') return `🥚 Belle ponte au poulailler${q ? ' : ' + q + ' œufs' : ''} !${desc ? ' — ' + desc : ''}`;
+  if (type === 'recolte') return `${m.icon} Récolte de la sablonponie${q ? ' : ' + q + ' poissons' : ''} !${desc ? ' — ' + desc : ''}`;
+  return `${m.icon} ${m.titre} — nouvelle activité.`;
+}
+
+async function elevageAddHist(module) {
+  const g = base => document.getElementById(base + '-' + module);
+  const date = g('el-h-date').value;
+  const type = g('el-h-type').value;
+  const qty = g('el-h-qty').value ? Number(g('el-h-qty').value) : null;
+  const desc = g('el-h-desc').value.trim() || null;
+  if (!date) { toast('Date requise', 'error'); return; }
+  const { error } = await sb.from('elevage_historique').insert({
+    module, date_evenement: date, type_evenement: type, quantite: qty, description: desc, created_by: currentProfile.id
+  });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  let posted = false;
+  if (g('el-h-bb')?.checked && ['ajout', ELEVAGE_META[module].prod].includes(type)) {
+    const { error: bbErr } = await sb.from('bulletin_board').insert({ content: elevageBabillardText(module, type, qty, desc), user_id: currentProfile.id });
+    posted = !bbErr;
+  }
+  toast(posted ? 'Événement ajouté et publié au babillard ✓' : 'Événement ajouté ✓', 'success');
+  loadElevage(module);
+}
+
+async function elevageAddCout(module) {
+  const g = base => document.getElementById(base + '-' + module);
+  const date = g('el-c-date').value;
+  const cat = g('el-c-cat').value;
+  const amt = g('el-c-amt').value ? Number(g('el-c-amt').value) : null;
+  const desc = g('el-c-desc').value.trim() || null;
+  if (!date || !amt) { toast('Date et montant requis', 'error'); return; }
+  const { error } = await sb.from('elevage_couts').insert({
+    module, date_cout: date, categorie: cat, montant: amt, description: desc, created_by: currentProfile.id
+  });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  toast('Coût ajouté ✓', 'success');
+  loadElevage(module);
+}
+
+async function elevageDelHist(module, id) {
+  if (!confirm('Supprimer cet événement ?')) return;
+  const { error } = await sb.from('elevage_historique').delete().eq('id', id);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  loadElevage(module);
+}
+
+async function elevageDelCout(module, id) {
+  if (!confirm('Supprimer ce coût ?')) return;
+  const { error } = await sb.from('elevage_couts').delete().eq('id', id);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  loadElevage(module);
 }
 
 // --- Demandes de location (candidatures) ---
