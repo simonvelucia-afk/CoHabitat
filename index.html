@@ -5858,10 +5858,21 @@ function serreDemoLoad() {
   _serre.locByZone = {};
   _serre.occ = {}; _serre.culturesByZone = {}; _serre.irrigByZone = {}; _serre.fertByZone = {};
   zones.forEach(z => { _serre.occ[z.id] = { zone_id: z.id, is_occupied: false, is_mine: false, frais_mensuel: 1 }; });
-  demoSet.forEach(d => {
+  const plantPool = ['Tomate', 'Laitue', 'Basilic', 'Concombre', 'Fraise', 'Radis', 'Poivron', 'Épinard', 'Fine herbes', 'Haricot', ''];
+  demoSet.forEach((d, k) => {
     const z = zones[d.i]; if (!z) return;
     _serre.occ[z.id].is_occupied = true;
-    _serre.culturesByZone[z.id] = [{ id: 'demo-cul-' + z.id, zone_id: z.id, location_id: 'demo-loc-' + z.id, culture: d.culture, date_semis: d.semis, date_recolte_prevue: d.prevue, statut: d.statut, rendement_qty: d.rq, rendement_unite: d.ru, notes: '' }];
+    // 3 sections, plantes différentes par section (déterministe → pas de scintillement)
+    _serre.culturesByZone[z.id] = [1, 2, 3].map(s => {
+      const p = plantPool[(d.i + s * 3 + k) % plantPool.length];
+      const st = p ? (((d.i + s) % 2 === 0) ? 'croissance' : 'recolte') : 'vide';
+      return {
+        id: `demo-cul-${z.id}-${s}`, zone_id: z.id, location_id: `demo-loc-${z.id}`, section: s,
+        culture: p || null, date_semis: p ? d.semis : null, date_recolte_prevue: p ? d.prevue : null,
+        statut: st, rendement_qty: st === 'recolte' ? Math.round((((d.i + s) % 5) + 1) * 10) / 10 : null,
+        rendement_unite: d.ru, notes: ''
+      };
+    });
     _serre.irrigByZone[z.id] = { zone_id: z.id, frequence: d.freq, systeme: d.sys };
     _serre.fertByZone[z.id] = { zone_id: z.id, type: d.fert, date_application: '2026-07-20' };
   });
@@ -5932,6 +5943,8 @@ function renderSerre() {
       .serre-row{display:flex;gap:8px}.serre-row .serre-field{flex:1}
       .serre-sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:10px 0 4px}
       .serre-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+      .serre-scion{border:1px solid var(--border);border-radius:8px;padding:9px 10px;margin-bottom:9px}
+      .serre-scion-h{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:7px}
       .serre-hist{margin-top:8px}.serre-hist summary{font-size:11px;color:var(--text3);cursor:pointer}
       .serre-hist .hi{font-size:11px;color:var(--text2);background:var(--surface2);padding:4px 8px;border-radius:6px;margin-top:4px}
       .serre-badge{font-size:11px;padding:2px 8px;border-radius:10px;white-space:nowrap}
@@ -5981,7 +5994,7 @@ function renderSerre() {
     card.querySelectorAll('[data-save]').forEach(inp => {
       inp.addEventListener('change', () => {
         const kind = inp.dataset.save;
-        if (kind === 'culture') serreSaveCulture(card);
+        if (kind === 'culture') serreSaveCulture(inp.closest('[data-section]'), card);
         else if (kind === 'irrigation') serreSaveIrrigation(card);
         else if (kind === 'fert') serreSaveFert(card);
       });
@@ -5994,7 +6007,6 @@ function serreZoneCard(zone) {
   const loc = _serre.locByZone[zone.id];             // ma location (ou toute location si admin)
   const canManage = !!loc || (_serre.isAdmin && occ.is_occupied);
   const allCul = _serre.culturesByZone[zone.id] || [];
-  const cur = allCul[0];                             // dernière culture (résumé lecture seule)
   const frais = Number(occ.frais_mensuel ?? zone.frais_mensuel ?? 0);
 
   // Zone libre → proposer la location
@@ -6015,19 +6027,24 @@ function serreZoneCard(zone) {
     </div>`;
   }
 
-  // Zone occupée mais non gérable par moi → résumé en lecture seule
+  // Zone occupée mais non gérable par moi → résumé en lecture seule (3 sections)
   if (!canManage) {
     const irr = _serre.irrigByZone[zone.id];
     const fert = _serre.fertByZone[zone.id];
+    const secLatest = [1, 2, 3].map(s => allCul.filter(c => (c.section || 1) === s)[0]);
+    const zoneStatut = secLatest.some(c => c?.statut === 'croissance') ? 'croissance'
+      : secLatest.some(c => c?.statut === 'recolte') ? 'recolte' : 'vide';
+    const planted = secLatest.map((c, i) => ({ s: i + 1, c })).filter(x => x.c?.culture);
     return `
     <div class="card serre-zone" data-zone="${zone.id}">
       <div class="card-header">
         <div class="card-title">${zone.code}</div>
-        ${serreStatutBadge(cur?.statut || 'vide')}
+        ${serreStatutBadge(zoneStatut)}
       </div>
       <div class="card-meta" style="flex-direction:column;align-items:flex-start;gap:4px;">
-        <span class="meta-item">🌿 ${cur?.culture ? escHtml(cur.culture) : pt('Zone louée')}</span>
-        ${cur?.date_semis ? `<span class="meta-item">🌱 ${pt('Semis')} ${cur.date_semis}</span>` : ''}
+        ${planted.length
+          ? planted.map(x => `<span class="meta-item">🌿 <strong>${zone.code}-${x.s}</strong> ${escHtml(x.c.culture)} · ${SERRE_STATUT_LABELS[x.c.statut] || ''}</span>`).join('')
+          : `<span class="meta-item">🌿 ${pt('Zone louée')}</span>`}
         ${irr?.systeme ? `<span class="meta-item">💧 ${escHtml(irr.systeme)}</span>` : ''}
         ${fert?.type ? `<span class="meta-item">🧪 ${(SERRE_FERT.find(f => f.v === fert.type) || {}).l || fert.type}</span>` : ''}
       </div>
@@ -6035,48 +6052,36 @@ function serreZoneCard(zone) {
     </div>`;
   }
 
-  // Zone gérable (la mienne, ou admin) → éditeur complet
+  // Zone gérable (la mienne, ou admin) → 1 location, 3 sections de culture
   const irr = _serre.irrigByZone[zone.id] || {};
   const fert = _serre.fertByZone[zone.id] || {};
-  // Cultures scopées à la location courante (l'historique de la zone
-  // physique reste propre à chaque locataire successif).
+  // Cultures scopées à la location courante, puis regroupées par section.
+  // L'historique reste ainsi propre à chaque section ET à chaque locataire.
   const locCul = loc ? allCul.filter(c => c.location_id === loc.id) : allCul;
-  const curM = locCul[0];
-  const hist = locCul.slice(1).filter(c => c.culture);
-  const st = curM?.statut || 'vide';
+  const bySec = { 1: [], 2: [], 3: [] };
+  locCul.forEach(c => { const s = c.section || 1; (bySec[s] = bySec[s] || []).push(c); });
+  const secCur = [1, 2, 3].map(s => (bySec[s] || [])[0]);
+  const zoneStatut = secCur.some(c => c?.statut === 'croissance') ? 'croissance'
+    : secCur.some(c => c?.statut === 'recolte') ? 'recolte' : 'vide';
   const owner = (_serre.isAdmin && loc?.tenant_id !== currentProfile?.id) ? (loc?.profiles?.full_name || '') : '';
 
   return `
-  <div class="card serre-zone" data-zone="${zone.id}" data-loc="${loc?.id || ''}" data-culture="${curM?.id || ''}" data-manage="1">
+  <div class="card serre-zone" data-zone="${zone.id}" data-loc="${loc?.id || ''}" data-manage="1">
     <div class="card-header">
       <div class="card-title">${zone.code}${owner ? ` <span style="font-weight:400;color:var(--text3);font-size:12px;">· ${escHtml(owner)}</span>` : ''}</div>
-      ${serreStatutBadge(st)}
+      ${serreStatutBadge(zoneStatut)}
     </div>
+    <div style="font-size:11px;color:var(--text3);margin:-2px 0 6px;">${pt('3 sections depuis l’allée — une plante différente par section')}</div>
 
-    <div class="serre-field"><label>${pt('Culture')}</label>
-      <select data-f="culture" data-save="culture">${serreOpt(SERRE_CULTURES, curM?.culture || '')}</select></div>
-    <div class="serre-row">
-      <div class="serre-field"><label>${pt('Semis')}</label><input type="date" data-f="semis" data-save="culture" value="${curM?.date_semis || ''}"></div>
-      <div class="serre-field"><label>${pt('Récolte prévue')}</label><input type="date" data-f="recolte" data-save="culture" value="${curM?.date_recolte_prevue || ''}"></div>
-    </div>
-    <div class="serre-field"><label>${pt('Statut')}</label>
-      <select data-f="statut" data-save="culture">
-        ${['vide', 'croissance', 'recolte'].map(s => `<option value="${s}"${st === s ? ' selected' : ''}>${SERRE_STATUT_LABELS[s]}</option>`).join('')}
-      </select></div>
+    ${[1, 2, 3].map(s => serreSectionBlock(zone, s, (bySec[s] || [])[0], (bySec[s] || []).slice(1).filter(c => c.culture))).join('')}
 
-    <div class="serre-sec">${pt('Rendement')}</div>
-    <div class="serre-row">
-      <div class="serre-field"><label>${pt('Quantité')}</label><input type="number" step="0.1" min="0" data-f="rqty" data-save="culture" value="${curM?.rendement_qty ?? ''}"></div>
-      <div class="serre-field"><label>${pt('Unité')}</label><select data-f="runite" data-save="culture">${serreOpt(SERRE_UNITES, curM?.rendement_unite || 'kg')}</select></div>
-    </div>
-
-    <div class="serre-sec">${pt('Irrigation')}</div>
+    <div class="serre-sec">${pt('Irrigation')} <span style="font-weight:400;text-transform:none;letter-spacing:0;">· ${pt('zone entière')}</span></div>
     <div class="serre-row">
       <div class="serre-field"><label>${pt('Fréquence')}</label><select data-f="ifreq" data-save="irrigation">${serreOpt(['', ...SERRE_FREQ], irr.frequence || '')}</select></div>
       <div class="serre-field"><label>${pt('Système')}</label><select data-f="isys" data-save="irrigation">${serreOpt(['', ...SERRE_SYSTEMES], irr.systeme || '')}</select></div>
     </div>
 
-    <div class="serre-sec">${pt('Fertilisation')}</div>
+    <div class="serre-sec">${pt('Fertilisation')} <span style="font-weight:400;text-transform:none;letter-spacing:0;">· ${pt('zone entière')}</span></div>
     <div class="serre-row">
       <div class="serre-field"><label>${pt('Type')}</label>
         <select data-f="ftype" data-save="fert">
@@ -6086,30 +6091,51 @@ function serreZoneCard(zone) {
       <div class="serre-field"><label>${pt('Dernière application')}</label><input type="date" data-f="fdate" data-save="fert" value="${fert.date_application || ''}"></div>
     </div>
 
-    <div class="serre-field"><label>${pt('Notes')}</label><textarea data-f="notes" data-save="culture">${escHtml(curM?.notes || '')}</textarea></div>
-
-    ${hist.length ? `<details class="serre-hist"><summary>${pt('Historique')} (${hist.length})</summary>
-      ${hist.map(h => `<div class="hi">${h.culture ? escHtml(h.culture) : '—'} · ${pt('semé')} ${h.date_semis || '?'} → ${pt('récolté')} ${h.date_recolte_reelle || '?'} · ${h.rendement_qty || '0'} ${h.rendement_unite || ''}</div>`).join('')}
-    </details>` : ''}
-
     <div class="serre-actions">
-      <button class="btn btn-secondary btn-sm" onclick="serreArchiveCulture('${zone.id}')">${pt('Archiver & recommencer')}</button>
       ${loc?.tenant_id === currentProfile?.id ? `<button class="btn btn-danger btn-sm" onclick="serreReleaseZone('${loc.id}','${zone.code}')">${pt('Libérer la zone')}</button>` : ''}
     </div>
   </div>`;
 }
 
-function serreReadCard(card) {
-  const g = f => card.querySelector('[data-f="' + f + '"]');
-  return { g };
+// Bloc d'une section de culture (1 à 3) au sein d'une zone gérable.
+function serreSectionBlock(zone, s, cur, hist) {
+  const st = cur?.statut || 'vide';
+  return `
+    <div class="serre-scion" data-section="${s}" data-culture="${cur?.id || ''}">
+      <div class="serre-scion-h">
+        <span>${pt('Section')} ${zone.code}-${s}${s === 1 ? ` · ${pt('allée')}` : ''}</span>
+        ${serreStatutBadge(st)}
+      </div>
+      <div class="serre-field"><label>${pt('Culture')}</label>
+        <select data-f="culture" data-save="culture">${serreOpt(SERRE_CULTURES, cur?.culture || '')}</select></div>
+      <div class="serre-row">
+        <div class="serre-field"><label>${pt('Semis')}</label><input type="date" data-f="semis" data-save="culture" value="${cur?.date_semis || ''}"></div>
+        <div class="serre-field"><label>${pt('Récolte prévue')}</label><input type="date" data-f="recolte" data-save="culture" value="${cur?.date_recolte_prevue || ''}"></div>
+      </div>
+      <div class="serre-row">
+        <div class="serre-field"><label>${pt('Statut')}</label>
+          <select data-f="statut" data-save="culture">
+            ${['vide', 'croissance', 'recolte'].map(x => `<option value="${x}"${st === x ? ' selected' : ''}>${SERRE_STATUT_LABELS[x]}</option>`).join('')}
+          </select></div>
+        <div class="serre-field"><label>${pt('Quantité')}</label><input type="number" step="0.1" min="0" data-f="rqty" data-save="culture" value="${cur?.rendement_qty ?? ''}"></div>
+        <div class="serre-field"><label>${pt('Unité')}</label><select data-f="runite" data-save="culture">${serreOpt(SERRE_UNITES, cur?.rendement_unite || 'kg')}</select></div>
+      </div>
+      <div class="serre-field"><label>${pt('Notes')}</label><textarea data-f="notes" data-save="culture">${escHtml(cur?.notes || '')}</textarea></div>
+      ${hist.length ? `<details class="serre-hist"><summary>${pt('Historique')} (${hist.length})</summary>
+        ${hist.map(h => `<div class="hi">${h.culture ? escHtml(h.culture) : '—'} · ${pt('semé')} ${h.date_semis || '?'} → ${pt('récolté')} ${h.date_recolte_reelle || '?'} · ${h.rendement_qty || '0'} ${h.rendement_unite || ''}</div>`).join('')}
+      </details>` : ''}
+      <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="serreArchiveCulture('${zone.id}',${s})">${pt('Archiver cette section')}</button>
+    </div>`;
 }
 
-async function serreSaveCulture(card) {
-  const cultureId = card.dataset.culture;
+async function serreSaveCulture(sectionEl, card) {
+  const cultureId = sectionEl.dataset.culture;
   const zoneId = card.dataset.zone;
-  const locId = card.dataset.loc;
-  const g = f => card.querySelector('[data-f="' + f + '"]');
+  const locId = card.dataset.loc || null;
+  const section = Number(sectionEl.dataset.section) || 1;
+  const g = f => sectionEl.querySelector('[data-f="' + f + '"]');
   const payload = {
+    section: section,
     culture: g('culture').value || null,
     date_semis: g('semis').value || null,
     date_recolte_prevue: g('recolte').value || null,
@@ -6120,11 +6146,11 @@ async function serreSaveCulture(card) {
   };
   let res;
   if (cultureId) res = await sb.from('serre_cultures').update(payload).eq('id', cultureId).select().single();
-  else res = await sb.from('serre_cultures').insert(Object.assign({ zone_id: zoneId, location_id: locId || null }, payload)).select().single();
+  else res = await sb.from('serre_cultures').insert(Object.assign({ zone_id: zoneId, location_id: locId }, payload)).select().single();
   if (res.error) { toast('Erreur : ' + res.error.message, 'error'); return; }
-  if (!cultureId && res.data) card.dataset.culture = res.data.id;
-  // Rafraîchir le badge de statut
-  const badge = card.querySelector('.serre-badge');
+  if (!cultureId && res.data) sectionEl.dataset.culture = res.data.id;
+  // Rafraîchir le badge de statut de la section
+  const badge = sectionEl.querySelector('.serre-badge');
   if (badge) badge.outerHTML = serreStatutBadge(payload.statut);
   serreFlash('Enregistré ✓');
 }
@@ -6156,20 +6182,21 @@ async function serreSaveFert(card) {
   serreFlash('Fertilisation enregistrée ✓');
 }
 
-async function serreArchiveCulture(zoneId) {
+async function serreArchiveCulture(zoneId, section) {
   const card = document.querySelector('.serre-zone[data-zone="' + zoneId + '"]');
-  if (!card) return;
-  const cultureId = card.dataset.culture;
+  const sectionEl = card?.querySelector('[data-section="' + section + '"]');
+  if (!card || !sectionEl) return;
+  const cultureId = sectionEl.dataset.culture;
   const locId = card.dataset.loc || null;
-  const cultureVal = card.querySelector('[data-f="culture"]')?.value;
+  const cultureVal = sectionEl.querySelector('[data-f="culture"]')?.value;
   if (!cultureId || !cultureVal) { toast('Rien à archiver', 'info'); return; }
-  // Sauver l'état courant, marquer récolté, puis créer un nouveau cycle vide
-  await serreSaveCulture(card);
+  // Sauver l'état courant, marquer récolté, puis créer un nouveau cycle vide (même section)
+  await serreSaveCulture(sectionEl, card);
   const today = new Date().toISOString().split('T')[0];
   const cur = (_serre.culturesByZone[zoneId] || []).find(c => c.id === cultureId);
   await sb.from('serre_cultures').update({ statut: 'recolte', date_recolte_reelle: cur?.date_recolte_reelle || today }).eq('id', cultureId);
-  await sb.from('serre_cultures').insert({ zone_id: zoneId, location_id: locId, statut: 'vide' });
-  toast('Culture archivée', 'success');
+  await sb.from('serre_cultures').insert({ zone_id: zoneId, location_id: locId, section: section, statut: 'vide' });
+  toast('Section archivée', 'success');
   loadSerre();
 }
 
@@ -6194,8 +6221,12 @@ async function serreRentZone(zoneId, code, frais) {
     loadSerre(); return;
   }
 
-  // Cycle de culture vide initial
-  await sb.from('serre_cultures').insert({ zone_id: zoneId, location_id: loc.id, statut: 'vide' });
+  // Cycles de culture vides : une section par sous-partie (1 à 3)
+  await sb.from('serre_cultures').insert([
+    { zone_id: zoneId, location_id: loc.id, section: 1, statut: 'vide' },
+    { zone_id: zoneId, location_id: loc.id, section: 2, statut: 'vide' },
+    { zone_id: zoneId, location_id: loc.id, section: 3, statut: 'vide' }
+  ]);
 
   // Débit du premier mois (type whitelisté finance-bridge : space_reservation)
   if (fee > 0) {
@@ -6294,15 +6325,19 @@ async function serreChargeDueFees(myLocs) {
 }
 
 async function exportSerreCSV() {
-  let csv = "Zone,Statut location,Culture,Semis,Recolte prevue,Statut culture,Rendement,Unite,Irrigation freq,Irrigation systeme,Fertilisation,Frais mensuel,Notes\n";
+  let csv = "Zone,Section,Statut location,Culture,Semis,Recolte prevue,Statut culture,Rendement,Unite,Irrigation freq,Irrigation systeme,Fertilisation,Frais mensuel,Notes\n";
   for (const z of _serre.zones) {
     const occ = _serre.occ[z.id] || {};
-    const cur = (_serre.culturesByZone[z.id] || [])[0] || {};
+    const all = _serre.culturesByZone[z.id] || [];
     const irr = _serre.irrigByZone[z.id] || {};
     const fert = _serre.fertByZone[z.id] || {};
     const fertL = fert.type ? ((SERRE_FERT.find(f => f.v === fert.type) || {}).l || fert.type) : '';
-    const notes = (cur.notes || '').replace(/"/g, '""');
-    csv += `${z.code},${occ.is_occupied ? 'Louée' : 'Libre'},${cur.culture || ''},${cur.date_semis || ''},${cur.date_recolte_prevue || ''},${SERRE_STATUT_LABELS[cur.statut] || ''},${cur.rendement_qty || ''},${cur.rendement_unite || ''},${irr.frequence || ''},${irr.systeme || ''},${fertL},${z.frais_mensuel || ''},"${notes}"\n`;
+    // Une ligne par section (1 à 3)
+    for (let s = 1; s <= 3; s++) {
+      const cur = all.filter(c => (c.section || 1) === s)[0] || {};
+      const notes = (cur.notes || '').replace(/"/g, '""');
+      csv += `${z.code},${z.code}-${s},${occ.is_occupied ? 'Louée' : 'Libre'},${cur.culture || ''},${cur.date_semis || ''},${cur.date_recolte_prevue || ''},${SERRE_STATUT_LABELS[cur.statut] || ''},${cur.rendement_qty || ''},${cur.rendement_unite || ''},${irr.frequence || ''},${irr.systeme || ''},${fertL},${z.frais_mensuel || ''},"${notes}"\n`;
+    }
   }
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);

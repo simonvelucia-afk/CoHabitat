@@ -59,6 +59,7 @@ create table if not exists serre_cultures (
   id uuid primary key default gen_random_uuid(),
   zone_id uuid not null references serre_zones(id) on delete cascade,
   location_id uuid references serre_locations(id) on delete set null,
+  section int not null default 1 check (section between 1 and 3),  -- sous-section de la zone (1 à 3, depuis l'allée)
   culture text,
   date_semis date,
   date_recolte_prevue date,
@@ -70,8 +71,16 @@ create table if not exists serre_cultures (
   notes text,
   created_at timestamptz default now()
 );
+-- Colonne section pour installs antérieures (create table if not exists n'ajoute rien)
+alter table serre_cultures add column if not exists section int not null default 1;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'serre_cultures_section_check') then
+    alter table serre_cultures add constraint serre_cultures_section_check check (section between 1 and 3);
+  end if;
+end $$;
 create index if not exists idx_serre_cultures_zone on serre_cultures(zone_id);
 create index if not exists idx_serre_cultures_location on serre_cultures(location_id);
+create index if not exists idx_serre_cultures_loc_section on serre_cultures(location_id, section);
 
 -- ============================================================
 -- 4. Fertilisation (compost / backwash sandponique)
@@ -134,6 +143,7 @@ select
   loc.date_debut,
   loc.date_fin,
   loc.statut as statut_location,
+  c.section,
   c.culture,
   c.date_semis,
   c.date_recolte_reelle,

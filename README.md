@@ -61,8 +61,9 @@ Dans Supabase → **Authentication → URL Configuration**:
 - Section dédiée en bas de la page **Espaces communs**
 - 20 zones de culture (2 planches × 10 zones de 2 × 3 pi)
 - Serre commune + 20 zones attribuables, louables **au mois** (frais de base **1 $/mois** par zone, débité via le solde virtuel)
-- Suivi par zone : culture, semis, récolte, statut, rendement, irrigation, fertilisation, notes
-- Historique des cultures par location + export CSV
+- Chaque zone se divise en **3 sections** (ex. P1-Z4-1/-2/-3, numérotées depuis l'allée) pour cultiver **des plantes différentes** — une seule location par zone
+- Suivi par section : culture, semis, récolte, statut, rendement, notes ; irrigation et fertilisation gérées à l'échelle de la zone
+- Historique des cultures **par section** + export CSV (une ligne par section)
 - Suivi des conditions : températures air/eau et niveaux des 3 réservoirs
 - Activable/désactivable par l'admin (module optionnel `module_serre`)
 - Migration : `sql/009_serre.sql`
@@ -105,7 +106,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 | `system_settings` | Paramètres configurables |
 | `serre_zones` | Zones de culture de la serre (fixes) |
 | `serre_locations` | Locations mensuelles d'une zone par un locataire |
-| `serre_cultures` | Cycles de culture (plantation → récolte) |
+| `serre_cultures` | Cycles de culture par section (1-3) d'une zone |
 | `serre_fertilisations` | Applications de fertilisant par zone |
 | `serre_irrigation_config` | Config d'irrigation par zone |
 | `serre_reservoirs` | Réservoirs d'eau de la serre |
