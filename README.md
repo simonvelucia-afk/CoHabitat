@@ -66,8 +66,9 @@ Dans Supabase → **Authentication → URL Configuration**:
 - Suivi par section : culture, semis, récolte, statut, rendement, irrigation (fréquence/système), fertilisation, notes
 - Historique des cultures **par section** + export CSV (une ligne par section)
 - Suivi des conditions : température de l'air + **niveau et température propres à chacun des 3 réservoirs**
+- **Panneau admin** (onglet 🌱 Serre) : attribution des zones aux locataires (revenu mensuel, zones occupées) + **frais d'exploitation** de la serre (semences, terreau, eau, électricité…)
 - Activable/désactivable par l'admin (module optionnel `module_serre`)
-- Migration : `sql/009_serre.sql`
+- Migrations : `sql/009_serre.sql`, `sql/010_serre_reservoir_temps.sql`, `sql/012_serre_couts_module.sql`
 
 ### Administration
 - Gestion des locataires et unités
@@ -114,4 +115,4 @@ Dans Supabase → **Authentication → URL Configuration**:
 | `serre_reservoirs` | Réservoirs d'eau de la serre |
 | `serre_lectures` | Lectures de capteurs (températures, niveaux) |
 | `elevage_historique` | Historique poulailler / sablonponie (événements) |
-| `elevage_couts` | Coûts d'exploitation poulailler / sablonponie |
+| `elevage_couts` | Coûts d'exploitation serre / poulailler / sablonponie |

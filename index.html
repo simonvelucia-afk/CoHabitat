@@ -1617,6 +1617,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         <button class="admin-tab" id="demandes-tab" onclick="adminTab('demandes')" data-pt="Demandes">📋 Demandes <span id="demandes-pending-count" class="badge badge-yellow" style="display:none;font-size:10px;margin-left:4px;padding:1px 6px;"></span></button>
         <button class="admin-tab" onclick="adminTab('spaces-admin')" data-pt="Espaces">Espaces</button>
         <button class="admin-tab" onclick="adminTab('vehicles-admin')" data-pt="Véhicules">Véhicules</button>
+        <button class="admin-tab" onclick="adminTab('serre')">🌱 Serre</button>
         <button class="admin-tab" onclick="adminTab('poulailler')">🐔 Poulailler</button>
         <button class="admin-tab" onclick="adminTab('poissons')">🐟 Poissons</button>
         <button class="admin-tab" onclick="adminTab('payments')" data-pt="Paiements">Paiements</button>
@@ -1709,6 +1710,9 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
           </table>
         </div>
       </div>
+
+      <!-- Serre admin : attribution des zones + frais d'exploitation -->
+      <div id="admin-serre" class="admin-section" style="display:none"></div>
 
       <!-- Élevages : poulailler & sablonponie (rempli par renderElevage) -->
       <div id="admin-poulailler" class="admin-section" style="display:none"></div>
@@ -9013,6 +9017,7 @@ async function adminTab(tab) {
     case 'demandes': await loadBuildingDemandes(); break;
     case 'spaces-admin': await loadAdminSpaces(); break;
     case 'vehicles-admin': await loadAdminVehicles(); break;
+    case 'serre': await loadSerreAdmin(); break;
     case 'poulailler': await loadElevage('poulailler'); break;
     case 'poissons': await loadElevage('sablonponie'); break;
     case 'payments': await loadAdminPayments(); break;
@@ -9164,7 +9169,13 @@ async function elevageAddCout(module) {
   });
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }
   toast('Coût ajouté ✓', 'success');
-  loadElevage(module);
+  reloadCoutsView(module);
+}
+
+// Recharge la bonne vue après ajout/suppression d'un coût (serre ou élevage).
+function reloadCoutsView(module) {
+  if (module === 'serre') loadSerreAdmin();
+  else loadElevage(module);
 }
 
 async function elevageDelHist(module, id) {
@@ -9178,7 +9189,145 @@ async function elevageDelCout(module, id) {
   if (!confirm('Supprimer ce coût ?')) return;
   const { error } = await sb.from('elevage_couts').delete().eq('id', id);
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }
-  loadElevage(module);
+  reloadCoutsView(module);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SERRE (admin) — attribution des zones aux locataires + frais d'exploitation
+// ═══════════════════════════════════════════════════════════════════════
+const SERRE_COUT_CATS = ['Semences', 'Terreau / substrat', 'Eau', 'Électricité', 'Équipement', 'Entretien', 'Autre'];
+let _serreAdmin = { zones: [], locByZone: {}, tenants: [], couts: [] };
+
+async function loadSerreAdmin() {
+  const root = document.getElementById('admin-serre');
+  if (!root) return;
+  root.innerHTML = `<div class="loading"><div class="spinner"></div> Chargement…</div>`;
+  const [zRes, lRes, tRes, cRes] = await Promise.all([
+    sb.from('serre_zones').select('*').eq('is_active', true).order('planche').order('position'),
+    sb.from('serre_locations').select('id, zone_id, tenant_id, date_debut, frais_mensuel, profiles(full_name, unit)').eq('statut', 'active'),
+    sb.from('profiles').select('id, full_name, unit, role').neq('role', 'demo').order('full_name'),
+    sb.from('elevage_couts').select('*').eq('module', 'serre').order('date_cout', { ascending: false })
+  ]);
+  if (zRes.error) {
+    root.innerHTML = `<div class="empty-state"><p>Erreur de chargement — vérifiez les migrations serre.<br>${escHtml(zRes.error.message)}</p></div>`;
+    return;
+  }
+  _serreAdmin.zones = zRes.data || [];
+  _serreAdmin.locByZone = {};
+  (lRes.data || []).forEach(l => { _serreAdmin.locByZone[l.zone_id] = l; });
+  _serreAdmin.tenants = tRes.data || [];
+  _serreAdmin.couts = cRes.data || [];
+  renderSerreAdmin();
+}
+
+function renderSerreAdmin() {
+  const root = document.getElementById('admin-serre');
+  const zones = _serreAdmin.zones;
+  const occ = Object.keys(_serreAdmin.locByZone).length;
+  const revenu = Object.values(_serreAdmin.locByZone).reduce((s, l) => s + Number(l.frais_mensuel || 0), 0);
+  const totalCout = _serreAdmin.couts.reduce((s, c) => s + Number(c.montant || 0), 0);
+  const year = new Date().getFullYear();
+  const totalCoutYear = _serreAdmin.couts.filter(c => (c.date_cout || '').slice(0, 4) === String(year)).reduce((s, c) => s + Number(c.montant || 0), 0);
+  const today = new Date().toISOString().split('T')[0];
+
+  const tenantOpts = (selId) => `<option value="">— Libre —</option>` + _serreAdmin.tenants.map(t =>
+    `<option value="${t.id}"${t.id === selId ? ' selected' : ''}>${escHtml(t.full_name || t.id)}${t.unit ? ' (' + escHtml(t.unit) + ')' : ''}</option>`).join('');
+
+  const rows = zones.map(z => {
+    const loc = _serreAdmin.locByZone[z.id];
+    const curName = loc ? (loc.profiles?.full_name || '—') : '';
+    return `<tr>
+      <td style="font-weight:600">${z.code}</td>
+      <td>${Number(z.frais_mensuel || 0).toFixed(2)} $</td>
+      <td>${loc ? escHtml(curName) + (loc.profiles?.unit ? ' <span style="color:var(--text3)">(' + escHtml(loc.profiles.unit) + ')</span>' : '') + ' <span style="color:var(--text3);font-size:11px">· depuis ' + (loc.date_debut || '') + '</span>' : '<span style="color:var(--text3)">Libre</span>'}</td>
+      <td><select id="sa-sel-${z.id}" style="font-size:13px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);min-width:180px">${tenantOpts(loc?.tenant_id)}</select></td>
+      <td><button class="btn btn-primary btn-sm" onclick="serreAdminAssign('${z.id}')">Enregistrer</button></td>
+    </tr>`;
+  }).join('');
+
+  const coutRows = _serreAdmin.couts.length ? _serreAdmin.couts.map(c => `
+    <tr><td>${c.date_cout || ''}</td><td>${escHtml(c.categorie || '')}</td><td>${Number(c.montant || 0).toFixed(2)} $</td><td>${escHtml(c.description || '')}</td>
+    <td><button class="btn btn-secondary btn-sm" onclick="elevageDelCout('serre','${c.id}')">✕</button></td></tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;color:var(--text3)">Aucun coût</td></tr>';
+
+  root.innerHTML = `
+    <style>
+      .sa-form{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px}
+      .sa-field{display:flex;flex-direction:column;gap:3px}
+      .sa-field label{font-size:11px;color:var(--text3)}
+      .sa-field input,.sa-field select{font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit;width:100%}
+      .sa-sec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin:8px 0 8px}
+    </style>
+    <div class="section-header">
+      <div class="section-title"><h3 style="font-size:1.15rem">🌱 Serre — gestion</h3></div>
+      <div style="display:flex;gap:20px;align-items:center;">
+        <div style="text-align:right"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Zones attribuées</div><div style="font-size:1.3rem;font-weight:700;color:var(--accent2)">${occ} / ${zones.length}</div></div>
+        <div style="text-align:right"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Revenu mensuel</div><div style="font-size:1.3rem;font-weight:700">${revenu.toFixed(2)} $</div></div>
+        <div style="text-align:right"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Coûts ${year}</div><div style="font-size:1.3rem;font-weight:700">${totalCoutYear.toFixed(2)} $</div></div>
+      </div>
+    </div>
+
+    <div class="sa-sec">Attribution des zones</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Choisissez un locataire et cliquez « Enregistrer ». Le frais mensuel de la zone est ensuite facturé automatiquement côté locataire (à sa prochaine visite de la serre).</div>
+    <div class="table-container" style="margin-bottom:26px">
+      <table><thead><tr><th>Zone</th><th>Frais/mois</th><th>Locataire actuel</th><th>Attribuer à</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    </div>
+
+    <div class="sa-sec">Frais d'exploitation de la serre</div>
+    <div class="sa-form">
+      <div class="sa-field" style="min-width:130px"><label>Date</label><input type="date" id="el-c-date-serre" value="${today}"></div>
+      <div class="sa-field" style="min-width:150px"><label>Catégorie</label><select id="el-c-cat-serre">${SERRE_COUT_CATS.map(c => `<option value="${c}">${c}</option>`).join('')}</select></div>
+      <div class="sa-field" style="width:110px"><label>Montant ($)</label><input type="number" step="0.01" min="0" id="el-c-amt-serre"></div>
+      <div class="sa-field" style="flex:1;min-width:150px"><label>Description</label><input type="text" id="el-c-desc-serre" placeholder="fournisseur, détail…"></div>
+      <button class="btn btn-primary btn-sm" onclick="elevageAddCout('serre')">+ Ajouter</button>
+    </div>
+    <div class="table-container">
+      <table><thead><tr><th>Date</th><th>Catégorie</th><th>Montant</th><th>Description</th><th></th></tr></thead>
+      <tbody>${coutRows}
+        <tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="2">Total</td><td>${totalCout.toFixed(2)} $</td><td colspan="2"></td></tr>
+      </tbody></table>
+    </div>
+  `;
+}
+
+async function serreAdminAssign(zoneId) {
+  const sel = document.getElementById('sa-sel-' + zoneId);
+  if (!sel) return;
+  const tenantId = sel.value;
+  const zone = _serreAdmin.zones.find(z => z.id === zoneId);
+  const cur = _serreAdmin.locByZone[zoneId];
+  const today = new Date().toISOString().split('T')[0];
+
+  if (!tenantId) {
+    if (!cur) { toast('Zone déjà libre', 'info'); return; }
+    if (!confirm(`Libérer la zone ${zone.code} ?`)) return;
+    const { error } = await sb.from('serre_locations').update({ statut: 'terminee', date_fin: today }).eq('id', cur.id);
+    if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+    toast('Zone libérée', 'success');
+    loadSerreAdmin();
+    return;
+  }
+
+  if (cur && cur.tenant_id === tenantId) { toast('Déjà attribuée à ce locataire', 'info'); return; }
+  const tName = (_serreAdmin.tenants.find(t => t.id === tenantId)?.full_name) || 'ce locataire';
+  if (!confirm(`Attribuer la zone ${zone.code} à ${tName} ?${cur ? '\n(La location actuelle sera terminée.)' : ''}`)) return;
+
+  if (cur) {
+    await sb.from('serre_locations').update({ statut: 'terminee', date_fin: today }).eq('id', cur.id);
+  }
+  const { data: loc, error } = await sb.from('serre_locations').insert({
+    zone_id: zoneId, tenant_id: tenantId, date_debut: today,
+    frais_mensuel: zone.frais_mensuel, statut: 'active'
+  }).select().single();
+  if (error) {
+    toast(error.code === '23505' ? 'Cette zone a déjà une location active' : 'Erreur : ' + error.message, 'error');
+    loadSerreAdmin(); return;
+  }
+  // 3 sections vides pour le nouveau locataire
+  await sb.from('serre_cultures').insert([1, 2, 3].map(s => ({ zone_id: zoneId, location_id: loc.id, section: s, statut: 'vide' })));
+  toast(`Zone ${zone.code} attribuée à ${tName} ✓`, 'success');
+  loadSerreAdmin();
 }
 
 // --- Demandes de location (candidatures) ---
