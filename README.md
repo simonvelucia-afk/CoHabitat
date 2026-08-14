@@ -57,6 +57,16 @@ Dans Supabase → **Authentication → URL Configuration**:
 - Réservation de cargo disponible
 - Annulation avec règles configurables
 
+### Serre communautaire
+- Section dédiée en bas de la page **Espaces communs**
+- 20 zones de culture (2 planches × 10 zones de 2 × 3 pi)
+- Serre commune + 20 zones attribuables, louables **au mois** (frais de base **1 $/mois** par zone, débité via le solde virtuel)
+- Suivi par zone : culture, semis, récolte, statut, rendement, irrigation, fertilisation, notes
+- Historique des cultures par location + export CSV
+- Suivi des conditions : températures air/eau et niveaux des 3 réservoirs
+- Activable/désactivable par l'admin (module optionnel `module_serre`)
+- Migration : `sql/009_serre.sql`
+
 ### Administration
 - Gestion des locataires et unités
 - Gestion des espaces communs + tarification
@@ -93,3 +103,10 @@ Dans Supabase → **Authentication → URL Configuration**:
 | `reservation_requests` | Log de toutes les actions |
 | `notifications` | Notifications utilisateurs |
 | `system_settings` | Paramètres configurables |
+| `serre_zones` | Zones de culture de la serre (fixes) |
+| `serre_locations` | Locations mensuelles d'une zone par un locataire |
+| `serre_cultures` | Cycles de culture (plantation → récolte) |
+| `serre_fertilisations` | Applications de fertilisant par zone |
+| `serre_irrigation_config` | Config d'irrigation par zone |
+| `serre_reservoirs` | Réservoirs d'eau de la serre |
+| `serre_lectures` | Lectures de capteurs (températures, niveaux) |
