@@ -62,6 +62,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 - Serre commune : **2 rangées × 10 colonnes = 20 zones** (2 × 3 pi), attribuables et louables **au mois** (frais de base **1 $/mois** par zone, débité via le solde virtuel)
 - Chaque zone se divise en **3 sections indépendantes** numérotées depuis l'allée — codage **R1C4S2** (Rangée 1, Colonne 4, Section 2)
 - Chaque section a **sa propre culture, irrigation et fertilisation** (plantes et traitements différents), pour une seule location par zone
+- **Plan visuel de la serre** : les 20 zones sur 2 rangées avec allée centrale ; chaque section montre en direct **ce qui pousse (emoji) et son stade** (couleur). Clic sur une zone → détails + historique
 - Suivi par section : culture, semis, récolte, statut, rendement, irrigation (fréquence/système), fertilisation, notes
 - Historique des cultures **par section** + export CSV (une ligne par section)
 - Suivi des conditions : températures air/eau et niveaux des 3 réservoirs
