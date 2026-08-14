@@ -5830,11 +5830,53 @@ function serreFlash(msg) {
   el._t = setTimeout(() => { el.textContent = ''; }, 1600);
 }
 
+// Jeu de données fictif pour le mode démo (aucun accès base). Les zones
+// occupées montrent des cultures représentatives ; les occupants restent
+// anonymisés à l'affichage (anonName). Consultation seule.
+function serreDemoLoad() {
+  const zones = [];
+  for (let p = 1; p <= 2; p++) for (let z = 1; z <= 10; z++) {
+    zones.push({ id: `demo-P${p}Z${z}`, code: `P${p}-Z${z}`, planche: p, position: z, largeur_pi: 2, longueur_pi: 3, frais_mensuel: 1, is_active: true });
+  }
+  const demoSet = [
+    { i: 0,  culture: 'Tomate',      statut: 'croissance', semis: '2026-05-02', prevue: '2026-08-20', rq: 3.5, ru: 'kg',      freq: 'Aux 2 jours', sys: 'Goutte-à-goutte',              fert: 'compost' },
+    { i: 1,  culture: 'Laitue',      statut: 'croissance', semis: '2026-06-10', prevue: '2026-08-01', rq: null, ru: 'unités', freq: 'Quotidien',   sys: 'Aspersion',                    fert: 'compost_backwash' },
+    { i: 2,  culture: 'Laitue',      statut: 'recolte',    semis: '2026-04-01', prevue: '2026-06-15', rq: 6,   ru: 'unités',  freq: 'Quotidien',   sys: 'Aspersion',                    fert: 'compost' },
+    { i: 3,  culture: 'Basilic',     statut: 'recolte',    semis: '2026-04-15', prevue: '2026-07-01', rq: 0.8, ru: 'kg',      freq: '2x/semaine',  sys: 'Manuel',                       fert: 'backwash_sandponique' },
+    { i: 5,  culture: 'Concombre',   statut: 'croissance', semis: '2026-05-20', prevue: '2026-08-25', rq: null, ru: 'kg',     freq: 'Aux 2 jours', sys: 'Sandponique (recirculation)',  fert: 'compost' },
+    { i: 7,  culture: 'Fraise',      statut: 'croissance', semis: '2026-03-30', prevue: '2026-07-15', rq: 1.2, ru: 'kg',      freq: 'Quotidien',   sys: 'Goutte-à-goutte',              fert: 'compost' },
+    { i: 9,  culture: 'Radis',       statut: 'recolte',    semis: '2026-06-01', prevue: '2026-07-10', rq: 2.0, ru: 'bottes',  freq: 'Selon besoin', sys: 'Manuel',                      fert: 'autre' },
+    { i: 11, culture: 'Poivron',     statut: 'croissance', semis: '2026-05-05', prevue: '2026-09-01', rq: null, ru: 'kg',     freq: 'Aux 2 jours', sys: 'Goutte-à-goutte',              fert: 'compost_backwash' },
+    { i: 13, culture: 'Épinard',     statut: 'croissance', semis: '2026-06-18', prevue: '2026-08-10', rq: null, ru: 'bottes', freq: '2x/semaine',  sys: 'Aspersion',                    fert: 'compost' },
+    { i: 15, culture: 'Fine herbes', statut: 'croissance', semis: '2026-05-12', prevue: '2026-08-05', rq: null, ru: 'kg',     freq: 'Quotidien',   sys: 'Manuel',                       fert: 'backwash_sandponique' },
+    { i: 17, culture: 'Haricot',     statut: 'croissance', semis: '2026-06-05', prevue: '2026-08-28', rq: null, ru: 'kg',     freq: 'Aux 2 jours', sys: 'Goutte-à-goutte',              fert: 'compost' }
+  ];
+
+  _serre.zones = zones;
+  _serre.isAdmin = false;
+  _serre.isDemo = true;
+  _serre.locByZone = {};
+  _serre.occ = {}; _serre.culturesByZone = {}; _serre.irrigByZone = {}; _serre.fertByZone = {};
+  zones.forEach(z => { _serre.occ[z.id] = { zone_id: z.id, is_occupied: false, is_mine: false, frais_mensuel: 1 }; });
+  demoSet.forEach(d => {
+    const z = zones[d.i]; if (!z) return;
+    _serre.occ[z.id].is_occupied = true;
+    _serre.culturesByZone[z.id] = [{ id: 'demo-cul-' + z.id, zone_id: z.id, location_id: 'demo-loc-' + z.id, culture: d.culture, date_semis: d.semis, date_recolte_prevue: d.prevue, statut: d.statut, rendement_qty: d.rq, rendement_unite: d.ru, notes: '' }];
+    _serre.irrigByZone[z.id] = { zone_id: z.id, frequence: d.freq, systeme: d.sys };
+    _serre.fertByZone[z.id] = { zone_id: z.id, type: d.fert, date_application: '2026-07-20' };
+  });
+  _serre.lecture = { horodatage: new Date().toISOString(), temp_air: 24.5, temp_eau: 19.2, reservoir1_pct: 78, reservoir2_pct: 64, reservoir3_pct: 90 };
+}
+
 async function loadSerre() {
   const root = document.getElementById('serre-section');
   if (!root) return;
   root.style.display = '';
   root.innerHTML = `<div class="loading"><div class="spinner"></div> ${pt('Chargement de la serre…')}</div>`;
+
+  // Mode démo : pas de session authentifiée (RLS to authenticated), donc on
+  // affiche un jeu de données fictif et anonymisé, en consultation seule.
+  if (isDemo) { serreDemoLoad(); renderSerre(); return; }
 
   _serre.isAdmin = ['admin', 'principal_admin'].includes(currentProfile?.role);
 
@@ -5911,16 +5953,20 @@ function renderSerre() {
       </div>
     </div>
 
-    ${mine ? `<div style="font-size:12px;color:var(--text2);margin-bottom:14px;">${pt('Vous louez actuellement')} <strong>${mine}</strong> ${mine > 1 ? pt('zones') : pt('zone')}.</div>` : ''}
+    ${isDemo
+      ? `<div style="font-size:11px;color:var(--accent);background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2);border-radius:4px;padding:4px 10px;display:inline-block;margin-bottom:14px;">${pt('Mode démo — données fictives et anonymisées, consultation seule')}</div>`
+      : (mine ? `<div style="font-size:12px;color:var(--text2);margin-bottom:14px;">${pt('Vous louez actuellement')} <strong>${mine}</strong> ${mine > 1 ? pt('zones') : pt('zone')}.</div>` : '')}
 
     <div class="serre-sec" style="margin-top:0;">${pt('Conditions de la serre')}</div>
     <div class="serre-global">
-      <div class="serre-field"><label>${pt("Température air (°C)")}</label><input type="number" step="0.1" id="serre-tair" value="${L.temp_air ?? ''}"></div>
-      <div class="serre-field"><label>${pt("Température eau (°C)")}</label><input type="number" step="0.1" id="serre-teau" value="${L.temp_eau ?? ''}"></div>
-      <div class="serre-field"><label>${pt("Réservoir 1 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r1" value="${L.reservoir1_pct ?? ''}"></div>
-      <div class="serre-field"><label>${pt("Réservoir 2 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r2" value="${L.reservoir2_pct ?? ''}"></div>
-      <div class="serre-field"><label>${pt("Réservoir 3 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r3" value="${L.reservoir3_pct ?? ''}"></div>
-      <button class="btn btn-primary btn-sm" onclick="serreSaveLecture()">${pt('Enregistrer la lecture')}</button>
+      <div class="serre-field"><label>${pt("Température air (°C)")}</label><input type="number" step="0.1" id="serre-tair" value="${L.temp_air ?? ''}"${isDemo ? ' disabled' : ''}></div>
+      <div class="serre-field"><label>${pt("Température eau (°C)")}</label><input type="number" step="0.1" id="serre-teau" value="${L.temp_eau ?? ''}"${isDemo ? ' disabled' : ''}></div>
+      <div class="serre-field"><label>${pt("Réservoir 1 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r1" value="${L.reservoir1_pct ?? ''}"${isDemo ? ' disabled' : ''}></div>
+      <div class="serre-field"><label>${pt("Réservoir 2 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r2" value="${L.reservoir2_pct ?? ''}"${isDemo ? ' disabled' : ''}></div>
+      <div class="serre-field"><label>${pt("Réservoir 3 (%)")}</label><input type="number" step="1" min="0" max="100" id="serre-r3" value="${L.reservoir3_pct ?? ''}"${isDemo ? ' disabled' : ''}></div>
+      ${isDemo
+        ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:.5;cursor:not-allowed;">🔒 ${pt('Connexion requise')}</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="serreSaveLecture()">${pt('Enregistrer la lecture')}</button>`}
       ${_serre.lecture ? `<span style="font-size:11px;color:var(--text3);align-self:center;">${pt('Dernière lecture')} : ${new Date(_serre.lecture.horodatage).toLocaleString('fr-CA')}</span>` : ''}
     </div>
 
@@ -5985,7 +6031,7 @@ function serreZoneCard(zone) {
         ${irr?.systeme ? `<span class="meta-item">💧 ${escHtml(irr.systeme)}</span>` : ''}
         ${fert?.type ? `<span class="meta-item">🧪 ${(SERRE_FERT.find(f => f.v === fert.type) || {}).l || fert.type}</span>` : ''}
       </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px;">${pt('Occupée par un autre locataire')}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;">👤 ${isDemo ? escHtml(anonName(zone.id)) : pt('Occupée par un autre locataire')}</div>
     </div>`;
   }
 
@@ -6185,6 +6231,7 @@ async function serreReleaseZone(locId, code) {
 }
 
 async function serreSaveLecture() {
+  if (isDemo) { toast('Indisponible en mode démo', 'info'); return; }
   const num = id => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
   const { error } = await sb.from('serre_lectures').insert({
     temp_air: num('serre-tair'), temp_eau: num('serre-teau'),
