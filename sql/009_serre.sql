@@ -21,9 +21,9 @@ BEGIN;
 -- ============================================================
 create table if not exists serre_zones (
   id uuid primary key default gen_random_uuid(),
-  code text unique not null,            -- ex: 'P1-Z1'
-  planche int not null,                 -- 1 ou 2
-  position int not null,                -- 1 à 10
+  code text unique not null,            -- ex: 'R1C1' (Rangée 1, Colonne 1)
+  planche int not null,                 -- RANGÉE : 1 ou 2
+  position int not null,                -- COLONNE : 1 à 10
   largeur_pi numeric default 2,
   longueur_pi numeric default 3,
   frais_mensuel numeric not null default 1,  -- petit frais mensuel de location ($ CAD)
@@ -59,6 +59,7 @@ create table if not exists serre_cultures (
   id uuid primary key default gen_random_uuid(),
   zone_id uuid not null references serre_zones(id) on delete cascade,
   location_id uuid references serre_locations(id) on delete set null,
+  section int not null default 1 check (section between 1 and 3),  -- sous-section de la zone (1 à 3, depuis l'allée)
   culture text,
   date_semis date,
   date_recolte_prevue date,
@@ -70,8 +71,16 @@ create table if not exists serre_cultures (
   notes text,
   created_at timestamptz default now()
 );
+-- Colonne section pour installs antérieures (create table if not exists n'ajoute rien)
+alter table serre_cultures add column if not exists section int not null default 1;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'serre_cultures_section_check') then
+    alter table serre_cultures add constraint serre_cultures_section_check check (section between 1 and 3);
+  end if;
+end $$;
 create index if not exists idx_serre_cultures_zone on serre_cultures(zone_id);
 create index if not exists idx_serre_cultures_location on serre_cultures(location_id);
+create index if not exists idx_serre_cultures_loc_section on serre_cultures(location_id, section);
 
 -- ============================================================
 -- 4. Fertilisation (compost / backwash sandponique)
@@ -79,6 +88,7 @@ create index if not exists idx_serre_cultures_location on serre_cultures(locatio
 create table if not exists serre_fertilisations (
   id uuid primary key default gen_random_uuid(),
   zone_id uuid not null references serre_zones(id) on delete cascade,
+  section int not null default 1 check (section between 1 and 3),  -- section traitée
   culture_id uuid references serre_cultures(id) on delete set null,
   type text not null
     check (type in ('compost', 'backwash_sandponique', 'compost_backwash', 'autre')),
@@ -86,17 +96,25 @@ create table if not exists serre_fertilisations (
   notes text,
   created_at timestamptz default now()
 );
-create index if not exists idx_serre_fertilisations_zone on serre_fertilisations(zone_id);
+-- section pour installs antérieures
+alter table serre_fertilisations add column if not exists section int not null default 1;
+create index if not exists idx_serre_fertilisations_zone on serre_fertilisations(zone_id, section);
 
 -- ============================================================
--- 5. Config d'irrigation par zone
+-- 5. Config d'irrigation par SECTION (chaque section est traitée séparément)
 -- ============================================================
 create table if not exists serre_irrigation_config (
-  zone_id uuid primary key references serre_zones(id) on delete cascade,
+  zone_id uuid not null references serre_zones(id) on delete cascade,
+  section int not null default 1 check (section between 1 and 3),
   frequence text,     -- quotidien, aux 2 jours, 2x/semaine, etc.
   systeme text,       -- goutte-à-goutte, aspersion, manuel, sandponique
   updated_at timestamptz default now()
 );
+-- Migration d'un ancien schéma (clé sur zone_id seul) vers (zone_id, section)
+alter table serre_irrigation_config add column if not exists section int not null default 1;
+alter table serre_irrigation_config drop constraint if exists serre_irrigation_config_pkey;
+create unique index if not exists uniq_serre_irrig_zone_section
+  on serre_irrigation_config(zone_id, section);
 
 -- ============================================================
 -- 6. Réservoirs d'eau (3 réservoirs distincts)
@@ -134,6 +152,7 @@ select
   loc.date_debut,
   loc.date_fin,
   loc.statut as statut_location,
+  c.section,
   c.culture,
   c.date_semis,
   c.date_recolte_reelle,
@@ -203,8 +222,13 @@ grant execute on function serre_occupancy() to authenticated;
 -- ============================================================
 -- Données de départ : 20 zones fixes + 3 réservoirs
 -- ============================================================
+-- Renomme les codes hérités (P{r}-Z{c} → R{r}C{c}) avant le seed, pour que
+-- le on conflict (code) retombe bien sur les zones existantes.
+update serre_zones set code = 'R' || planche || 'C' || position
+where code ~ '^P[0-9]+-Z[0-9]+$';
+
 insert into serre_zones (code, planche, position)
-select 'P' || p || '-Z' || z, p, z
+select 'R' || p || 'C' || z, p, z
 from generate_series(1, 2) as p, generate_series(1, 10) as z
 on conflict (code) do nothing;
 
