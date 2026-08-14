@@ -74,6 +74,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 - Gestion des espaces communs + tarification
 - Gestion des véhicules + tarification
 - Enregistrement des paiements réels → crédits virtuels
+- **Élevages** (onglets 🐔 Poulailler et 🐟 Poissons) : historique des poules/poissons (ajouts, pertes, ponte/récolte, santé) + coûts d'exploitation, avec cheptel courant et total des coûts. Les faits saillants (ajout, ponte/récolte) sont **publiés automatiquement au babillard**. Migration : `sql/011_elevages.sql`
 - Paramètres système (délais annulation, etc.)
 - Logs de toutes les actions (dont mode démo)
 
@@ -112,3 +113,5 @@ Dans Supabase → **Authentication → URL Configuration**:
 | `serre_irrigation_config` | Config d'irrigation par section (zone_id, section) |
 | `serre_reservoirs` | Réservoirs d'eau de la serre |
 | `serre_lectures` | Lectures de capteurs (températures, niveaux) |
+| `elevage_historique` | Historique poulailler / sablonponie (événements) |
+| `elevage_couts` | Coûts d'exploitation poulailler / sablonponie |
