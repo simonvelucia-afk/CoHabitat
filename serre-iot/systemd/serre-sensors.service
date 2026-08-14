@@ -1,0 +1,15 @@
+[Unit]
+Description=Serre IoT — lecture capteurs et publication MQTT
+After=network-online.target mosquitto.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/CoHabitat/serre-iot
+ExecStart=/home/pi/CoHabitat/serre-iot/.venv/bin/python sensors_publish.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
