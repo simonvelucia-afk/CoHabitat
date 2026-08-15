@@ -899,6 +899,13 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   border: 1px solid var(--border); border-radius: 6px; background: var(--surface2);
   color: var(--text); min-height: 31px;
 }
+/* Mobile : une seule colonne. En flex-wrap, la température de l'air et les
+   3 réservoirs se répartissaient en escalier selon la place restante. */
+@media (max-width: 640px) {
+  .serre-global { flex-direction: column; align-items: stretch; gap: 10px; }
+  .serre-global > .serre-field, .serre-global > .serre-resv { width: 100%; min-width: 0; }
+  .serre-global > .btn { align-self: stretch; }
+}
 
 /* ===== LOADING ===== */
 .loading {
