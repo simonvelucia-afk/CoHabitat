@@ -61,6 +61,8 @@ Dans Supabase → **Authentication → URL Configuration**:
 ### Serre communautaire
 - Section dédiée en bas de la page **Espaces communs**
 - Serre commune : **2 rangées × 10 colonnes = 20 zones** (2 × 3 pi), attribuables et louables **au mois** ; à la location, une **date de fin envisagée** peut être indiquée — toujours facultative, la location se reconduisant au mois jusqu'à libération (frais de base **0,50 $/mois** par zone, **modifiable par l'admin** via la variable `serre_frais_mensuel`, débité via le solde virtuel)
+- **Stades de culture** : Vide → Semis → En croissance → **En production** → Terminé, plus une case **« un plant conservé pour la semence »** (porte-graine) indépendante du stade — une section peut produire et porter graine en même temps
+- **Journal de cueillettes** : la plupart des légumes de serre (tomate, concombre, laitue, poivron…) donnent en continu ; chaque passage se note à part (date + quantité), et le cumul s'affiche sur le plan, dans la section et au tableau de bord. Seul le radis est traité comme une récolte unique (liste `SERRE_CULTURES_UNIQUES`)
 - Chaque zone se divise en **3 sections indépendantes** numérotées depuis l'allée — codage **R1C4S2** (Rangée 1, Colonne 4, Section 2)
 - Chaque section a **sa propre culture, irrigation et fertilisation** (plantes et traitements différents), pour une seule location par zone
 - **Plan visuel de la serre** (orientation **verticale** uniquement) : les 2 rangées forment 2 **colonnes** de 10 zones, séparées par l'**allée principale** (bande verticale centrale) et encadrées par les 2 **tunnels à poules** (bandes verticales de bordure). Chaque zone affiche **3 chips colorés** — un par section — dont la couleur donne le statut de culture (**neutre** = vide, **vert** = en croissance, **ambre** = récolté) et l'emoji ce qui pousse : l'état se lit sans cliquer. Le plan occupe la **pleine largeur** : chaque section affiche l'**icône de la plante** et son **stade** en clair. Chaque zone montre **qui la loue** (prénom + initiale) et la **période**, en version courte ; ces informations et le stade apparaissent dès que la colonne est assez large — sur mobile, pivoter l'appareil suffit. **Clic sur une section** → le formulaire de cette section (locataire et admin) ou le résumé de la zone (autres) ; **clic sur l'en-tête** → demande de location si la zone est libre, libération si c'est la vôtre. Bouton **« Plan seul »** : masque le header/nav pour donner tout l'écran au plan (`100svh`, sans `requestFullscreen()`). Clic sur une zone → détails + historique
@@ -69,7 +71,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 - Suivi des conditions : température de l'air + **niveau et température propres à chacun des 3 réservoirs**. **Acquisition automatique** via un Raspberry Pi 5 + MQTT (voir `serre-iot/`) ; la **saisie manuelle vit uniquement dans le panneau admin** (onglet 🌱 Serre) — sur la page Espaces, le bloc est en **lecture seule pour tout le monde** (même composant `ConditionsSerre`, prop `readOnly`), et la restriction est appliquée **au niveau de la table** par la RLS `serre_lectures_insert`, pas seulement masquée dans l'UI
 - **Panneau admin** (onglet 🌱 Serre) : **saisie manuelle des conditions** (dépannage si un capteur est HS) + **frais mensuel de base modifiable** (appliqué à toutes les zones) + attribution des zones aux locataires (revenu mensuel, zones occupées) + **frais d'exploitation** de la serre (semences, terreau, eau, électricité…)
 - Activable/désactivable par l'admin (module optionnel `module_serre`)
-- Migrations : `sql/009_serre.sql`, `sql/010_serre_reservoir_temps.sql`, `sql/012_serre_couts_module.sql`, `sql/013_serre_frais_base.sql`, `sql/014_serre_lectures_admin_insert.sql`, `sql/015_serre_plan_locataire.sql`
+- Migrations : `sql/009_serre.sql`, `sql/010_serre_reservoir_temps.sql`, `sql/012_serre_couts_module.sql`, `sql/013_serre_frais_base.sql`, `sql/014_serre_lectures_admin_insert.sql`, `sql/015_serre_plan_locataire.sql`, `sql/016_serre_recoltes_stades.sql`
 
 ### Administration
 - Gestion des locataires et unités
@@ -79,6 +81,10 @@ Dans Supabase → **Authentication → URL Configuration**:
 - **Élevages** (onglets 🐔 Poulailler et 🐟 Poissons) : historique des poules/poissons (ajouts, pertes, ponte/récolte, santé) + coûts d'exploitation, avec cheptel courant et total des coûts. Les faits saillants (ajout, ponte/récolte) sont **publiés automatiquement au babillard**. Migration : `sql/011_elevages.sql`
 - Paramètres système (délais annulation, etc.)
 - Logs de toutes les actions (dont mode démo)
+
+### Traductions
+
+L'interface est disponible en **français, anglais et espagnol** (sélecteur dans la barre de navigation). Le module serre est entièrement traduit : libellés, stades, noms de cultures, unités, systèmes d'irrigation et fertilisants. Les **valeurs stockées en base restent en français** (`serre_cultures.culture`, `rendement_unite`…) — seul l'affichage est traduit, pour ne pas casser les données existantes ni les clés d'icônes.
 
 ### Mode démo
 - Accès sans compte via bouton "Démo"
@@ -111,6 +117,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 | `serre_zones` | Zones de culture de la serre (fixes) |
 | `serre_locations` | Locations mensuelles d'une zone par un locataire |
 | `serre_cultures` | Cycles de culture par section (1-3) d'une zone |
+| `serre_recoltes` | Journal des cueillettes : une ligne par passage (cultures continues) |
 | `serre_fertilisations` | Applications de fertilisant par section |
 | `serre_irrigation_config` | Config d'irrigation par section (zone_id, section) |
 | `serre_reservoirs` | Réservoirs d'eau de la serre |
