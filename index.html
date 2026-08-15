@@ -6102,7 +6102,7 @@ async function loadSpaces() {
 function renderSpaces(spaces) {
   const grid = document.getElementById('spaces-grid');
   if (!spaces.length) {
-    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">🏠</div><p>${pt('Aucun espace disponible')}</p></div>`;
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🏠</div><p>${pt('Aucun espace disponible')}</p></div>`;
     return;
   }
   grid.innerHTML = spaces.map(s => {
@@ -6143,7 +6143,7 @@ function renderNetworkSpaces() {
     ? '<div style="font-size:11px;color:var(--accent);background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2);border-radius:4px;padding:4px 10px;display:inline-block;margin-bottom:10px;">Mode démo — données fictives pour illustration</div>'
     : '';
   const networkName = window.networkData.network?.name || 'Réseau';
-  const header = '<div style="margin:24px 0 12px;padding-top:20px;border-top:1px solid var(--border);">'
+  const header = '<div style="grid-column:1/-1;margin:24px 0 12px;padding-top:20px;border-top:1px solid var(--border);">'
     + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:2px;">🔗 ' + networkName + '</div>'
     + '<div style="font-size:12px;color:var(--text3)">Ressources partagées par les bâtiments du réseau</div>'
     + demoNotice
@@ -6172,7 +6172,7 @@ function renderNetworkSpaces() {
       + '</div>'
       + '</div>';
   }).join('');
-  return header + '<div class="cards-grid">' + cards + '</div>';
+  return header + '<div class="cards-grid" style="grid-column:1/-1">' + cards + '</div>';
 }
 
 function filterSpaces() {
