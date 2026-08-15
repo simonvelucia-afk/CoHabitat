@@ -5860,17 +5860,7 @@ const SERRE_FERT = [
   { v: 'compost_backwash', l: 'Compost + backwash' },
   { v: 'autre', l: 'Autre' }
 ];
-// Photo de la plante en culture, affichée dans la section du plan. Déposez
-// les fichiers dans img/cultures/ (voir img/cultures/README.md) : toute image
-// absente retombe silencieusement sur l'emoji correspondant.
-const SERRE_PHOTOS = {
-  'Tomate': 'img/cultures/tomate.webp', 'Concombre': 'img/cultures/concombre.webp',
-  'Laitue': 'img/cultures/laitue.webp', 'Poivron': 'img/cultures/poivron.webp',
-  'Basilic': 'img/cultures/basilic.webp', 'Haricot': 'img/cultures/haricot.webp',
-  'Radis': 'img/cultures/radis.webp', 'Épinard': 'img/cultures/epinard.webp',
-  'Fine herbes': 'img/cultures/fines-herbes.webp', 'Fraise': 'img/cultures/fraise.webp'
-};
-
+// Icône de la plante affichée dans chaque section du plan.
 const SERRE_EMOJI = {
   'Tomate': '🍅', 'Concombre': '🥒', 'Laitue': '🥬', 'Poivron': '🫑', 'Basilic': '🌿',
   'Haricot': '🫛', 'Radis': '🌰', 'Épinard': '🥬', 'Fine herbes': '🌿', 'Fraise': '🍓', 'Autre': '🌱'
@@ -6048,15 +6038,16 @@ function renderSerre() {
       .serre-plan-code{font-size:10.5px;font-weight:700;color:var(--text2);display:flex;justify-content:space-between;align-items:center;gap:2px;line-height:1}
       .serre-plan-code .dotmine{color:var(--accent2);font-size:9px}
       /* 3 chips de statut par zone (aucun texte : la couleur porte l'info) */
-      .serre-plan-secs{display:flex;flex:1;min-height:0;gap:3px}
-      /* La couleur de statut passe par la bordure : elle reste lisible même
-         quand une photo de culture couvre toute la section. */
-      .serre-plan-sec{flex:1;min-width:0;position:relative;overflow:hidden;display:flex;align-items:center;
-        justify-content:center;border-radius:4px;line-height:1;background:var(--surface2);border:2px solid transparent}
-      /* Photo de la culture : couvre la section, la couleur de statut reste
-         visible en bordure. Si le fichier manque, l'emoji reprend la place. */
-      .serre-plan-sec img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-      .serre-plan-sec .em{font-size:clamp(13px,1.8vw,26px)}
+      .serre-plan-secs{display:flex;flex:1;min-height:0;gap:3px;container-type:size}
+      /* Section = un chip : couleur de bordure et de fond pour le statut,
+         icône de la plante au centre, dimensionnée avec la cellule. */
+      .serre-plan-sec{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;overflow:hidden;
+        border-radius:4px;line-height:1;background:var(--surface2);border:2px solid transparent;
+        font-size:clamp(13px,1.7vw,30px)}
+      /* Les 10 rangées écrasent les cellules sur écran court : l'icône se cale
+         sur la hauteur réelle du chip plutôt que sur celle de la fenêtre.
+         Ignoré (donc repli sur le clamp ci-dessus) sans container queries. */
+      .serre-plan-sec{font-size:min(30px,64cqh,42cqw)}
       .serre-plan-sec.st-croissance{background:rgba(126,184,160,.22);border-color:rgba(126,184,160,.85)}
       .serre-plan-sec.st-recolte{background:rgba(208,138,90,.20);border-color:rgba(208,138,90,.85)}
       .serre-plan-sec.st-vide{background:var(--surface2);border-color:var(--border)}
@@ -6211,14 +6202,11 @@ function serrePlanTile(zone, p) {
     const cur = all.filter(c => (c.section || 1) === s)[0];
     const cult = cur?.culture;
     const st = cur ? (cur.statut || 'vide') : (occ.is_occupied ? 'vide' : 'libre');
-    const emoji = cult ? (SERRE_EMOJI[cult] || '🌱') : '';
-    const photo = cult ? SERRE_PHOTOS[cult] : null;
+    const icone = cult ? (SERRE_EMOJI[cult] || '🌱') : '';
     const statutLabel = cur ? (SERRE_STATUT_LABELS[cur.statut] || SERRE_STATUT_LABELS.vide)
                             : (occ.is_occupied ? pt('vide') : pt('libre'));
     const title = `${zone.code}S${s} — ` + (cult ? `${escHtml(cult)} · ${statutLabel}` : statutLabel);
-    return `<div class="serre-plan-sec st-${st}" title="${title}" aria-label="${title}">${
-      photo ? `<img src="${photo}" alt="" loading="lazy" onerror="this.remove()">` : ''
-    }<span class="em">${emoji}</span></div>`;
+    return `<div class="serre-plan-sec st-${st}" title="${title}" aria-label="${title}">${icone}</div>`;
   }).join('');
   return `<button class="serre-plan-zone ${stateClass}" onclick="serreOpenZone('${zone.id}')">
     <div class="serre-plan-code">${zone.code}${isMine ? '<span class="dotmine">●</span>' : ''}</div>
