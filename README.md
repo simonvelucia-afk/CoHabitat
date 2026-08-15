@@ -41,6 +41,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 
 ### Locataires
 - Tableau de bord avec solde et réservations
+- **Résumé « Ma serre »** sur le tableau de bord : zones louées et cultures en cours (par section, avec stade et dates), récoltes passées avec rendement cumulé par unité, et locations terminées
 - Réservation d'espaces communs par tranches de 15 min
 - Consultation et demande de covoiturage
 - Historique des transactions

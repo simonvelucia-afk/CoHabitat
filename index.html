@@ -1428,6 +1428,9 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         </div>
       </div>
       <div id="my-reservations-list"></div>
+
+      <!-- Résumé personnel de la serre : zones en cours + historique -->
+      <div id="dashboard-serre" style="margin-top:36px;"></div>
     </div>
 
     <!-- ==================== TENANT: ESPACES ==================== -->
@@ -5677,6 +5680,7 @@ async function loadDashboard() {
         <td><span class="badge ${statusBadge(r.status)}">${statusLabel(r.status)}</span></td>
       </tr>`).join('')}</tbody>
     </table></div>`;
+    loadDashboardSerre();
     return;
   }
 
@@ -5719,6 +5723,8 @@ async function loadDashboard() {
       </tr>`).join('')}</tbody>
     </table></div>`;
   }
+
+  loadDashboardSerre();
 }
 
 function statusBadge(s) {
@@ -5885,6 +5891,181 @@ function serreFlash(msg) {
   el.textContent = msg;
   clearTimeout(el._t);
   el._t = setTimeout(() => { el.textContent = ''; }, 1600);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SERRE — résumé personnel (tableau de bord)
+//  Ce que le locataire a en cours (zones louées + cultures) et son
+//  historique de récoltes. Les données sont déjà limitées à lui par la RLS
+//  de serre_locations (tenant_id = auth.uid()) ; les cultures sont ensuite
+//  filtrées sur ses propres locations.
+// ═══════════════════════════════════════════════════════════════════════
+
+async function loadDashboardSerre() {
+  const root = document.getElementById('dashboard-serre');
+  if (!root) return;
+  if (window.appModules?.serre === false) { root.innerHTML = ''; return; }
+
+  if (isDemo) { renderDashboardSerre(dashboardSerreDemo(), true); return; }
+  if (!currentProfile) { root.innerHTML = ''; return; }
+
+  root.innerHTML = `<div class="loading"><div class="spinner"></div> ${pt('Chargement…')}</div>`;
+
+  const { data: locs, error } = await sb.from('serre_locations')
+    .select('id, zone_id, date_debut, date_fin, frais_mensuel, statut, serre_zones(code)')
+    .eq('tenant_id', currentProfile.id)
+    .order('date_debut', { ascending: false });
+
+  // Module absent ou migrations non jouées : on n'encombre pas le tableau de bord.
+  if (error) { root.innerHTML = ''; return; }
+  if (!locs || !locs.length) { renderDashboardSerre({ locs: [], cultures: [] }, false); return; }
+
+  const { data: cultures } = await sb.from('serre_cultures')
+    .select('*')
+    .in('location_id', locs.map(l => l.id));
+
+  renderDashboardSerre({ locs, cultures: cultures || [] }, false);
+}
+
+// Jeu fictif pour le mode démo, aligné sur le reste du tableau de bord.
+function dashboardSerreDemo() {
+  const loc = (id, code, debut, fin, statut) => ({ id, zone_id: id, date_debut: debut, date_fin: fin, frais_mensuel: 0.5, statut, serre_zones: { code } });
+  const cul = (locId, sec, culture, statut, semis, prevue, reelle, qty, unite) => ({
+    location_id: locId, section: sec, culture, statut, date_semis: semis,
+    date_recolte_prevue: prevue, date_recolte_reelle: reelle, rendement_qty: qty, rendement_unite: unite
+  });
+  return {
+    locs: [loc('d1', 'R1C4', '2026-05-01', null, 'active'), loc('d2', 'R2C7', '2026-06-01', null, 'active'),
+           loc('d3', 'R1C9', '2025-04-01', '2025-10-31', 'terminee')],
+    cultures: [
+      cul('d1', 1, 'Tomate', 'croissance', '2026-05-02', '2026-08-20', null, null, null),
+      cul('d1', 2, 'Basilic', 'croissance', '2026-05-10', '2026-08-01', null, null, null),
+      cul('d1', 3, 'Laitue', 'recolte', '2026-04-01', '2026-06-15', '2026-06-18', 6, 'unités'),
+      cul('d2', 1, 'Fraise', 'croissance', '2026-06-05', '2026-09-01', null, null, null),
+      cul('d2', 2, '', 'vide', null, null, null, null, null),
+      cul('d2', 3, 'Radis', 'recolte', '2026-06-01', '2026-07-10', '2026-07-12', 2, 'bottes'),
+      cul('d3', 1, 'Concombre', 'recolte', '2025-05-01', '2025-08-15', '2025-08-20', 4.5, 'kg')
+    ]
+  };
+}
+
+function renderDashboardSerre(data, demo) {
+  const root = document.getElementById('dashboard-serre');
+  const actives = data.locs.filter(l => l.statut === 'active');
+  const terminees = data.locs.filter(l => l.statut !== 'active');
+  const culByLoc = {};
+  data.cultures.forEach(c => { (culByLoc[c.location_id] = culByLoc[c.location_id] || []).push(c); });
+
+  // Rien à afficher : on garde une invite discrète plutôt qu'un bloc vide.
+  if (!data.locs.length) {
+    root.innerHTML = `
+      <div class="section-header"><div class="section-title"><h2>🌱 ${pt('Ma serre')}</h2></div></div>
+      <div class="empty-state"><div class="empty-icon">🌱</div>
+        <p>${pt('Vous ne louez aucune zone de la serre pour le moment.')}</p>
+        <button class="btn btn-secondary btn-sm" onclick="navigateTo('spaces')">${pt('Voir le plan de la serre')}</button>
+      </div>`;
+    return;
+  }
+
+  const enCours = data.cultures.filter(c => c.statut === 'croissance').length;
+  // Historique : tout ce qui a été récolté, quelle que soit la location.
+  const recoltes = data.cultures
+    .filter(c => c.statut === 'recolte' || c.date_recolte_reelle)
+    .sort((a, b) => (b.date_recolte_reelle || b.date_recolte_prevue || '').localeCompare(a.date_recolte_reelle || a.date_recolte_prevue || ''));
+
+  // Rendement cumulé, par unité (kg et « unités » ne s'additionnent pas).
+  const parUnite = {};
+  recoltes.forEach(c => {
+    if (c.rendement_qty == null) return;
+    const u = c.rendement_unite || '—';
+    parUnite[u] = (parUnite[u] || 0) + Number(c.rendement_qty);
+  });
+  const rendement = Object.entries(parUnite).map(([u, q]) => `${Math.round(q * 10) / 10} ${u}`).join(' · ') || '—';
+
+  const codeOf = l => l.serre_zones?.code || '—';
+  const fr = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+  const zoneCards = actives.map(l => {
+    const secs = [1, 2, 3].map(n => {
+      const c = (culByLoc[l.id] || []).find(x => (x.section || 1) === n);
+      const cult = c?.culture;
+      const st = c?.statut || 'vide';
+      const icone = cult ? (SERRE_EMOJI[cult] || '🌱') : '·';
+      return `<div class="ds-sec">
+        <div class="ds-sec-h"><span class="ds-ic">${icone}</span><strong>S${n}</strong> ${cult ? escHtml(cult) : `<span style="color:var(--text3)">${pt('vide')}</span>`}</div>
+        <div>${serreStatutBadge(st)}</div>
+        <div class="ds-dates">${c?.date_semis ? pt('Semis') + ' ' + fr(c.date_semis) : ''}${
+          c?.date_recolte_reelle ? ' · ' + pt('récoltée le') + ' ' + fr(c.date_recolte_reelle)
+          : (c?.date_recolte_prevue ? ' · ' + pt('récolte prévue') + ' ' + fr(c.date_recolte_prevue) : '')}</div>
+      </div>`;
+    }).join('');
+    return `<div class="ds-zone">
+      <div class="ds-zone-h">
+        <strong>${codeOf(l)}</strong>
+        <span>${pt('Louée depuis le')} ${fr(l.date_debut)} · ${Number(l.frais_mensuel || 0).toFixed(2)} $/${pt('mois')}</span>
+      </div>
+      <div class="ds-secs">${secs}</div>
+    </div>`;
+  }).join('');
+
+  const histRows = recoltes.slice(0, 10).map(c => {
+    const l = data.locs.find(x => x.id === c.location_id);
+    return `<tr>
+      <td>${l ? codeOf(l) : '—'}S${c.section || 1}</td>
+      <td>${c.culture ? escHtml(c.culture) : '—'}</td>
+      <td>${fr(c.date_semis)}</td>
+      <td>${fr(c.date_recolte_reelle || c.date_recolte_prevue)}</td>
+      <td>${c.rendement_qty != null ? Math.round(c.rendement_qty * 10) / 10 + ' ' + (c.rendement_unite || '') : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  root.innerHTML = `
+    <style>
+      .ds-zones{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:20px}
+      .ds-zone{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px}
+      .ds-zone-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;
+        font-size:13px;color:var(--text3);margin-bottom:10px}
+      .ds-zone-h strong{font-size:15px;color:var(--text)}
+      .ds-secs{display:flex;flex-direction:column;gap:7px}
+      .ds-sec{border:1px solid var(--border);border-radius:8px;padding:7px 9px;display:flex;
+        align-items:center;gap:8px;flex-wrap:wrap}
+      .ds-sec-h{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:6px;flex:1;min-width:120px}
+      .ds-ic{font-size:17px;line-height:1}
+      .ds-dates{font-size:11px;color:var(--text3);width:100%}
+    </style>
+
+    <div class="section-header" style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div class="section-title"><h2>🌱 ${pt('Ma serre')}</h2>
+        <p style="color:var(--text3);font-size:13px;margin:0;">${pt('Vos zones en cours et vos récoltes passées')}</p></div>
+      <button class="btn btn-secondary btn-sm" onclick="navigateTo('spaces')">${pt('Voir le plan de la serre')}</button>
+    </div>
+
+    ${demo ? `<div style="font-size:11px;color:var(--accent);background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2);border-radius:4px;padding:4px 10px;display:inline-block;margin-bottom:14px;">${pt('Mode démo — données fictives')}</div>` : ''}
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">${pt('Zones louées')}</div><div class="stat-value">${actives.length}</div></div>
+      <div class="stat-card"><div class="stat-label">${pt('Cultures en croissance')}</div><div class="stat-value">${enCours}</div></div>
+      <div class="stat-card"><div class="stat-label">${pt('Récoltes')}</div><div class="stat-value">${recoltes.length}</div></div>
+      <div class="stat-card"><div class="stat-label">${pt('Rendement cumulé')}</div><div class="stat-value" style="font-size:1.2rem">${rendement}</div></div>
+    </div>
+
+    <div class="serre-sec">${pt('En cours')}</div>
+    ${actives.length
+      ? `<div class="ds-zones">${zoneCards}</div>`
+      : `<div class="empty-state" style="padding:24px"><p>${pt('Aucune zone louée en ce moment.')}</p></div>`}
+
+    <div class="serre-sec">${pt('Historique des récoltes')}</div>
+    ${recoltes.length
+      ? `<div class="table-container"><table>
+          <thead><tr><th>${pt('Section')}</th><th>${pt('Culture')}</th><th>${pt('Semis')}</th><th>${pt('Récolte')}</th><th>${pt('Rendement')}</th></tr></thead>
+          <tbody>${histRows}</tbody></table></div>
+         ${recoltes.length > 10 ? `<div style="font-size:11px;color:var(--text3);margin-top:6px;">${pt('10 récoltes les plus récentes sur')} ${recoltes.length}. ${pt('Historique complet et export CSV sur la page Espaces communs.')}</div>` : ''}`
+      : `<div class="empty-state" style="padding:24px"><p>${pt('Aucune récolte enregistrée pour le moment.')}</p></div>`}
+
+    ${terminees.length ? `<div style="font-size:12px;color:var(--text3);margin-top:10px;">
+      ${pt('Locations terminées')} : ${terminees.map(l => `${codeOf(l)} <span style="color:var(--text3)">(${fr(l.date_debut)} → ${fr(l.date_fin)})</span>`).join(' · ')}
+    </div>` : ''}
+  `;
 }
 
 // Jeu de données fictif pour le mode démo (aucun accès base). Les zones
