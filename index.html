@@ -9205,7 +9205,7 @@ async function loadSerreAdmin() {
   const [zRes, lRes, tRes, cRes, sRes] = await Promise.all([
     sb.from('serre_zones').select('*').eq('is_active', true).order('planche').order('position'),
     sb.from('serre_locations').select('id, zone_id, tenant_id, date_debut, frais_mensuel, profiles(full_name, unit)').eq('statut', 'active'),
-    sb.from('profiles').select('id, full_name, unit, role').neq('role', 'demo').order('full_name'),
+    sb.from('profiles').select('id, full_name, unit, role, email').neq('role', 'demo').order('full_name'),
     sb.from('elevage_couts').select('*').eq('module', 'serre').order('date_cout', { ascending: false }),
     sb.from('system_settings').select('value').eq('key', 'serre_frais_mensuel').maybeSingle()
   ]);
@@ -9217,7 +9217,7 @@ async function loadSerreAdmin() {
   _serreAdmin.zones = zRes.data || [];
   _serreAdmin.locByZone = {};
   (lRes.data || []).forEach(l => { _serreAdmin.locByZone[l.zone_id] = l; });
-  _serreAdmin.tenants = tRes.data || [];
+  _serreAdmin.tenants = (tRes.data || []).filter(t => !isDeviceAccount(t.email));
   _serreAdmin.couts = cRes.data || [];
   renderSerreAdmin();
 }
@@ -9908,9 +9908,14 @@ function exportStatsCSV() {
 }
 
 // --- Tenants ---
+// Comptes techniques (Raspberry Pi capteurs, etc.) : exclus des listes de résidents.
+function isDeviceAccount(email) {
+  return (email || '').toLowerCase().endsWith('@device.local');
+}
+
 async function loadTenants() {
   const { data } = await sb.from('profiles').select('*').neq('role', 'demo').order('full_name');
-  tenantsCache = data || [];
+  tenantsCache = (data || []).filter(p => !isDeviceAccount(p.email));
 
   // Récupérer la liste des clients Central pour détecter ceux qui sont
   // sans forfait + sans row côté central -> 🟢 Approuver. Les résidents
@@ -10603,7 +10608,8 @@ async function toggleVehicle(id, val) {
 
 // --- Payments ---
 async function loadAdminPayments() {
-  const { data: tenants } = await sb.from('profiles').select('id, full_name, unit').neq('role', 'demo').order('full_name');
+  const { data: tenantsRaw } = await sb.from('profiles').select('id, full_name, unit, email').neq('role', 'demo').order('full_name');
+  const tenants = (tenantsRaw || []).filter(t => !isDeviceAccount(t.email));
   document.getElementById('payment-tenant').innerHTML = (tenants || []).map(t =>
     `<option value="${t.id}">${isDemo ? anonName(t.id) : t.full_name} (${isDemo ? (t.unit ? anonUnit(t.id) : 'sans unité') : (t.unit || 'sans unité')})</option>`
   ).join('');
