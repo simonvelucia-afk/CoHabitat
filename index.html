@@ -874,6 +874,32 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   #burger-btn { display: none !important; }
 }
 
+/* ===== SERRE — champs partagés (page Espaces + panneau admin) ===== */
+.serre-field { margin-bottom: 8px; }
+.serre-field label { display: block; font-size: 11px; color: var(--text3); margin-bottom: 3px; }
+.serre-field select, .serre-field input, .serre-field textarea {
+  width: 100%; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--surface2); color: var(--text); font-family: inherit;
+}
+.serre-row { display: flex; gap: 8px; }
+.serre-row .serre-field { flex: 1; }
+.serre-sec { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text3); margin: 10px 0 4px; }
+.serre-global {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 14px; display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 18px;
+}
+.serre-global > .serre-field { min-width: 120px; margin: 0; }
+.serre-resv { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 170px; background: var(--surface); }
+.serre-resv-h { font-size: 11px; font-weight: 700; color: var(--text2); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+.serre-resv .serre-row { gap: 8px; }
+.serre-resv .serre-field { margin: 0; }
+/* Conditions en lecture seule : même gabarit visuel qu'un <input> */
+.serre-ro {
+  width: 100%; box-sizing: border-box; font-size: 13px; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--surface2);
+  color: var(--text); min-height: 31px;
+}
+
 /* ===== LOADING ===== */
 .loading {
   display: flex;
@@ -5834,6 +5860,7 @@ const SERRE_FERT = [
   { v: 'compost_backwash', l: 'Compost + backwash' },
   { v: 'autre', l: 'Autre' }
 ];
+// Icône de la plante affichée dans chaque section du plan.
 const SERRE_EMOJI = {
   'Tomate': '🍅', 'Concombre': '🥒', 'Laitue': '🥬', 'Poivron': '🫑', 'Basilic': '🌿',
   'Haricot': '🫛', 'Radis': '🌰', 'Épinard': '🥬', 'Fine herbes': '🌿', 'Fraise': '🍓', 'Autre': '🌱'
@@ -5967,15 +5994,9 @@ function renderSerre() {
   const mine = Object.values(_serre.locByZone).filter(l => l.tenant_id === currentProfile?.id).length;
   // Conditions : remplies automatiquement par les capteurs (Pi/MQTT). Saisie
   // manuelle réservée aux admins (fallback si un capteur est absent/HS).
-  const canEditCond = _serre.isAdmin && !isDemo;
 
   root.innerHTML = `
     <style>
-      .serre-field{margin-bottom:8px}
-      .serre-field label{display:block;font-size:11px;color:var(--text3);margin-bottom:3px}
-      .serre-field select,.serre-field input,.serre-field textarea{width:100%;font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-family:inherit}
-      .serre-row{display:flex;gap:8px}.serre-row .serre-field{flex:1}
-      .serre-sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:10px 0 4px}
       .serre-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
       .serre-scion{border:1px solid var(--border);border-radius:8px;padding:9px 10px;margin-bottom:9px}
       .serre-scion-h{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:7px}
@@ -5985,17 +6006,12 @@ function renderSerre() {
       .serre-zone textarea[data-f=notes]{resize:vertical;min-height:34px}
       .serre-planche{font-size:13px;font-weight:600;color:var(--text2);margin:18px 0 10px;display:flex;align-items:center;gap:8px}
       .serre-planche .b{font-size:11px;font-weight:400;color:var(--text3);background:var(--surface2);padding:2px 8px;border-radius:10px}
-      .serre-global{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
-      .serre-global > .serre-field{min-width:120px;margin:0}
-      .serre-resv{border:1px solid var(--border);border-radius:8px;padding:8px 10px;min-width:170px;background:var(--surface)}
-      .serre-resv-h{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:5px}
-      .serre-resv .serre-row{gap:8px}.serre-resv .serre-field{margin:0}
       /* ── Plan de la serre — orientation verticale unique ─────────────
          Les 2 rangées sont deux COLONNES côte à côte (10 zones chacune),
          séparées par l'allée principale (bande verticale centrale) et
          encadrées par les 2 tunnels à poules (bandes verticales). */
-      .plan-serre-container{width:100%;max-width:480px;margin:0 auto;padding:1rem;box-sizing:border-box;
-        height:min(68svh,620px);min-height:400px}
+      .plan-serre-container{width:100%;padding:1rem;box-sizing:border-box;
+        height:min(82svh,880px);min-height:460px}
       .plan-serre-head{display:flex;gap:8px;margin:0 0 6px}
       .plan-serre-head .hl{flex:1;min-width:0;text-align:center;font-size:11px;font-weight:700;
         text-transform:uppercase;letter-spacing:.06em;color:var(--text3)}
@@ -6007,13 +6023,13 @@ function renderSerre() {
         border-left:1px dashed var(--border);border-right:1px dashed var(--border);
         font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--text3)}
       /* Tunnels à poules : bandes fixes en bordure, alignées sur les rangées */
-      .serre-tunnel{flex:0 0 26px;display:flex;align-items:center;justify-content:center;
+      .serre-tunnel{flex:0 0 30px;display:flex;align-items:center;justify-content:center;
         writing-mode:vertical-rl;text-orientation:mixed;
         background:rgba(208,138,90,.10);border:1px dashed rgba(208,138,90,.35);border-radius:8px;
         font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
       .serre-tunnel .ic{text-orientation:upright;letter-spacing:0}
       /* Spacers du bandeau de titres : mêmes largeurs que tunnels / allée */
-      .plan-serre-head .sp-tunnel{flex:0 0 26px}
+      .plan-serre-head .sp-tunnel{flex:0 0 30px}
       .plan-serre-head .sp-allee{flex:0 0 22px}
       .serre-plan-zone{display:flex;flex-direction:column;gap:3px;padding:4px 5px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;text-align:left;color:var(--text);overflow:hidden;transition:border-color .12s,transform .06s}
       .serre-plan-zone:hover{border-color:var(--accent2);transform:translateY(-1px)}
@@ -6022,25 +6038,29 @@ function renderSerre() {
       .serre-plan-code{font-size:10.5px;font-weight:700;color:var(--text2);display:flex;justify-content:space-between;align-items:center;gap:2px;line-height:1}
       .serre-plan-code .dotmine{color:var(--accent2);font-size:9px}
       /* 3 chips de statut par zone (aucun texte : la couleur porte l'info) */
-      .serre-plan-secs{display:flex;flex:1;min-height:0;gap:3px}
-      .serre-plan-sec{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
-        border-radius:4px;font-size:11px;line-height:1;background:var(--surface2);border:1px solid transparent}
-      .serre-plan-sec.st-croissance{background:rgba(126,184,160,.22);border-color:rgba(126,184,160,.35)}
-      .serre-plan-sec.st-recolte{background:rgba(208,138,90,.20);border-color:rgba(208,138,90,.35)}
-      .serre-plan-sec.st-vide{background:var(--surface2)}
-      .serre-plan-sec.st-libre{background:transparent;border:1px dashed var(--border)}
+      .serre-plan-secs{display:flex;flex:1;min-height:0;gap:3px;container-type:size}
+      /* Section = un chip : couleur de bordure et de fond pour le statut,
+         icône de la plante au centre, dimensionnée avec la cellule. */
+      .serre-plan-sec{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;overflow:hidden;
+        border-radius:4px;line-height:1;background:var(--surface2);border:2px solid transparent;
+        font-size:clamp(13px,1.7vw,30px)}
+      /* Les 10 rangées écrasent les cellules sur écran court : l'icône se cale
+         sur la hauteur réelle du chip plutôt que sur celle de la fenêtre.
+         Ignoré (donc repli sur le clamp ci-dessus) sans container queries. */
+      .serre-plan-sec{font-size:min(30px,64cqh,42cqw)}
+      .serre-plan-sec.st-croissance{background:rgba(126,184,160,.22);border-color:rgba(126,184,160,.85)}
+      .serre-plan-sec.st-recolte{background:rgba(208,138,90,.20);border-color:rgba(208,138,90,.85)}
+      .serre-plan-sec.st-vide{background:var(--surface2);border-color:var(--border)}
+      .serre-plan-sec.st-libre{background:transparent;border:2px dashed var(--border)}
       /* Barre du plan + mode « plan seul » (sans requestFullscreen) */
       .serre-plan-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
       #serre-plan-wrap.solo{position:fixed;inset:0;height:100svh;z-index:1000;background:var(--bg);
         display:flex;flex-direction:column;padding:10px 12px;box-sizing:border-box;overflow:auto}
       #serre-plan-wrap.solo .plan-serre-container{height:auto;flex:1;min-height:0;max-height:none}
-      .serre-legend{display:flex;flex-wrap:wrap;gap:12px;margin:12px auto 4px;font-size:11px;color:var(--text3);
-        max-width:480px;padding:0 1rem;box-sizing:border-box}
+      .serre-legend{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0 4px;font-size:11px;color:var(--text3);
+        padding:0 1rem;box-sizing:border-box}
       .serre-legend span{display:inline-flex;align-items:center;gap:5px}
       .serre-legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
-      /* Conditions en lecture seule : même gabarit visuel qu'un <input> */
-      .serre-ro{width:100%;box-sizing:border-box;font-size:13px;padding:6px 8px;border:1px solid var(--border);
-        border-radius:6px;background:var(--surface2);color:var(--text);min-height:31px}
     </style>
 
     <div class="section-header" style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;">
@@ -6059,7 +6079,8 @@ function renderSerre() {
       : (mine ? `<div style="font-size:12px;color:var(--text2);margin-bottom:14px;">${pt('Vous louez actuellement')} <strong>${mine}</strong> ${mine > 1 ? pt('zones') : pt('zone')}.</div>` : '')}
 
     <div class="serre-sec" style="margin-top:0;">${pt('Conditions de la serre')}</div>
-    ${ConditionsSerre(L, !canEditCond)}
+    ${ConditionsSerre(L, true)}
+    ${_serre.isAdmin && !isDemo ? `<div style="font-size:11px;color:var(--text3);margin:-10px 0 18px;">${pt('Saisie manuelle : onglet Admin → 🌱 Serre')}</div>` : ''}
 
     <div id="serre-plan-wrap">
       <div class="serre-plan-bar">
@@ -6099,17 +6120,23 @@ function renderSerre() {
 }
 
 // Bloc « Conditions de la serre ». Un seul composant, deux rendus :
-//  · readOnly (locataire, démo) → valeurs en <div> au même gabarit visuel,
-//    sans champ éditable ni bouton d'enregistrement ;
-//  · éditable (admin)           → <input> + « Enregistrer la lecture ».
+//  · readOnly  → valeurs en <div> au même gabarit visuel, aucun champ
+//    éditable ni bouton (page Espaces, pour tout le monde) ;
+//  · éditable  → <input> + « Enregistrer la lecture » (panneau admin
+//    uniquement, onglet 🌱 Serre).
+// Les deux instances peuvent coexister dans le DOM (les pages restent
+// montées) : les ids ne sont émis que sur la version éditable, préfixés,
+// pour que serreSaveLecture() ne lise jamais les <div> en lecture seule.
 // L'écriture est de toute façon bloquée côté base par la RLS
 // serre_lectures_insert (voir sql/014_serre_lectures_admin_insert.sql).
-function ConditionsSerre(L, readOnly) {
+function ConditionsSerre(lecture, readOnly, idPrefix) {
+  const L = lecture || {};
+  const px = idPrefix || '';
   const shown = v => (v === null || v === undefined || v === '') ? '—' : v;
   const field = (label, id, val, attrs) => `
           <div class="serre-field"><label>${label}</label>${readOnly
-            ? `<div class="serre-ro" id="${id}">${shown(val)}</div>`
-            : `<input type="number" ${attrs} id="${id}" value="${val ?? ''}">`}</div>`;
+            ? `<div class="serre-ro">${shown(val)}</div>`
+            : `<input type="number" ${attrs} id="${px}${id}" value="${val ?? ''}">`}</div>`;
   return `
     <div class="serre-global">
       ${field(pt('Température air (°C)'), 'serre-tair', L.temp_air, 'step="0.1"')}
@@ -6124,7 +6151,7 @@ function ConditionsSerre(L, readOnly) {
       ${readOnly
         ? `<span style="font-size:11px;color:var(--text3);align-self:center;">🔌 ${pt('Relevé automatique (capteurs)')}</span>`
         : `<button class="btn btn-primary btn-sm" onclick="serreSaveLecture()">${pt('Enregistrer la lecture')}</button>`}
-      ${_serre.lecture ? `<span style="font-size:11px;color:var(--text3);align-self:center;">${pt('Dernière lecture')} : ${new Date(_serre.lecture.horodatage).toLocaleString('fr-CA')}</span>` : ''}
+      ${L.horodatage ? `<span style="font-size:11px;color:var(--text3);align-self:center;">${pt('Dernière lecture')} : ${new Date(L.horodatage).toLocaleString('fr-CA')}</span>` : ''}
     </div>`;
 }
 
@@ -6175,11 +6202,11 @@ function serrePlanTile(zone, p) {
     const cur = all.filter(c => (c.section || 1) === s)[0];
     const cult = cur?.culture;
     const st = cur ? (cur.statut || 'vide') : (occ.is_occupied ? 'vide' : 'libre');
-    const emoji = cult ? (SERRE_EMOJI[cult] || '🌱') : '';
+    const icone = cult ? (SERRE_EMOJI[cult] || '🌱') : '';
     const statutLabel = cur ? (SERRE_STATUT_LABELS[cur.statut] || SERRE_STATUT_LABELS.vide)
                             : (occ.is_occupied ? pt('vide') : pt('libre'));
     const title = `${zone.code}S${s} — ` + (cult ? `${escHtml(cult)} · ${statutLabel}` : statutLabel);
-    return `<div class="serre-plan-sec st-${st}" title="${title}" aria-label="${title}">${emoji}</div>`;
+    return `<div class="serre-plan-sec st-${st}" title="${title}" aria-label="${title}">${icone}</div>`;
   }).join('');
   return `<button class="serre-plan-zone ${stateClass}" onclick="serreOpenZone('${zone.id}')">
     <div class="serre-plan-code">${zone.code}${isMine ? '<span class="dotmine">●</span>' : ''}</div>
@@ -6479,10 +6506,12 @@ async function serreReleaseZone(locId, code) {
   closeModal('modal-serre-zone');
 }
 
+// Saisie manuelle d'une lecture — panneau admin uniquement (fallback si un
+// capteur est absent ou HS ; le cas normal reste l'acquisition par le Pi).
 async function serreSaveLecture() {
   if (isDemo) { toast('Indisponible en mode démo', 'info'); return; }
-  if (!_serre.isAdmin) { toast('Saisie réservée aux administrateurs', 'info'); return; }
-  const num = id => { const el = document.getElementById(id); const v = el ? el.value : ''; return v === '' ? null : Number(v); };
+  if (!['admin', 'principal_admin'].includes(currentProfile?.role)) { toast('Saisie réservée aux administrateurs', 'info'); return; }
+  const num = id => { const el = document.getElementById(SERRE_COND_ADMIN_PREFIX + id); const v = el ? el.value : ''; return v === '' ? null : Number(v); };
   const { error } = await sb.from('serre_lectures').insert({
     temp_air: num('serre-tair'),
     reservoir1_pct: num('serre-r1'), reservoir2_pct: num('serre-r2'), reservoir3_pct: num('serre-r3'),
@@ -6490,8 +6519,8 @@ async function serreSaveLecture() {
     created_by: currentProfile?.id || null
   });
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }
-  serreFlash('Lecture enregistrée ✓');
-  loadSerre();
+  toast('Lecture enregistrée ✓', 'success');
+  loadSerreAdmin();
 }
 
 // Facturation mensuelle : débite les mois échus non encore facturés pour MES
@@ -9296,18 +9325,23 @@ async function elevageDelCout(module, id) {
 //  SERRE (admin) — attribution des zones aux locataires + frais d'exploitation
 // ═══════════════════════════════════════════════════════════════════════
 const SERRE_COUT_CATS = ['Semences', 'Terreau / substrat', 'Eau', 'Électricité', 'Équipement', 'Entretien', 'Autre'];
-let _serreAdmin = { zones: [], locByZone: {}, tenants: [], couts: [], basePrice: 0.5 };
+// Le bloc « Conditions » éditable ne vit que dans le panneau admin ; ses ids
+// sont préfixés pour ne pas entrer en collision avec la version lecture seule
+// de la page Espaces, montée en même temps dans le DOM.
+const SERRE_COND_ADMIN_PREFIX = 'sa-';
+let _serreAdmin = { zones: [], locByZone: {}, tenants: [], couts: [], basePrice: 0.5, lecture: null };
 
 async function loadSerreAdmin() {
   const root = document.getElementById('admin-serre');
   if (!root) return;
   root.innerHTML = `<div class="loading"><div class="spinner"></div> Chargement…</div>`;
-  const [zRes, lRes, tRes, cRes, sRes] = await Promise.all([
+  const [zRes, lRes, tRes, cRes, sRes, condRes] = await Promise.all([
     sb.from('serre_zones').select('*').eq('is_active', true).order('planche').order('position'),
     sb.from('serre_locations').select('id, zone_id, tenant_id, date_debut, frais_mensuel, profiles(full_name, unit)').eq('statut', 'active'),
     sb.from('profiles').select('id, full_name, unit, role, email').neq('role', 'demo').order('full_name'),
     sb.from('elevage_couts').select('*').eq('module', 'serre').order('date_cout', { ascending: false }),
-    sb.from('system_settings').select('value').eq('key', 'serre_frais_mensuel').maybeSingle()
+    sb.from('system_settings').select('value').eq('key', 'serre_frais_mensuel').maybeSingle(),
+    sb.from('serre_lectures').select('*').order('horodatage', { ascending: false }).limit(1)
   ]);
   if (zRes.error) {
     root.innerHTML = `<div class="empty-state"><p>Erreur de chargement — vérifiez les migrations serre.<br>${escHtml(zRes.error.message)}</p></div>`;
@@ -9319,6 +9353,7 @@ async function loadSerreAdmin() {
   (lRes.data || []).forEach(l => { _serreAdmin.locByZone[l.zone_id] = l; });
   _serreAdmin.tenants = (tRes.data || []).filter(t => !isDeviceAccount(t.email));
   _serreAdmin.couts = cRes.data || [];
+  _serreAdmin.lecture = (condRes.data && condRes.data[0]) || null;
   renderSerreAdmin();
 }
 
@@ -9368,6 +9403,10 @@ function renderSerreAdmin() {
         <div style="text-align:right"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Coûts ${year}</div><div style="font-size:1.3rem;font-weight:700">${totalCoutYear.toFixed(2)} $</div></div>
       </div>
     </div>
+
+    <div class="sa-sec">Conditions de la serre — saisie manuelle</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Les conditions sont normalement remplies par les capteurs (Raspberry Pi + MQTT). Cette saisie est un dépannage si un capteur est absent ou hors service ; les locataires voient le résultat en lecture seule sur la page Espaces.</div>
+    ${ConditionsSerre(_serreAdmin.lecture, false, SERRE_COND_ADMIN_PREFIX)}
 
     <div class="sa-sec">Tarif</div>
     <div class="sa-form" style="align-items:flex-end">
