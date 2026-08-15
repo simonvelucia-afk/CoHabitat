@@ -26,7 +26,8 @@ Deux processus indépendants (services systemd) :
    un message JSON combiné sur le topic MQTT `serre/lectures`.
 2. **`mqtt_to_supabase.py`** — s'abonne à ce topic et insère chaque lecture dans
    `serre_lectures` via l'API REST Supabase, authentifié par un **compte
-   appareil** (les insertions respectent la RLS : `created_by = auth.uid()`).
+   appareil** (l'insertion est autorisée par la RLS via `serre_is_capteur()`,
+   voir `sql/014_serre_lectures_admin_insert.sql`).
 
 Découpler les deux via MQTT permet d'ajouter facilement d'autres abonnés
 (tableau de bord local, alertes, domotique) sans toucher à l'acquisition.
@@ -125,9 +126,11 @@ pip install -r requirements.txt
 ### 2. Créer le compte « appareil » Supabase
 
 Dans Supabase → **Authentication → Users → Add user**, créez par exemple
-`serre-pi@device.local` avec un mot de passe fort. Ce compte n'a pas besoin
-d'être admin : la policy `serre_lectures_insert` autorise tout utilisateur
-authentifié à insérer une ligne dont `created_by = auth.uid()`.
+`serre-pi@device.local` avec un mot de passe fort. **L'adresse doit se
+terminer par `@device.local`** : depuis `sql/014_serre_lectures_admin_insert.sql`,
+la policy `serre_lectures_insert` n'autorise que les admins *et* les comptes
+capteurs, reconnus par ce suffixe (`serre_is_capteur()`). Le compte n'a donc
+pas besoin d'être admin, mais un compte hors `@device.local` sera refusé.
 
 > Assurez-vous d'avoir un profil pour ce compte (le trigger `handle_new_user`
 > en crée un automatiquement à l'inscription). Sinon, insérez une ligne dans

@@ -3,8 +3,9 @@
 
 S'abonne au topic `serre/lectures` et insère chaque lecture dans la table
 `serre_lectures`. L'authentification se fait via un compte « appareil »
-(email/mot de passe), donc les insertions respectent la RLS existante
-(`created_by = auth.uid()`). Le jeton est rafraîchi automatiquement.
+(email/mot de passe) dont l'adresse se termine par `@device.local` : la RLS
+`serre_lectures_insert` réserve l'insertion aux admins et à ces comptes
+capteurs. Le jeton est rafraîchi automatiquement.
 
 Note — alternative plus stricte : au lieu d'insérer directement, appeler une
 Edge Function Supabase `ingest-lecture` protégée par un secret d'appareil, qui
@@ -92,7 +93,8 @@ def insert_lecture(reading):
         return False
     if "ts" in reading:
         row["horodatage"] = reading["ts"]
-    # Requis par la RLS serre_lectures_insert (created_by = auth.uid()).
+    # Traçabilité de l'auteur de la lecture (l'accès en écriture, lui, est
+    # accordé par la RLS au compte capteur @device.local).
     if _device_uid:
         row["created_by"] = _device_uid
 
