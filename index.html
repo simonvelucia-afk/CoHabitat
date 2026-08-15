@@ -6511,25 +6511,46 @@ function serreDemoLoad() {
   _serre.isAdmin = false;
   _serre.isDemo = true;
   _serre.locByZone = {};
-  _serre.occ = {}; _serre.culturesByZone = {}; _serre.irrigBySec = {}; _serre.fertBySec = {};
+  _serre.occ = {}; _serre.culturesByZone = {}; _serre.irrigBySec = {}; _serre.fertBySec = {}; _serre.cumulByCulture = {};
   zones.forEach(z => { _serre.occ[z.id] = { zone_id: z.id, is_occupied: false, is_mine: false, frais_mensuel: 0.5 }; });
   const plantPool = ['Tomate', 'Laitue', 'Basilic', 'Concombre', 'Fraise', 'Radis', 'Poivron', 'Épinard', 'Fine herbes', 'Haricot', ''];
   const sysPool = SERRE_SYSTEMES, freqPool = SERRE_FREQ, fertPool = ['compost', 'backwash_sandponique', 'compost_backwash', 'autre'];
+  const debutsDemo = ['2026-03-01', '2026-04-15', '2026-05-01', '2026-06-01'];
   demoSet.forEach((d, k) => {
     const z = zones[d.i]; if (!z) return;
     _serre.occ[z.id].is_occupied = true;
+    // Locataire et période fictifs : la démo montre le plan tel qu'il est en
+    // vrai — nom abrégé, date de début, fin envisagée quand il y en a une.
+    // Les noms viennent d'anonName(), déjà utilisé partout ailleurs en démo.
+    const nom = (anonName(z.id) || '').split(' ');
+    _serre.occ[z.id].locataire_court = nom[0] ? nom[0] + (nom[1] ? ' ' + nom[1][0] + '.' : '') : '';
+    _serre.occ[z.id].date_debut = debutsDemo[k % debutsDemo.length];
+    _serre.occ[z.id].date_fin_prevue = (k % 3 === 0) ? '2026-10-31' : null;
     // 3 sections indépendantes : plante, irrigation et fertilisation différentes
     _serre.culturesByZone[z.id] = [1, 2, 3].map(s => {
       const p = plantPool[(d.i + s * 3 + k) % plantPool.length];
-      const st = p ? (((d.i + s) % 2 === 0) ? 'croissance' : 'recolte') : 'vide';
+      // Trois stades représentés, dont « en production » — c'est le cas
+      // courant d'une tomate ou d'un concombre en pleine saison.
+      const st = !p ? 'vide' : ((d.i + s) % 3 === 0 ? 'production' : (d.i + s) % 3 === 1 ? 'croissance' : 'recolte');
+      const id = `demo-cul-${z.id}-${s}`;
       if (p) {
         _serre.irrigBySec[z.id + ':' + s] = { zone_id: z.id, section: s, frequence: freqPool[(d.i + s) % freqPool.length], systeme: sysPool[(d.i + s * 2) % sysPool.length] };
         _serre.fertBySec[z.id + ':' + s] = { zone_id: z.id, section: s, type: fertPool[(d.i + s) % fertPool.length], date_application: '2026-07-20' };
       }
+      // Cumul de cueillettes pour les sections en production, et un plant
+      // monté en graine de temps à autre : les deux nouveautés du plan.
+      if (st === 'production') {
+        _serre.cumulByCulture[id] = [{
+          culture_id: id, unite: d.ru,
+          total: Math.round((((d.i + s) % 9) + 2) * 1.4 * 10) / 10,
+          nb: ((d.i + s) % 12) + 3, derniere: '2026-08-14'
+        }];
+      }
       return {
-        id: `demo-cul-${z.id}-${s}`, zone_id: z.id, location_id: `demo-loc-${z.id}`, section: s,
+        id, zone_id: z.id, location_id: `demo-loc-${z.id}`, section: s,
         culture: p || null, date_semis: p ? d.semis : null, date_recolte_prevue: p ? d.prevue : null,
-        statut: st, rendement_qty: st === 'recolte' ? Math.round((((d.i + s) % 5) + 1) * 10) / 10 : null,
+        statut: st, en_germination: !!p && (d.i + s) % 7 === 0,
+        rendement_qty: st === 'recolte' ? Math.round((((d.i + s) % 5) + 1) * 10) / 10 : null,
         rendement_unite: d.ru, notes: ''
       };
     });
@@ -6653,10 +6674,15 @@ function renderSerre() {
       /* Locataire + période, en version courte. Colonne étroite : la ligne
          passe sous le code plutôt que de disparaître. Vraiment trop étroite
          (mobile hors « plan seul ») : masquée, le code doit rester lisible. */
-      .serre-plan-meta{display:none;font-weight:400;color:var(--text3);font-size:9.5px;
-        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+      .serre-plan-meta{display:none;font-size:10.5px;white-space:nowrap;overflow:hidden;
+        text-overflow:ellipsis;min-width:0}
+      /* Le locataire est une information d'identité, au même niveau de
+         lisibilité que le code de zone ; la période reste secondaire. */
+      .serre-plan-meta .qui{font-weight:700;color:var(--text)}
+      .serre-plan-meta .quand{font-weight:400;color:var(--text3)}
+      .serre-plan-zone.mine .serre-plan-meta .qui{color:var(--accent2)}
       @container (min-width:104px){.serre-plan-meta{display:block;flex-basis:100%}}
-      @container (min-width:190px){.serre-plan-meta{flex-basis:auto;text-align:right}}
+      @container (min-width:200px){.serre-plan-meta{flex-basis:auto;text-align:right}}
       /* 3 chips de statut par zone (aucun texte : la couleur porte l'info) */
       .serre-plan-secs{display:flex;flex:1;min-height:0;gap:3px;container-type:size}
       /* Section = un chip : couleur de bordure et de fond pour le statut,
@@ -6883,7 +6909,12 @@ function serrePlanMeta(occ, isMine) {
   const fin = mois(occ.date_fin_prevue);
   if (!qui && !debut) return '';
   const periode = debut ? (fin ? `${debut} → ${fin}` : `${pt('depuis')} ${debut}`) : '';
-  return escHtml([qui, periode].filter(Boolean).join(' · '));
+  // Nom et période sont deux niveaux d'information : ils portent chacun leur
+  // classe pour que le nom ressorte et que la date reste discrète.
+  return [
+    qui ? `<span class="qui">${escHtml(qui)}</span>` : '',
+    periode ? `<span class="quand">${escHtml(periode)}</span>` : ''
+  ].filter(Boolean).join(' <span class="quand">·</span> ');
 }
 
 // Clic sur l'en-tête d'une zone : demander la location, ou libérer la mienne.
