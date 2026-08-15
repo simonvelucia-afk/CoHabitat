@@ -4461,6 +4461,149 @@ const PT = {
     'tkErrLoad': 'Load error. Make sure the <code>tickets</code> tables exist (migration <code>sql/005_tickets.sql</code>).',
     'tkErrNotFound': 'Ticket not found.',
     'tkDemoUnavail': 'Unavailable in demo mode.',
+    // ── Serre, tableau de bord et divers (ajout) ──
+    '10 récoltes les plus récentes sur': 'Showing the 10 most recent harvests of',
+    '1re récolte prévue': 'First harvest expected',
+    '3 sections indépendantes depuis l’allée (culture, irrigation et fertilisation propres à chacune)': '3 independent sections from the aisle (each with its own crop, irrigation and fertilising)',
+    'Allée principale': 'Main aisle',
+    'Aucun trajet trouvé': 'No trips found',
+    'Aucune cueillette notée.': 'No pickings recorded.',
+    'Aucune demande de trajet pour le moment': 'No trip requests yet',
+    'Aucune récolte enregistrée pour le moment.': 'No harvest recorded yet.',
+    'Aucune transaction': 'No transactions',
+    'Aucune zone louée en ce moment.': 'No plot rented at the moment.',
+    'Chargement de la serre…': 'Loading greenhouse…',
+    'Choisissez une culture pour commencer à noter les cueillettes.': 'Pick a crop to start recording harvests.',
+    'Clôt le cycle : la section passe à « Terminé » et repart vide. Les cueillettes notées restent dans l’historique.': 'Closes the cycle: the section becomes “Finished” and starts empty again. Recorded pickings stay in the history.',
+    'Complété': 'Completed',
+    'Conditions de la serre': 'Greenhouse conditions',
+    'Connexion requise': 'Sign-in required',
+    'Cueillettes': 'Pickings',
+    'Culture': 'Crop',
+    'Cultures en cours': 'Active crops',
+    'Demander la location de cette zone': 'Request to rent this plot',
+    'Dernière application': 'Last application',
+    'Dernière lecture': 'Last reading',
+    'Dernière récolte': 'Last harvest',
+    'En cours': 'Active',
+    'En croissance': 'Growing',
+    'En production': 'Producing',
+    'Enregistrer la lecture': 'Save reading',
+    'Exporter CSV': 'Export CSV',
+    'Fertilisation': 'Fertilising',
+    'Historique': 'History',
+    'Historique complet et export CSV sur la page Espaces communs.': 'Full history and CSV export on the Common spaces page.',
+    'Irrigation — fréquence': 'Irrigation — frequency',
+    'Journal indisponible — migration 016 non jouée ?': 'Log unavailable — has migration 016 been run?',
+    'Libre': 'Free',
+    'Libérer cette zone': 'Release this plot',
+    'Libérer la zone': 'Release the plot',
+    'Locations terminées': 'Past rentals',
+    'Louer cette zone': 'Rent this plot',
+    'Louer la zone': 'Rent plot',
+    'Louée depuis le': 'Rented since',
+    'Ma serre': 'My greenhouse',
+    'Mes zones': 'My plots',
+    'Mode démo — données fictives': 'Demo mode — fictional data',
+    'Mode démo — données fictives et anonymisées, consultation seule': 'Demo mode — fictional, anonymised data, read-only',
+    'Moi': 'Me',
+    'Motif de la demande (optionnel) :': 'Reason for the request (optional):',
+    'Niveau (%)': 'Level (%)',
+    'Non confirmé': 'Unconfirmed',
+    'Noter': 'Record',
+    'Notes': 'Notes',
+    'Occupée par un autre locataire': 'Rented by another resident',
+    'Plan de la serre': 'Greenhouse map',
+    'Plan seul': 'Map only',
+    'Plant conservé pour la semence': 'Plant kept for seed',
+    'Porte-graine': 'Seed-bearing',
+    'Publié': 'Published',
+    'Quantité': 'Quantity',
+    'Quitter le plan seul': 'Exit map-only view',
+    'Rangée 1': 'Row 1',
+    'Rangée 2': 'Row 2',
+    'Relevé automatique (capteurs)': 'Automatic reading (sensors)',
+    'Rendement cumulé': 'Total yield',
+    'Récolte': 'Harvest',
+    'Récoltes': 'Harvests',
+    'Réservoir': 'Tank',
+    'Saisie manuelle : onglet Admin → 🌱 Serre': 'Manual entry: Admin tab → 🌱 Greenhouse',
+    'Section': 'Section',
+    'Semis': 'Sowing',
+    'Serre 10 × 20 pi — 2 rangées × 10 colonnes = 20 zones, chacune en 3 sections. Louez une zone au mois (code ex. R1C4S2).': '10 × 20 ft greenhouse — 2 rows × 10 columns = 20 plots, each in 3 sections. Rent a plot by the month (code e.g. R1C4S2).',
+    'Serre communautaire': 'Community greenhouse',
+    'Serre indisponible': 'Greenhouse unavailable',
+    'Stade': 'Stage',
+    'Supprimer cette cueillette': 'Delete this picking',
+    'Système': 'System',
+    'Temp. (°C)': 'Temp. (°C)',
+    'Température air (°C)': 'Air temperature (°C)',
+    'Terminer le cycle': 'End the cycle',
+    'Terminé': 'Finished',
+    'Total cueilli': 'Total picked',
+    'Tunnel à poules': 'Chicken tunnel',
+    'Tunnel à poules (bordure est)': 'Chicken tunnel (east side)',
+    'Tunnel à poules (bordure ouest)': 'Chicken tunnel (west side)',
+    'Un plant est conservé pour la semence (en germination)': 'One plant is kept for seed (going to seed)',
+    'Unité des récoltes': 'Harvest unit',
+    'Vide': 'Empty',
+    'Voir le plan de la serre': 'View the greenhouse map',
+    'Voir les 3 sections': 'View all 3 sections',
+    'Vos zones en cours et vos récoltes passées': 'Your active plots and past harvests',
+    'Vous louez actuellement': 'You currently rent',
+    'Vous ne louez aucune zone de la serre pour le moment.': 'You are not renting any greenhouse plot at the moment.',
+    'Zone': 'Plot',
+    'Zone libre': 'Free plot',
+    'Zone louée': 'Rented plot',
+    'Zones louées': 'Plots rented',
+    'allée': 'aisle',
+    'cliquez une zone pour ses détails et son historique': 'click a plot for its details and history',
+    'cueillettes': 'pickings',
+    'cueilli': 'picked',
+    'cumul': 'total',
+    'depuis': 'since',
+    'en production': 'producing',
+    'le premier mois est facturé maintenant.': 'the first month is charged now.',
+    'mois': 'month',
+    'porte-graine': 'seed-bearing',
+    'récolte prévue': 'harvest expected',
+    'récolté': 'harvested',
+    'récoltée le': 'harvested on',
+    'semé': 'sown',
+    'vide': 'empty',
+    'zone': 'plot',
+    'zones': 'plots',
+    'À faire quand le plant est arraché. Les cueillettes se notent au fur et à mesure ci-dessus.': 'Do this when the plant is pulled out. Pickings are recorded above as you go.',
+
+    // ── Serre : cultures, unités, irrigation, fertilisation ──
+    '1x/semaine': '1×/week',
+    '2x/semaine': '2×/week',
+    'Aspersion': 'Sprinkler',
+    'Autre': 'Other',
+    'Aux 2 jours': 'Every 2 days',
+    'Backwash sandponique': 'Sandponic backwash',
+    'Basilic': 'Basil',
+    'Compost': 'Compost',
+    'Compost + backwash': 'Compost + backwash',
+    'Concombre': 'Cucumber',
+    'Fine herbes': 'Herbs',
+    'Fraise': 'Strawberry',
+    'Goutte-à-goutte': 'Drip',
+    'Haricot': 'Bean',
+    'Laitue': 'Lettuce',
+    'Manuel': 'Manual',
+    'Poivron': 'Bell pepper',
+    'Quotidien': 'Daily',
+    'Radis': 'Radish',
+    'Sandponique (recirculation)': 'Sandponic (recirculating)',
+    'Selon besoin': 'As needed',
+    'Tomate': 'Tomato',
+    'bottes': 'bunches',
+    'kg': 'kg',
+    'lb': 'lb',
+    'unités': 'units',
+    'Épinard': 'Spinach',
+
   },
   es: {
     'Solde disponible': 'Saldo disponible',
@@ -4581,11 +4724,159 @@ const PT = {
     'tkErrLoad': 'Error de carga. Verifique que existan las tablas <code>tickets</code> (migración <code>sql/005_tickets.sql</code>).',
     'tkErrNotFound': 'Ticket no encontrado.',
     'tkDemoUnavail': 'No disponible en modo demo.',
+    // ── Serre, tableau de bord et divers (ajout) ──
+    '10 récoltes les plus récentes sur': 'Mostrando las 10 cosechas más recientes de',
+    '1re récolte prévue': 'Primera cosecha prevista',
+    '3 sections indépendantes depuis l’allée (culture, irrigation et fertilisation propres à chacune)': '3 secciones independientes desde el pasillo (cada una con su cultivo, riego y fertilización)',
+    'Allée principale': 'Pasillo principal',
+    'Aucun trajet trouvé': 'No se encontraron viajes',
+    'Aucune cueillette notée.': 'Ninguna recolección registrada.',
+    'Aucune demande de trajet pour le moment': 'Ninguna solicitud de viaje por ahora',
+    'Aucune récolte enregistrée pour le moment.': 'Ninguna cosecha registrada por ahora.',
+    'Aucune transaction': 'Sin transacciones',
+    'Aucune zone louée en ce moment.': 'Ninguna parcela alquilada por el momento.',
+    'Chargement de la serre…': 'Cargando el invernadero…',
+    'Choisissez une culture pour commencer à noter les cueillettes.': 'Elija un cultivo para empezar a registrar las recolecciones.',
+    'Clôt le cycle : la section passe à « Terminé » et repart vide. Les cueillettes notées restent dans l’historique.': 'Cierra el ciclo: la sección pasa a «Terminado» y vuelve a estar vacía. Las recolecciones registradas permanecen en el historial.',
+    'Complété': 'Completado',
+    'Conditions de la serre': 'Condiciones del invernadero',
+    'Connexion requise': 'Inicio de sesión requerido',
+    'Cueillettes': 'Recolecciones',
+    'Culture': 'Cultivo',
+    'Cultures en cours': 'Cultivos en curso',
+    'Demander la location de cette zone': 'Solicitar el alquiler de esta parcela',
+    'Dernière application': 'Última aplicación',
+    'Dernière lecture': 'Última lectura',
+    'Dernière récolte': 'Última cosecha',
+    'En cours': 'En curso',
+    'En croissance': 'En crecimiento',
+    'En production': 'En producción',
+    'Enregistrer la lecture': 'Guardar la lectura',
+    'Exporter CSV': 'Exportar CSV',
+    'Fertilisation': 'Fertilización',
+    'Historique': 'Historial',
+    'Historique complet et export CSV sur la page Espaces communs.': 'Historial completo y exportación CSV en la página Espacios comunes.',
+    'Irrigation — fréquence': 'Riego — frecuencia',
+    'Journal indisponible — migration 016 non jouée ?': 'Registro no disponible — ¿se ejecutó la migración 016?',
+    'Libre': 'Libre',
+    'Libérer cette zone': 'Liberar esta parcela',
+    'Libérer la zone': 'Liberar la parcela',
+    'Locations terminées': 'Alquileres finalizados',
+    'Louer cette zone': 'Alquilar esta parcela',
+    'Louer la zone': 'Alquilar la parcela',
+    'Louée depuis le': 'Alquilada desde el',
+    'Ma serre': 'Mi invernadero',
+    'Mes zones': 'Mis parcelas',
+    'Mode démo — données fictives': 'Modo demo — datos ficticios',
+    'Mode démo — données fictives et anonymisées, consultation seule': 'Modo demo — datos ficticios y anónimos, solo lectura',
+    'Moi': 'Yo',
+    'Motif de la demande (optionnel) :': 'Motivo de la solicitud (opcional):',
+    'Niveau (%)': 'Nivel (%)',
+    'Non confirmé': 'Sin confirmar',
+    'Noter': 'Registrar',
+    'Notes': 'Notas',
+    'Occupée par un autre locataire': 'Alquilada por otro residente',
+    'Plan de la serre': 'Plano del invernadero',
+    'Plan seul': 'Solo el plano',
+    'Plant conservé pour la semence': 'Planta reservada para semilla',
+    'Porte-graine': 'Porta-semilla',
+    'Publié': 'Publicado',
+    'Quantité': 'Cantidad',
+    'Quitter le plan seul': 'Salir de la vista solo plano',
+    'Rangée 1': 'Hilera 1',
+    'Rangée 2': 'Hilera 2',
+    'Relevé automatique (capteurs)': 'Lectura automática (sensores)',
+    'Rendement cumulé': 'Rendimiento acumulado',
+    'Récolte': 'Cosecha',
+    'Récoltes': 'Cosechas',
+    'Réservoir': 'Depósito',
+    'Saisie manuelle : onglet Admin → 🌱 Serre': 'Entrada manual: pestaña Admin → 🌱 Invernadero',
+    'Section': 'Sección',
+    'Semis': 'Siembra',
+    'Serre 10 × 20 pi — 2 rangées × 10 colonnes = 20 zones, chacune en 3 sections. Louez une zone au mois (code ex. R1C4S2).': 'Invernadero de 10 × 20 pies — 2 hileras × 10 columnas = 20 parcelas, cada una en 3 secciones. Alquile una parcela por mes (código ej. R1C4S2).',
+    'Serre communautaire': 'Invernadero comunitario',
+    'Serre indisponible': 'Invernadero no disponible',
+    'Stade': 'Etapa',
+    'Supprimer cette cueillette': 'Eliminar esta recolección',
+    'Système': 'Sistema',
+    'Temp. (°C)': 'Temp. (°C)',
+    'Température air (°C)': 'Temperatura del aire (°C)',
+    'Terminer le cycle': 'Terminar el ciclo',
+    'Terminé': 'Terminado',
+    'Total cueilli': 'Total recolectado',
+    'Tunnel à poules': 'Túnel de gallinas',
+    'Tunnel à poules (bordure est)': 'Túnel de gallinas (lado este)',
+    'Tunnel à poules (bordure ouest)': 'Túnel de gallinas (lado oeste)',
+    'Un plant est conservé pour la semence (en germination)': 'Se conserva una planta para semilla (en germinación)',
+    'Unité des récoltes': 'Unidad de las cosechas',
+    'Vide': 'Vacía',
+    'Voir le plan de la serre': 'Ver el plano del invernadero',
+    'Voir les 3 sections': 'Ver las 3 secciones',
+    'Vos zones en cours et vos récoltes passées': 'Sus parcelas activas y cosechas pasadas',
+    'Vous louez actuellement': 'Actualmente alquila',
+    'Vous ne louez aucune zone de la serre pour le moment.': 'No alquila ninguna parcela del invernadero por el momento.',
+    'Zone': 'Parcela',
+    'Zone libre': 'Parcela libre',
+    'Zone louée': 'Parcela alquilada',
+    'Zones louées': 'Parcelas alquiladas',
+    'allée': 'pasillo',
+    'cliquez une zone pour ses détails et son historique': 'haga clic en una parcela para ver sus detalles e historial',
+    'cueillettes': 'recolecciones',
+    'cueilli': 'recolectado',
+    'cumul': 'total',
+    'depuis': 'desde',
+    'en production': 'en producción',
+    'le premier mois est facturé maintenant.': 'el primer mes se cobra ahora.',
+    'mois': 'mes',
+    'porte-graine': 'porta-semilla',
+    'récolte prévue': 'cosecha prevista',
+    'récolté': 'cosechado',
+    'récoltée le': 'cosechada el',
+    'semé': 'sembrado',
+    'vide': 'vacía',
+    'zone': 'parcela',
+    'zones': 'parcelas',
+    'À faire quand le plant est arraché. Les cueillettes se notent au fur et à mesure ci-dessus.': 'Hágalo cuando se arranque la planta. Las recolecciones se registran arriba sobre la marcha.',
+
+    // ── Serre : cultures, unités, irrigation, fertilisation ──
+    '1x/semaine': '1×/semana',
+    '2x/semaine': '2×/semana',
+    'Aspersion': 'Aspersión',
+    'Autre': 'Otro',
+    'Aux 2 jours': 'Cada 2 días',
+    'Backwash sandponique': 'Backwash sandpónico',
+    'Basilic': 'Albahaca',
+    'Compost': 'Compost',
+    'Compost + backwash': 'Compost + backwash',
+    'Concombre': 'Pepino',
+    'Fine herbes': 'Hierbas finas',
+    'Fraise': 'Fresa',
+    'Goutte-à-goutte': 'Goteo',
+    'Haricot': 'Judía',
+    'Laitue': 'Lechuga',
+    'Manuel': 'Manual',
+    'Poivron': 'Pimiento',
+    'Quotidien': 'Diario',
+    'Radis': 'Rábano',
+    'Sandponique (recirculation)': 'Sandpónico (recirculación)',
+    'Selon besoin': 'Según necesidad',
+    'Tomate': 'Tomate',
+    'bottes': 'manojos',
+    'kg': 'kg',
+    'lb': 'lb',
+    'unités': 'unidades',
+    'Épinard': 'Espinaca',
+
   }
 };
 
 function pt(key) {
   return (PT[appLang] || PT['fr'])[key] || (PT['fr'][key] || key);
+}
+
+// Locale de formatage des dates, alignée sur la langue de l'interface.
+function appLocale() {
+  return appLang === 'es' ? 'es-ES' : appLang === 'en' ? 'en-CA' : 'fr-CA';
 }
 
 function ptApply() {
@@ -5755,7 +6046,7 @@ async function loadDashboard() {
       <tbody>${combined.map(r => `<tr>
         <td><span class="badge badge-gray">${r.type}</span></td>
         <td>${escHtml(r.name || '—')}</td>
-        <td>${r.date ? new Date(r.date).toLocaleString(appLang === 'fr' ? 'fr-CA' : appLang === 'es' ? 'es-ES' : 'en-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
+        <td>${r.date ? new Date(r.date).toLocaleString(appLocale(), { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
         <td>${(r.cost || 0).toFixed(2)} $</td>
         <td><span class="badge ${statusBadge(r.status)}">${statusLabel(r.status)}</span></td>
       </tr>`).join('')}</tbody>
@@ -5894,7 +6185,20 @@ function filterSpaces() {
 //  Section dédiée affichée en bas de la page « Espaces communs ».
 // ═══════════════════════════════════════════════════════════════════════
 const SERRE_CULTURES = ["", "Tomate", "Concombre", "Laitue", "Poivron", "Basilic", "Haricot", "Radis", "Épinard", "Fine herbes", "Fraise", "Autre"];
-const SERRE_STATUT_LABELS = { vide: "Vide", croissance: "En croissance", recolte: "Récolté" };
+// Cycle de vie d'une section. « recolte » est conservé en base pour les
+// lignes existantes ; c'est son libellé qui devient « Terminé ».
+const SERRE_STATUTS = ['vide', 'semis', 'croissance', 'production', 'recolte'];
+const SERRE_STATUT_LABELS = {
+  vide: "Vide", semis: "Semis", croissance: "En croissance",
+  production: "En production", recolte: "Terminé"
+};
+// La plupart des légumes de serre se cueillent en continu (tomate, concombre,
+// laitue, poivron…). Seules ces cultures-ci se récoltent en une fois : leur
+// section propose « Terminé » plutôt que « En production » après la croissance.
+const SERRE_CULTURES_UNIQUES = ['Radis'];
+function serreEstContinue(culture) {
+  return !!culture && !SERRE_CULTURES_UNIQUES.includes(culture);
+}
 const SERRE_UNITES = ["kg", "lb", "unités", "bottes"];
 const SERRE_SYSTEMES = ["Goutte-à-goutte", "Aspersion", "Manuel", "Sandponique (recirculation)"];
 const SERRE_FREQ = ["Quotidien", "Aux 2 jours", "2x/semaine", "1x/semaine", "Selon besoin"];
@@ -5910,18 +6214,32 @@ const SERRE_EMOJI = {
   'Haricot': '🫛', 'Radis': '🌰', 'Épinard': '🥬', 'Fine herbes': '🌿', 'Fraise': '🍓', 'Autre': '🌱'
 };
 
-let _serre = { zones: [], occ: {}, locByZone: {}, culturesByZone: {}, irrigBySec: {}, fertBySec: {}, lecture: null, isAdmin: false, planSolo: false };
+let _serre = { zones: [], occ: {}, locByZone: {}, culturesByZone: {}, irrigBySec: {}, fertBySec: {}, cumulByCulture: {}, lecture: null, isAdmin: false, planSolo: false };
 
+// Le libellé est traduit, la valeur reste la chaîne française : c'est elle
+// qui part en base (serre_cultures.culture, rendement_unite…) et qui sert de
+// clé à SERRE_EMOJI. Traduire la valeur casserait les données existantes.
 function serreOpt(list, val) {
-  return list.map(c => `<option value="${c}"${val === c ? ' selected' : ''}>${c || '—'}</option>`).join('');
+  return list.map(c => `<option value="${c}"${val === c ? ' selected' : ''}>${c ? pt(c) : '—'}</option>`).join('');
 }
+// Total cueilli sur un cycle, toutes unités confondues (« 4,5 kg · 12 unités »).
+// kg et « unités » ne s'additionnent pas : une ligne de cumul par unité.
+function serreCumulTxt(cultureId) {
+  const rows = (_serre.cumulByCulture || {})[cultureId] || [];
+  return rows.filter(r => r.total != null)
+    .map(r => `${Math.round(Number(r.total) * 10) / 10} ${r.unite || ''}`.trim())
+    .join(' · ');
+}
+
 function serreStatutBadge(st) {
   const map = {
     vide: 'background:var(--surface2);color:var(--text3)',
+    semis: 'background:rgba(126,184,160,.10);color:#8fbfa8',
     croissance: 'background:rgba(126,184,160,.15);color:var(--accent2)',
+    production: 'background:rgba(200,169,110,.18);color:var(--accent)',
     recolte: 'background:rgba(200,120,80,.15);color:#d08a5a'
   };
-  return `<span class="serre-badge" style="${map[st] || map.vide}">${SERRE_STATUT_LABELS[st] || '—'}</span>`;
+  return `<span class="serre-badge" style="${map[st] || map.vide}">${SERRE_STATUT_LABELS[st] ? pt(SERRE_STATUT_LABELS[st]) : '—'}</span>`;
 }
 function serreFlash(msg) {
   const el = document.getElementById('serre-status');
@@ -5962,7 +6280,15 @@ async function loadDashboardSerre() {
     .select('*')
     .in('location_id', locs.map(l => l.id));
 
-  renderDashboardSerre({ locs, cultures: cultures || [] }, false);
+  // Cumuls par cycle (migration 016). Absents = anciennes données : on
+  // retombe sur rendement_qty, le champ unique d'avant le journal.
+  let cumul = [];
+  if (cultures && cultures.length) {
+    const { data } = await sb.from('serre_recoltes_cumul').select('*').in('culture_id', cultures.map(c => c.id));
+    cumul = data || [];
+  }
+
+  renderDashboardSerre({ locs, cultures: cultures || [], cumul }, false);
 }
 
 // Jeu fictif pour le mode démo, aligné sur le reste du tableau de bord.
@@ -5972,17 +6298,27 @@ function dashboardSerreDemo() {
     location_id: locId, section: sec, culture, statut, date_semis: semis,
     date_recolte_prevue: prevue, date_recolte_reelle: reelle, rendement_qty: qty, rendement_unite: unite
   });
+  const cultures = [
+    cul('d1', 1, 'Tomate', 'production', '2026-05-02', '2026-07-20', null, null, 'kg'),
+    cul('d1', 2, 'Basilic', 'croissance', '2026-05-10', '2026-08-01', null, null, 'kg'),
+    cul('d1', 3, 'Laitue', 'production', '2026-04-01', '2026-06-15', null, null, 'unités'),
+    cul('d2', 1, 'Fraise', 'production', '2026-06-05', '2026-07-01', null, null, 'kg'),
+    cul('d2', 2, '', 'semis', '2026-08-01', null, null, null, null),
+    cul('d2', 3, 'Radis', 'recolte', '2026-06-01', '2026-07-10', '2026-07-12', null, 'bottes'),
+    cul('d3', 1, 'Concombre', 'recolte', '2025-05-01', '2025-08-15', '2025-08-20', null, 'kg')
+  ];
+  cultures.forEach((c, i) => { c.id = 'dc' + i; });
+  cultures[0].en_germination = true;
   return {
     locs: [loc('d1', 'R1C4', '2026-05-01', null, 'active'), loc('d2', 'R2C7', '2026-06-01', null, 'active'),
            loc('d3', 'R1C9', '2025-04-01', '2025-10-31', 'terminee')],
-    cultures: [
-      cul('d1', 1, 'Tomate', 'croissance', '2026-05-02', '2026-08-20', null, null, null),
-      cul('d1', 2, 'Basilic', 'croissance', '2026-05-10', '2026-08-01', null, null, null),
-      cul('d1', 3, 'Laitue', 'recolte', '2026-04-01', '2026-06-15', '2026-06-18', 6, 'unités'),
-      cul('d2', 1, 'Fraise', 'croissance', '2026-06-05', '2026-09-01', null, null, null),
-      cul('d2', 2, '', 'vide', null, null, null, null, null),
-      cul('d2', 3, 'Radis', 'recolte', '2026-06-01', '2026-07-10', '2026-07-12', 2, 'bottes'),
-      cul('d3', 1, 'Concombre', 'recolte', '2025-05-01', '2025-08-15', '2025-08-20', 4.5, 'kg')
+    cultures,
+    cumul: [
+      { culture_id: 'dc0', unite: 'kg', total: 12.4, nb: 23, derniere: '2026-08-14' },
+      { culture_id: 'dc2', unite: 'unités', total: 18, nb: 9, derniere: '2026-08-12' },
+      { culture_id: 'dc3', unite: 'kg', total: 2.1, nb: 7, derniere: '2026-08-10' },
+      { culture_id: 'dc5', unite: 'bottes', total: 2, nb: 1, derniere: '2026-07-12' },
+      { culture_id: 'dc6', unite: 'kg', total: 4.5, nb: 11, derniere: '2025-08-20' }
     ]
   };
 }
@@ -6005,23 +6341,43 @@ function renderDashboardSerre(data, demo) {
     return;
   }
 
-  const enCours = data.cultures.filter(c => c.statut === 'croissance').length;
-  // Historique : tout ce qui a été récolté, quelle que soit la location.
+  const enCulture = data.cultures.filter(c => ['semis', 'croissance', 'production'].includes(c.statut)).length;
+  const enProduction = data.cultures.filter(c => c.statut === 'production').length;
+
+  // Cumuls par cycle, issus du journal de cueillettes (migration 016).
+  const cumulByCul = {};
+  (data.cumul || []).forEach(r => { (cumulByCul[r.culture_id] = cumulByCul[r.culture_id] || []).push(r); });
+
+  // Historique : tout cycle ayant donné au moins une cueillette, plus les
+  // cycles clos sans récolte (utile pour retracer ce qui a été cultivé).
   const recoltes = data.cultures
-    .filter(c => c.statut === 'recolte' || c.date_recolte_reelle)
-    .sort((a, b) => (b.date_recolte_reelle || b.date_recolte_prevue || '').localeCompare(a.date_recolte_reelle || a.date_recolte_prevue || ''));
+    .filter(c => cumulByCul[c.id] || c.statut === 'recolte' || c.date_recolte_reelle)
+    .map(c => {
+      const rows = cumulByCul[c.id] || [];
+      return {
+        c,
+        nb: rows.reduce((n, r) => n + Number(r.nb || 0), 0),
+        derniere: rows.map(r => r.derniere).sort().pop() || c.date_recolte_reelle || c.date_recolte_prevue || '',
+        total: rows.filter(r => r.total != null)
+          .map(r => `${Math.round(Number(r.total) * 10) / 10} ${r.unite || ''}`.trim()).join(' · ')
+          || (c.rendement_qty != null ? `${c.rendement_qty} ${c.rendement_unite || ''}`.trim() : '')
+      };
+    })
+    .sort((a, b) => (b.derniere || '').localeCompare(a.derniere || ''));
+
+  const nbCueillettes = recoltes.reduce((n, r) => n + r.nb, 0);
 
   // Rendement cumulé, par unité (kg et « unités » ne s'additionnent pas).
   const parUnite = {};
-  recoltes.forEach(c => {
-    if (c.rendement_qty == null) return;
-    const u = c.rendement_unite || '—';
-    parUnite[u] = (parUnite[u] || 0) + Number(c.rendement_qty);
+  (data.cumul || []).forEach(r => {
+    if (r.total == null) return;
+    const u = r.unite || '—';
+    parUnite[u] = (parUnite[u] || 0) + Number(r.total);
   });
   const rendement = Object.entries(parUnite).map(([u, q]) => `${Math.round(q * 10) / 10} ${u}`).join(' · ') || '—';
 
   const codeOf = l => l.serre_zones?.code || '—';
-  const fr = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  const fr = d => d ? new Date(d + 'T12:00:00').toLocaleDateString(appLocale(), { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
   const zoneCards = actives.map(l => {
     const secs = [1, 2, 3].map(n => {
@@ -6029,9 +6385,11 @@ function renderDashboardSerre(data, demo) {
       const cult = c?.culture;
       const st = c?.statut || 'vide';
       const icone = cult ? (SERRE_EMOJI[cult] || '🌱') : '·';
+      const tot = (cumulByCul[c?.id] || []).filter(r => r.total != null)
+        .map(r => `${Math.round(Number(r.total) * 10) / 10} ${r.unite || ''}`.trim()).join(' · ');
       return `<div class="ds-sec">
-        <div class="ds-sec-h"><span class="ds-ic">${icone}</span><strong>S${n}</strong> ${cult ? escHtml(cult) : `<span style="color:var(--text3)">${pt('vide')}</span>`}</div>
-        <div>${serreStatutBadge(st)}</div>
+        <div class="ds-sec-h"><span class="ds-ic">${icone}</span><strong>S${n}</strong> ${cult ? escHtml(pt(cult)) : `<span style="color:var(--text3)">${pt('vide')}</span>`}${c?.en_germination ? ' 🌰' : ''}</div>
+        <div>${serreStatutBadge(st)}${tot ? `<span class="serre-badge" style="background:rgba(200,169,110,.18);color:var(--accent);margin-left:5px;">${escHtml(tot)}</span>` : ''}</div>
         <div class="ds-dates">${c?.date_semis ? pt('Semis') + ' ' + fr(c.date_semis) : ''}${
           c?.date_recolte_reelle ? ' · ' + pt('récoltée le') + ' ' + fr(c.date_recolte_reelle)
           : (c?.date_recolte_prevue ? ' · ' + pt('récolte prévue') + ' ' + fr(c.date_recolte_prevue) : '')}</div>
@@ -6046,14 +6404,15 @@ function renderDashboardSerre(data, demo) {
     </div>`;
   }).join('');
 
-  const histRows = recoltes.slice(0, 10).map(c => {
+  const histRows = recoltes.slice(0, 10).map(r => {
+    const c = r.c;
     const l = data.locs.find(x => x.id === c.location_id);
     return `<tr>
-      <td>${l ? codeOf(l) : '—'}S${c.section || 1}</td>
-      <td>${c.culture ? escHtml(c.culture) : '—'}</td>
+      <td>${l ? codeOf(l) : '—'}S${c.section || 1}${c.en_germination ? ' 🌰' : ''}</td>
+      <td>${c.culture ? escHtml(pt(c.culture)) : '—'}</td>
       <td>${fr(c.date_semis)}</td>
-      <td>${fr(c.date_recolte_reelle || c.date_recolte_prevue)}</td>
-      <td>${c.rendement_qty != null ? Math.round(c.rendement_qty * 10) / 10 + ' ' + (c.rendement_unite || '') : '—'}</td>
+      <td>${fr(r.derniere)}${r.nb > 1 ? `<span style="color:var(--text3)"> · ${r.nb} ${pt('cueillettes')}</span>` : ''}</td>
+      <td>${r.total || '—'}</td>
     </tr>`;
   }).join('');
 
@@ -6082,8 +6441,8 @@ function renderDashboardSerre(data, demo) {
 
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">${pt('Zones louées')}</div><div class="stat-value">${actives.length}</div></div>
-      <div class="stat-card"><div class="stat-label">${pt('Cultures en croissance')}</div><div class="stat-value">${enCours}</div></div>
-      <div class="stat-card"><div class="stat-label">${pt('Récoltes')}</div><div class="stat-value">${recoltes.length}</div></div>
+      <div class="stat-card"><div class="stat-label">${pt('Cultures en cours')}</div><div class="stat-value">${enCulture}${enProduction ? `<span style="font-size:.9rem;color:var(--accent);font-weight:400;"> · ${enProduction} ${pt('en production')}</span>` : ''}</div></div>
+      <div class="stat-card"><div class="stat-label">${pt('Cueillettes')}</div><div class="stat-value">${nbCueillettes}</div></div>
       <div class="stat-card"><div class="stat-label">${pt('Rendement cumulé')}</div><div class="stat-value" style="font-size:1.2rem">${rendement}</div></div>
     </div>
 
@@ -6092,10 +6451,10 @@ function renderDashboardSerre(data, demo) {
       ? `<div class="ds-zones">${zoneCards}</div>`
       : `<div class="empty-state" style="padding:24px"><p>${pt('Aucune zone louée en ce moment.')}</p></div>`}
 
-    <div class="serre-sec">${pt('Historique des récoltes')}</div>
+    <div class="serre-sec">${pt('Récoltes')}</div>
     ${recoltes.length
       ? `<div class="table-container"><table>
-          <thead><tr><th>${pt('Section')}</th><th>${pt('Culture')}</th><th>${pt('Semis')}</th><th>${pt('Récolte')}</th><th>${pt('Rendement')}</th></tr></thead>
+          <thead><tr><th>${pt('Section')}</th><th>${pt('Culture')}</th><th>${pt('Semis')}</th><th>${pt('Dernière récolte')}</th><th>${pt('Total cueilli')}</th></tr></thead>
           <tbody>${histRows}</tbody></table></div>
          ${recoltes.length > 10 ? `<div style="font-size:11px;color:var(--text3);margin-top:6px;">${pt('10 récoltes les plus récentes sur')} ${recoltes.length}. ${pt('Historique complet et export CSV sur la page Espaces communs.')}</div>` : ''}`
       : `<div class="empty-state" style="padding:24px"><p>${pt('Aucune récolte enregistrée pour le moment.')}</p></div>`}
@@ -6170,14 +6529,15 @@ async function loadSerre() {
 
   _serre.isAdmin = ['admin', 'principal_admin'].includes(currentProfile?.role);
 
-  const [zonesRes, occRes, curRes, irrigRes, fertRes, lectureRes, myLocsRes] = await Promise.all([
+  const [zonesRes, occRes, curRes, irrigRes, fertRes, lectureRes, myLocsRes, cumulRes] = await Promise.all([
     sb.from('serre_zones').select('*').eq('is_active', true).order('planche').order('position'),
     sb.rpc('serre_occupancy'),
     sb.from('serre_cultures').select('*').order('created_at', { ascending: false }),
     sb.from('serre_irrigation_config').select('*'),
     sb.from('serre_fertilisations').select('*').order('date_application', { ascending: false }),
     sb.from('serre_lectures').select('*').order('horodatage', { ascending: false }).limit(1),
-    sb.from('serre_locations').select('*, profiles(full_name)').eq('statut', 'active')
+    sb.from('serre_locations').select('*, profiles(full_name)').eq('statut', 'active'),
+    sb.from('serre_recoltes_cumul').select('*')
   ]);
 
   if (zonesRes.error) {
@@ -6200,6 +6560,14 @@ async function loadSerre() {
   _serre.fertBySec = {};
   (fertRes.data || []).forEach(f => { const k = f.zone_id + ':' + (f.section || 1); if (!_serre.fertBySec[k]) _serre.fertBySec[k] = f; });
   _serre.lecture = (lectureRes.data && lectureRes.data[0]) || null;
+  // Cumul des cueillettes par cycle (vue serre_recoltes_cumul, migration 016).
+  // Absente tant que la migration n'est pas jouée : le plan affiche alors le
+  // stade sans total, sans rien casser.
+  _serre.cumulByCulture = {};
+  (cumulRes?.data || []).forEach(r => {
+    const k = r.culture_id;
+    (_serre.cumulByCulture[k] = _serre.cumulByCulture[k] || []).push(r);
+  });
 
   renderSerre();
 
@@ -6273,7 +6641,7 @@ function renderSerre() {
       .serre-plan-secs{display:flex;flex:1;min-height:0;gap:3px;container-type:size}
       /* Section = un chip : couleur de bordure et de fond pour le statut,
          icône de la plante au centre, dimensionnée avec la cellule. */
-      .serre-plan-sec{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;
+      .serre-plan-sec{flex:1;min-width:0;position:relative;display:flex;align-items:center;justify-content:center;gap:5px;
         overflow:hidden;border-radius:4px;line-height:1;background:var(--surface2);border:2px solid transparent;
         font-size:clamp(13px,1.7vw,30px);container-type:inline-size;
         background-clip:padding-box;padding:0;font-family:inherit;color:inherit;text-align:center}
@@ -6285,8 +6653,15 @@ function renderSerre() {
          sur la hauteur réelle du chip plutôt que sur celle de la fenêtre.
          Ignoré (donc repli sur le clamp ci-dessus) sans container queries. */
       .serre-plan-sec{font-size:max(10px,min(30px,64cqh,42cqw))}
+      .serre-plan-sec.st-semis{background:rgba(126,184,160,.10);border-color:rgba(126,184,160,.45)}
       .serre-plan-sec.st-croissance{background:rgba(126,184,160,.22);border-color:rgba(126,184,160,.85)}
+      .serre-plan-sec.st-production{background:rgba(200,169,110,.22);border-color:rgba(200,169,110,.9)}
       .serre-plan-sec.st-recolte{background:rgba(208,138,90,.20);border-color:rgba(208,138,90,.85)}
+      /* Porte-graine : marqueur, pas une couleur de plus — l'échelle de
+         couleurs doit rester une progression lisible d'un coup d'œil. */
+      .serre-plan-graine{position:absolute;top:1px;right:2px;font-size:9px;line-height:1}
+      .serre-plan-cumul{display:none;font-size:9.5px;font-weight:700;color:var(--accent);white-space:nowrap}
+      @container (min-width:120px){.serre-plan-cumul{display:inline}}
       .serre-plan-sec.st-vide{background:var(--surface2);border-color:var(--border)}
       .serre-plan-sec.st-libre{background:transparent;border:2px dashed var(--border)}
       /* Barre du plan + mode « plan seul » (sans requestFullscreen) */
@@ -6344,8 +6719,11 @@ function renderSerre() {
 
       <div class="serre-legend">
         <span><i style="background:var(--surface2);border:1px solid var(--border)"></i>${pt('Vide')}</span>
+        <span><i style="background:rgba(126,184,160,.22);border:1px solid rgba(126,184,160,.45)"></i>${pt('Semis')}</span>
         <span><i style="background:rgba(126,184,160,.5)"></i>${pt('En croissance')}</span>
-        <span><i style="background:rgba(208,138,90,.5)"></i>${pt('Récolté')}</span>
+        <span><i style="background:rgba(200,169,110,.6)"></i>${pt('En production')}</span>
+        <span><i style="background:rgba(208,138,90,.5)"></i>${pt('Terminé')}</span>
+        <span>🌰 ${pt('Porte-graine')}</span>
         <span><i style="border:1px dashed var(--border)"></i>${pt('Zone libre')}</span>
         <span><span class="dotmine" style="color:var(--accent2)">●</span> ${pt('Mes zones')}</span>
       </div>
@@ -6388,7 +6766,7 @@ function ConditionsSerre(lecture, readOnly, idPrefix) {
       ${readOnly
         ? `<span style="font-size:11px;color:var(--text3);align-self:center;">🔌 ${pt('Relevé automatique (capteurs)')}</span>`
         : `<button class="btn btn-primary btn-sm" onclick="serreSaveLecture()">${pt('Enregistrer la lecture')}</button>`}
-      ${L.horodatage ? `<span style="font-size:11px;color:var(--text3);align-self:center;">${pt('Dernière lecture')} : ${new Date(L.horodatage).toLocaleString('fr-CA')}</span>` : ''}
+      ${L.horodatage ? `<span style="font-size:11px;color:var(--text3);align-self:center;">${pt('Dernière lecture')} : ${new Date(L.horodatage).toLocaleString(appLocale())}</span>` : ''}
     </div>`;
 }
 
@@ -6440,14 +6818,22 @@ function serrePlanTile(zone, p) {
     const cult = cur?.culture;
     const st = cur ? (cur.statut || 'vide') : (occ.is_occupied ? 'vide' : 'libre');
     const icone = cult ? (SERRE_EMOJI[cult] || '🌱') : '';
-    const statutLabel = cur ? (SERRE_STATUT_LABELS[cur.statut] || SERRE_STATUT_LABELS.vide)
-                            : (occ.is_occupied ? SERRE_STATUT_LABELS.vide : pt('Libre'));
-    const title = `${zone.code}S${s} — ` + (cult ? `${escHtml(cult)} · ${statutLabel}` : statutLabel);
+    const statutLabel = cur ? pt(SERRE_STATUT_LABELS[cur.statut] || SERRE_STATUT_LABELS.vide)
+                            : (occ.is_occupied ? pt(SERRE_STATUT_LABELS.vide) : pt('Libre'));
+    // En production, le cumul de la saison est plus parlant que le stade :
+    // il dit combien la section a déjà donné.
+    const cumul = cur && cur.statut === 'production' ? serreCumulTxt(cur.id) : '';
+    const graine = cur?.en_germination ? `<span class="serre-plan-graine" title="${pt('Plant conservé pour la semence')}">🌰</span>` : '';
+    const title = `${zone.code}S${s} — ` + (cult ? `${escHtml(pt(cult))} · ${statutLabel}` : statutLabel)
+      + (cumul ? ` · ${pt('cueilli')} ${cumul}` : '')
+      + (cur?.en_germination ? ` · ${pt('porte-graine')}` : '');
     // Sur une zone libre, le stade n'apprend rien : le libellé est répété
     // 3 fois par zone et sature le plan. La bordure pointillée suffit.
-    const stade = occ.is_occupied ? `<span class="serre-plan-stade">${statutLabel}</span>` : '';
+    const stade = !occ.is_occupied ? ''
+      : (cumul ? `<span class="serre-plan-cumul">${escHtml(cumul)}</span>`
+               : `<span class="serre-plan-stade">${statutLabel}</span>`);
     return `<button class="serre-plan-sec act st-${st}" title="${title}" aria-label="${title}"
-      onclick="serreOpenSection('${zone.id}',${s})">${icone}${stade}</button>`;
+      onclick="serreOpenSection('${zone.id}',${s})">${graine}${icone}${stade}</button>`;
   }).join('');
 
   // En-tête : code + locataire abrégé + période, et action selon le cas
@@ -6471,7 +6857,7 @@ function serrePlanTile(zone, p) {
 // (migration 015) ; sans elle, on n'affiche rien plutôt que du vide.
 function serrePlanMeta(occ, isMine) {
   if (!occ.is_occupied) return '';
-  const mois = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('fr-CA', { month: 'short', year: '2-digit' }) : '';
+  const mois = d => d ? new Date(d + 'T12:00:00').toLocaleDateString(appLocale(), { month: 'short', year: '2-digit' }) : '';
   const qui = isMine ? pt('Moi') : (occ.locataire_court || '');
   const debut = mois(occ.date_debut);
   const fin = mois(occ.date_fin_prevue);
@@ -6524,8 +6910,11 @@ function serreCloseZone() {
   loadSerre();
 }
 
-// Auto-sauvegarde des champs d'une carte de zone gérable (dans la modale).
+// Auto-sauvegarde des champs d'une carte de zone gérable (dans la modale),
+// et chargement des journaux de cueillettes qu'elle contient.
 function serreAttachZoneHandlers(card) {
+  card.querySelectorAll('.serre-recoltes').forEach(w =>
+    serreLoadRecoltes(w.dataset.recCulture, w.querySelector('.serre-rec-list')));
   card.querySelectorAll('[data-save]').forEach(inp => {
     inp.addEventListener('change', () => {
       const kind = inp.dataset.save;
@@ -6580,7 +6969,7 @@ function serreZoneCard(zone, onlySection) {
         ${planted.length
           ? planted.map(x => {
               const irr = _serre.irrigBySec[zone.id + ':' + x.s];
-              return `<span class="meta-item">🌿 <strong>${zone.code}S${x.s}</strong> ${escHtml(x.c.culture)} · ${SERRE_STATUT_LABELS[x.c.statut] || ''}${irr?.systeme ? ' · 💧 ' + escHtml(irr.systeme) : ''}</span>`;
+              return `<span class="meta-item">🌿 <strong>${zone.code}S${x.s}</strong> ${escHtml(pt(x.c.culture))} · ${pt(SERRE_STATUT_LABELS[x.c.statut] || '')}${irr?.systeme ? ' · 💧 ' + escHtml(pt(irr.systeme)) : ''}</span>`;
             }).join('')
           : `<span class="meta-item">🌿 ${pt('Zone louée')}</span>`}
       </div>
@@ -6632,16 +7021,21 @@ function serreSectionBlock(zone, s, cur, hist) {
         <select data-f="culture" data-save="culture">${serreOpt(SERRE_CULTURES, cur?.culture || '')}</select></div>
       <div class="serre-row">
         <div class="serre-field"><label>${pt('Semis')}</label><input type="date" data-f="semis" data-save="culture" value="${cur?.date_semis || ''}"></div>
-        <div class="serre-field"><label>${pt('Récolte prévue')}</label><input type="date" data-f="recolte" data-save="culture" value="${cur?.date_recolte_prevue || ''}"></div>
+        <div class="serre-field"><label>${pt('1re récolte prévue')}</label><input type="date" data-f="recolte" data-save="culture" value="${cur?.date_recolte_prevue || ''}"></div>
       </div>
       <div class="serre-row">
-        <div class="serre-field"><label>${pt('Statut')}</label>
+        <div class="serre-field"><label>${pt('Stade')}</label>
           <select data-f="statut" data-save="culture">
-            ${['vide', 'croissance', 'recolte'].map(x => `<option value="${x}"${st === x ? ' selected' : ''}>${SERRE_STATUT_LABELS[x]}</option>`).join('')}
+            ${SERRE_STATUTS.map(x => `<option value="${x}"${st === x ? ' selected' : ''}>${pt(SERRE_STATUT_LABELS[x])}</option>`).join('')}
           </select></div>
-        <div class="serre-field"><label>${pt('Quantité')}</label><input type="number" step="0.1" min="0" data-f="rqty" data-save="culture" value="${cur?.rendement_qty ?? ''}"></div>
-        <div class="serre-field"><label>${pt('Unité')}</label><select data-f="runite" data-save="culture">${serreOpt(SERRE_UNITES, cur?.rendement_unite || 'kg')}</select></div>
+        <div class="serre-field"><label>${pt('Unité des récoltes')}</label><select data-f="runite" data-save="culture">${serreOpt(SERRE_UNITES, cur?.rendement_unite || 'kg')}</select></div>
       </div>
+      <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2);margin:2px 0 8px;cursor:pointer">
+        <input type="checkbox" data-f="graine" data-save="culture" style="width:auto"${cur?.en_germination ? ' checked' : ''}>
+        🌰 ${pt('Un plant est conservé pour la semence (en germination)')}
+      </label>
+
+      ${serreRecoltesBlock(zone, s, cur)}
       <div class="serre-row">
         <div class="serre-field"><label>💧 ${pt('Irrigation — fréquence')}</label><select data-f="ifreq" data-save="irrigation">${serreOpt(['', ...SERRE_FREQ], irr.frequence || '')}</select></div>
         <div class="serre-field"><label>${pt('Système')}</label><select data-f="isys" data-save="irrigation">${serreOpt(['', ...SERRE_SYSTEMES], irr.systeme || '')}</select></div>
@@ -6650,18 +7044,95 @@ function serreSectionBlock(zone, s, cur, hist) {
         <div class="serre-field"><label>🧪 ${pt('Fertilisation')}</label>
           <select data-f="ftype" data-save="fert">
             <option value="">—</option>
-            ${SERRE_FERT.map(f => `<option value="${f.v}"${fert.type === f.v ? ' selected' : ''}>${f.l}</option>`).join('')}
+            ${SERRE_FERT.map(f => `<option value="${f.v}"${fert.type === f.v ? ' selected' : ''}>${pt(f.l)}</option>`).join('')}
           </select></div>
         <div class="serre-field"><label>${pt('Dernière application')}</label><input type="date" data-f="fdate" data-save="fert" value="${fert.date_application || ''}"></div>
       </div>
       <div class="serre-field"><label>${pt('Notes')}</label><textarea data-f="notes" data-save="culture">${escHtml(cur?.notes || '')}</textarea></div>
       ${hist.length ? `<details class="serre-hist"><summary>${pt('Historique')} (${hist.length})</summary>
-        ${hist.map(h => `<div class="hi">${h.culture ? escHtml(h.culture) : '—'} · ${pt('semé')} ${h.date_semis || '?'} → ${pt('récolté')} ${h.date_recolte_reelle || '?'} · ${h.rendement_qty || '0'} ${h.rendement_unite || ''}</div>`).join('')}
+        ${hist.map(h => `<div class="hi">${h.culture ? escHtml(pt(h.culture)) : '—'} · ${pt('semé')} ${h.date_semis || '?'} → ${pt('récolté')} ${h.date_recolte_reelle || '?'} · ${h.rendement_qty || '0'} ${pt(h.rendement_unite || '')}</div>`).join('')}
       </details>` : ''}
       <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="serreArchiveCulture('${zone.id}',${s})"
-        title="${pt('Clôt le cycle en cours comme récolté (date du jour si aucune n’est saisie) et ouvre un nouveau cycle vide sur cette section.')}">${pt('Archiver la récolte')}</button>
-      <div style="font-size:10.5px;color:var(--text3);margin-top:4px;">${pt('Enregistre la récolte du cycle en cours, puis repart sur une section vide. Saisissez la quantité avant d’archiver.')}</div>
+        title="${pt('Clôt le cycle : la section passe à « Terminé » et repart vide. Les cueillettes notées restent dans l’historique.')}">${pt('Terminer le cycle')}</button>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:4px;">${pt('À faire quand le plant est arraché. Les cueillettes se notent au fur et à mesure ci-dessus.')}</div>
     </div>`;
+}
+
+// Journal de cueillettes d'un cycle. La plupart des légumes de serre donnent
+// en continu : une ligne par passage, plutôt qu'une quantité unique écrasée à
+// chaque fois. Les lignes sont chargées à l'ouverture (serreLoadRecoltes).
+function serreRecoltesBlock(zone, section, cur) {
+  if (!cur?.id) {
+    return `<div style="font-size:11px;color:var(--text3);margin:6px 0 2px;">${pt('Choisissez une culture pour commencer à noter les cueillettes.')}</div>`;
+  }
+  const cumul = serreCumulTxt(cur.id);
+  const continu = serreEstContinue(cur.culture);
+  return `
+    <div class="serre-recoltes" data-rec-culture="${cur.id}" data-rec-zone="${zone.id}">
+      <div class="serre-scion-h" style="margin-top:4px;">
+        <span>${continu ? pt('Cueillettes') : pt('Récolte')}</span>
+        ${cumul ? `<span class="serre-badge" style="background:rgba(200,169,110,.18);color:var(--accent)">${pt('cumul')} ${escHtml(cumul)}</span>` : ''}
+      </div>
+      <div class="serre-row" style="align-items:flex-end;">
+        <div class="serre-field"><label>${pt('Date')}</label><input type="date" data-f="rdate" value="${new Date().toISOString().split('T')[0]}"></div>
+        <div class="serre-field"><label>${pt('Quantité')}</label><input type="number" step="0.1" min="0" data-f="rqty2" placeholder="0"></div>
+        <button class="btn btn-primary btn-sm" style="flex:0 1 auto;width:auto;align-self:flex-end;"
+          onclick="serreAddRecolte('${zone.id}','${cur.id}',${section})">+ ${pt('Noter')}</button>
+      </div>
+      <div class="serre-rec-list" style="margin-top:4px;"><span style="font-size:11px;color:var(--text3)">${pt('Chargement…')}</span></div>
+    </div>`;
+}
+
+// Lignes de cueillette d'un cycle, chargées à la demande : le plan, lui, ne
+// travaille que sur les cumuls (vue serre_recoltes_cumul).
+async function serreLoadRecoltes(cultureId, listEl) {
+  if (!listEl) return;
+  const { data, error } = await sb.from('serre_recoltes')
+    .select('*').eq('culture_id', cultureId).order('date_recolte', { ascending: false }).limit(30);
+  if (error) { listEl.innerHTML = `<span style="font-size:11px;color:var(--text3)">${pt('Journal indisponible — migration 016 non jouée ?')}</span>`; return; }
+  if (!data.length) { listEl.innerHTML = `<span style="font-size:11px;color:var(--text3)">${pt('Aucune cueillette notée.')}</span>`; return; }
+  listEl.innerHTML = data.map(r => `<div class="hi" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span>${r.date_recolte} · <strong>${r.qty ?? '—'} ${escHtml(r.unite || '')}</strong></span>
+      <button class="btn btn-secondary btn-sm" style="padding:1px 7px;" title="${pt('Supprimer cette cueillette')}"
+        onclick="serreDelRecolte('${r.id}','${r.culture_id}')">✕</button>
+    </div>`).join('');
+}
+
+async function serreAddRecolte(zoneId, cultureId, section) {
+  if (isDemo) { toast('Indisponible en mode démo', 'info'); return; }
+  const wrap = document.querySelector(`.serre-recoltes[data-rec-culture="${cultureId}"]`);
+  if (!wrap) return;
+  const date = wrap.querySelector('[data-f="rdate"]').value;
+  const qtyRaw = wrap.querySelector('[data-f="rqty2"]').value;
+  if (!qtyRaw) { toast('Indiquez la quantité cueillie', 'info'); return; }
+  // L'unité est celle du cycle, choisie une fois dans le formulaire au-dessus.
+  const sectionEl = wrap.closest('[data-section]');
+  const unite = sectionEl?.querySelector('[data-f="runite"]')?.value || null;
+  const { error } = await sb.from('serre_recoltes').insert({
+    culture_id: cultureId, zone_id: zoneId, date_recolte: date || new Date().toISOString().split('T')[0],
+    qty: Number(qtyRaw), unite, created_by: currentProfile?.id || null
+  });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  wrap.querySelector('[data-f="rqty2"]').value = '';
+  serreFlash('Cueillette notée ✓');
+  await serreRefreshCumul();
+  serreLoadRecoltes(cultureId, wrap.querySelector('.serre-rec-list'));
+}
+
+async function serreDelRecolte(id, cultureId) {
+  if (!confirm('Supprimer cette cueillette ?')) return;
+  const { error } = await sb.from('serre_recoltes').delete().eq('id', id);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  await serreRefreshCumul();
+  const wrap = document.querySelector(`.serre-recoltes[data-rec-culture="${cultureId}"]`);
+  serreLoadRecoltes(cultureId, wrap?.querySelector('.serre-rec-list'));
+}
+
+// Recharge les cumuls sans refaire tout le plan (la modale reste ouverte).
+async function serreRefreshCumul() {
+  const { data } = await sb.from('serre_recoltes_cumul').select('*');
+  _serre.cumulByCulture = {};
+  (data || []).forEach(r => { (_serre.cumulByCulture[r.culture_id] = _serre.cumulByCulture[r.culture_id] || []).push(r); });
 }
 
 async function serreSaveCulture(sectionEl, card) {
@@ -6676,7 +7147,7 @@ async function serreSaveCulture(sectionEl, card) {
     date_semis: g('semis').value || null,
     date_recolte_prevue: g('recolte').value || null,
     statut: g('statut').value,
-    rendement_qty: g('rqty').value ? Number(g('rqty').value) : null,
+    en_germination: !!g('graine')?.checked,
     rendement_unite: g('runite').value || null,
     notes: g('notes').value || null
   };
@@ -6729,14 +7200,14 @@ async function serreArchiveCulture(zoneId, section) {
   const cultureId = sectionEl.dataset.culture;
   const locId = card.dataset.loc || null;
   const cultureVal = sectionEl.querySelector('[data-f="culture"]')?.value;
-  if (!cultureId || !cultureVal) { toast('Aucune culture à archiver sur cette section', 'info'); return; }
+  if (!cultureId || !cultureVal) { toast('Aucune culture à terminer sur cette section', 'info'); return; }
   // Sauver l'état courant, marquer récolté, puis créer un nouveau cycle vide (même section)
   await serreSaveCulture(sectionEl, card);
   const today = new Date().toISOString().split('T')[0];
   const cur = (_serre.culturesByZone[zoneId] || []).find(c => c.id === cultureId);
   await sb.from('serre_cultures').update({ statut: 'recolte', date_recolte_reelle: cur?.date_recolte_reelle || today }).eq('id', cultureId);
   await sb.from('serre_cultures').insert({ zone_id: zoneId, location_id: locId, section: section, statut: 'vide' });
-  toast('Récolte archivée ✓', 'success');
+  toast('Cycle terminé ✓', 'success');
   await loadSerre();
   serreOpenZone(zoneId);
 }
@@ -6906,7 +7377,7 @@ async function serreChargeDueFees(myLocs) {
 }
 
 async function exportSerreCSV() {
-  let csv = "Zone,Section,Statut location,Culture,Semis,Recolte prevue,Statut culture,Rendement,Unite,Irrigation freq,Irrigation systeme,Fertilisation,Frais mensuel,Notes\n";
+  let csv = "Zone,Section,Statut location,Culture,Semis,Recolte prevue,Stade,Porte-graine,Cumul cueilli,Irrigation freq,Irrigation systeme,Fertilisation,Frais mensuel,Notes\n";
   for (const z of _serre.zones) {
     const occ = _serre.occ[z.id] || {};
     const all = _serre.culturesByZone[z.id] || [];
@@ -6917,7 +7388,7 @@ async function exportSerreCSV() {
       const fert = _serre.fertBySec[z.id + ':' + s] || {};
       const fertL = fert.type ? ((SERRE_FERT.find(f => f.v === fert.type) || {}).l || fert.type) : '';
       const notes = (cur.notes || '').replace(/"/g, '""');
-      csv += `${z.code},${z.code}S${s},${occ.is_occupied ? 'Louée' : 'Libre'},${cur.culture || ''},${cur.date_semis || ''},${cur.date_recolte_prevue || ''},${SERRE_STATUT_LABELS[cur.statut] || ''},${cur.rendement_qty || ''},${cur.rendement_unite || ''},${irr.frequence || ''},${irr.systeme || ''},${fertL},${z.frais_mensuel || ''},"${notes}"\n`;
+      csv += `${z.code},${z.code}S${s},${occ.is_occupied ? 'Louée' : 'Libre'},${cur.culture || ''},${cur.date_semis || ''},${cur.date_recolte_prevue || ''},${pt(SERRE_STATUT_LABELS[cur.statut] || '')},${cur.en_germination ? 'oui' : ''},"${serreCumulTxt(cur.id)}",${irr.frequence || ''},${irr.systeme || ''},${fertL},${z.frais_mensuel || ''},"${notes}"\n`;
     }
   }
   const blob = new Blob([csv], { type: 'text/csv' });
