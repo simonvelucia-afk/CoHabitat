@@ -6658,7 +6658,9 @@ function serreSectionBlock(zone, s, cur, hist) {
       ${hist.length ? `<details class="serre-hist"><summary>${pt('Historique')} (${hist.length})</summary>
         ${hist.map(h => `<div class="hi">${h.culture ? escHtml(h.culture) : '—'} · ${pt('semé')} ${h.date_semis || '?'} → ${pt('récolté')} ${h.date_recolte_reelle || '?'} · ${h.rendement_qty || '0'} ${h.rendement_unite || ''}</div>`).join('')}
       </details>` : ''}
-      <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="serreArchiveCulture('${zone.id}',${s})">${pt('Archiver cette section')}</button>
+      <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="serreArchiveCulture('${zone.id}',${s})"
+        title="${pt('Clôt le cycle en cours comme récolté (date du jour si aucune n’est saisie) et ouvre un nouveau cycle vide sur cette section.')}">${pt('Archiver la récolte')}</button>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:4px;">${pt('Enregistre la récolte du cycle en cours, puis repart sur une section vide. Saisissez la quantité avant d’archiver.')}</div>
     </div>`;
 }
 
@@ -6727,14 +6729,14 @@ async function serreArchiveCulture(zoneId, section) {
   const cultureId = sectionEl.dataset.culture;
   const locId = card.dataset.loc || null;
   const cultureVal = sectionEl.querySelector('[data-f="culture"]')?.value;
-  if (!cultureId || !cultureVal) { toast('Rien à archiver', 'info'); return; }
+  if (!cultureId || !cultureVal) { toast('Aucune culture à archiver sur cette section', 'info'); return; }
   // Sauver l'état courant, marquer récolté, puis créer un nouveau cycle vide (même section)
   await serreSaveCulture(sectionEl, card);
   const today = new Date().toISOString().split('T')[0];
   const cur = (_serre.culturesByZone[zoneId] || []).find(c => c.id === cultureId);
   await sb.from('serre_cultures').update({ statut: 'recolte', date_recolte_reelle: cur?.date_recolte_reelle || today }).eq('id', cultureId);
   await sb.from('serre_cultures').insert({ zone_id: zoneId, location_id: locId, section: section, statut: 'vide' });
-  toast('Section archivée', 'success');
+  toast('Récolte archivée ✓', 'success');
   await loadSerre();
   serreOpenZone(zoneId);
 }
