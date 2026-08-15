@@ -4961,6 +4961,8 @@ function navigateTo(page) {
     recreateSb();
   }
   closeMobileMenu();
+  // Quitter le mode « plan seul » de la serre si on change de page
+  if (typeof _serre !== 'undefined' && _serre.planSolo) serreApplyPlanSolo(false);
   document.querySelectorAll('.page').forEach(p => {
     p.classList.remove('active');
     p.style.display = ''; // reset inline display
@@ -5837,7 +5839,7 @@ const SERRE_EMOJI = {
   'Haricot': '🫛', 'Radis': '🌰', 'Épinard': '🥬', 'Fine herbes': '🌿', 'Fraise': '🍓', 'Autre': '🌱'
 };
 
-let _serre = { zones: [], occ: {}, locByZone: {}, culturesByZone: {}, irrigBySec: {}, fertBySec: {}, lecture: null, isAdmin: false };
+let _serre = { zones: [], occ: {}, locByZone: {}, culturesByZone: {}, irrigBySec: {}, fertBySec: {}, lecture: null, isAdmin: false, planSolo: false };
 
 function serreOpt(list, val) {
   return list.map(c => `<option value="${c}"${val === c ? ' selected' : ''}>${c || '—'}</option>`).join('');
@@ -5966,7 +5968,6 @@ function renderSerre() {
   // Conditions : remplies automatiquement par les capteurs (Pi/MQTT). Saisie
   // manuelle réservée aux admins (fallback si un capteur est absent/HS).
   const canEditCond = _serre.isAdmin && !isDemo;
-  const condRO = canEditCond ? '' : ' disabled';
 
   root.innerHTML = `
     <style>
@@ -5989,29 +5990,57 @@ function renderSerre() {
       .serre-resv{border:1px solid var(--border);border-radius:8px;padding:8px 10px;min-width:170px;background:var(--surface)}
       .serre-resv-h{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:5px}
       .serre-resv .serre-row{gap:8px}.serre-resv .serre-field{margin:0}
-      /* Plan de la serre */
-      .serre-plan{overflow-x:auto;padding:4px 0 8px}
-      .serre-plan-inner{min-width:640px}
-      .serre-plan-row{display:grid;grid-template-columns:repeat(10,1fr);gap:6px}
-      .serre-plan-rowlabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:2px 0 6px}
-      .serre-plan-aisle{margin:8px 0;text-align:center;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--text3);
-        border-top:1px dashed var(--border);border-bottom:1px dashed var(--border);padding:4px 0;background:var(--surface2)}
-      .serre-plan-zone{display:flex;flex-direction:column;gap:3px;padding:5px 5px 6px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;text-align:left;color:var(--text);transition:border-color .12s,transform .06s}
+      /* ── Plan de la serre — orientation verticale unique ─────────────
+         Les 2 rangées sont deux COLONNES côte à côte (10 zones chacune),
+         séparées par l'allée principale (bande verticale centrale) et
+         encadrées par les 2 tunnels à poules (bandes verticales). */
+      .plan-serre-container{width:100%;max-width:480px;margin:0 auto;padding:1rem;box-sizing:border-box;
+        height:min(68svh,620px);min-height:400px}
+      .plan-serre-head{display:flex;gap:8px;margin:0 0 6px}
+      .plan-serre-head .hl{flex:1;min-width:0;text-align:center;font-size:11px;font-weight:700;
+        text-transform:uppercase;letter-spacing:.06em;color:var(--text3)}
+      .plan-serre-grid{height:100%;display:flex;gap:8px}
+      .rangee{flex:1;min-width:0;display:grid;grid-template-rows:repeat(10,1fr);gap:5px}
+      /* Allée principale : bande verticale centrale */
+      .serre-allee{flex:0 0 22px;display:flex;align-items:center;justify-content:center;
+        writing-mode:vertical-rl;text-orientation:mixed;background:var(--surface2);
+        border-left:1px dashed var(--border);border-right:1px dashed var(--border);
+        font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--text3)}
+      /* Tunnels à poules : bandes fixes en bordure, alignées sur les rangées */
+      .serre-tunnel{flex:0 0 26px;display:flex;align-items:center;justify-content:center;
+        writing-mode:vertical-rl;text-orientation:mixed;
+        background:rgba(208,138,90,.10);border:1px dashed rgba(208,138,90,.35);border-radius:8px;
+        font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
+      .serre-tunnel .ic{text-orientation:upright;letter-spacing:0}
+      /* Spacers du bandeau de titres : mêmes largeurs que tunnels / allée */
+      .plan-serre-head .sp-tunnel{flex:0 0 26px}
+      .plan-serre-head .sp-allee{flex:0 0 22px}
+      .serre-plan-zone{display:flex;flex-direction:column;gap:3px;padding:4px 5px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;text-align:left;color:var(--text);overflow:hidden;transition:border-color .12s,transform .06s}
       .serre-plan-zone:hover{border-color:var(--accent2);transform:translateY(-1px)}
       .serre-plan-zone.free{border-style:dashed;opacity:.7}
       .serre-plan-zone.mine{border-color:var(--accent2);box-shadow:inset 0 0 0 1px rgba(126,184,160,.35)}
-      .serre-plan-code{font-size:10.5px;font-weight:700;color:var(--text2);display:flex;justify-content:space-between;align-items:center;gap:2px}
+      .serre-plan-code{font-size:10.5px;font-weight:700;color:var(--text2);display:flex;justify-content:space-between;align-items:center;gap:2px;line-height:1}
       .serre-plan-code .dotmine{color:var(--accent2);font-size:9px}
-      .serre-plan-secs{display:flex;flex-direction:column;gap:2px}
-      .serre-plan-sec{display:flex;align-items:center;justify-content:space-between;height:17px;padding:0 4px;border-radius:4px;font-size:11px;background:var(--surface2);border:1px solid transparent}
-      .serre-plan-sec .s{font-size:8.5px;color:var(--text3)}
+      /* 3 chips de statut par zone (aucun texte : la couleur porte l'info) */
+      .serre-plan-secs{display:flex;flex:1;min-height:0;gap:3px}
+      .serre-plan-sec{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
+        border-radius:4px;font-size:11px;line-height:1;background:var(--surface2);border:1px solid transparent}
       .serre-plan-sec.st-croissance{background:rgba(126,184,160,.22);border-color:rgba(126,184,160,.35)}
       .serre-plan-sec.st-recolte{background:rgba(208,138,90,.20);border-color:rgba(208,138,90,.35)}
       .serre-plan-sec.st-vide{background:var(--surface2)}
       .serre-plan-sec.st-libre{background:transparent;border:1px dashed var(--border)}
-      .serre-legend{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0 4px;font-size:11px;color:var(--text3)}
+      /* Barre du plan + mode « plan seul » (sans requestFullscreen) */
+      .serre-plan-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+      #serre-plan-wrap.solo{position:fixed;inset:0;height:100svh;z-index:1000;background:var(--bg);
+        display:flex;flex-direction:column;padding:10px 12px;box-sizing:border-box;overflow:auto}
+      #serre-plan-wrap.solo .plan-serre-container{height:auto;flex:1;min-height:0;max-height:none}
+      .serre-legend{display:flex;flex-wrap:wrap;gap:12px;margin:12px auto 4px;font-size:11px;color:var(--text3);
+        max-width:480px;padding:0 1rem;box-sizing:border-box}
       .serre-legend span{display:inline-flex;align-items:center;gap:5px}
       .serre-legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+      /* Conditions en lecture seule : même gabarit visuel qu'un <input> */
+      .serre-ro{width:100%;box-sizing:border-box;font-size:13px;padding:6px 8px;border:1px solid var(--border);
+        border-radius:6px;background:var(--surface2);color:var(--text);min-height:31px}
     </style>
 
     <div class="section-header" style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;">
@@ -6030,61 +6059,127 @@ function renderSerre() {
       : (mine ? `<div style="font-size:12px;color:var(--text2);margin-bottom:14px;">${pt('Vous louez actuellement')} <strong>${mine}</strong> ${mine > 1 ? pt('zones') : pt('zone')}.</div>` : '')}
 
     <div class="serre-sec" style="margin-top:0;">${pt('Conditions de la serre')}</div>
+    ${ConditionsSerre(L, !canEditCond)}
+
+    <div id="serre-plan-wrap">
+      <div class="serre-plan-bar">
+        <div class="serre-sec" style="margin-bottom:0;">${pt('Plan de la serre')} <span style="font-weight:400;text-transform:none;letter-spacing:0;">· ${pt('cliquez une zone pour ses détails et son historique')}</span></div>
+        <button class="btn btn-secondary btn-sm" id="serre-solo-btn" onclick="serreTogglePlanSolo()">⛶ ${pt('Plan seul')}</button>
+      </div>
+
+      <div class="plan-serre-container">
+        <div class="plan-serre-head">
+          <span class="sp-tunnel"></span>
+          <div class="hl">${pt('Rangée 1')}</div>
+          <span class="sp-allee"></span>
+          <div class="hl">${pt('Rangée 2')}</div>
+          <span class="sp-tunnel"></span>
+        </div>
+        <div class="plan-serre-grid">
+          <div class="serre-tunnel" title="${pt('Tunnel à poules (bordure ouest)')}"><span class="ic">🐔</span> ${pt('Tunnel à poules')}</div>
+          <div class="rangee">${planCol(1)}</div>
+          <div class="serre-allee">${pt('Allée principale')}</div>
+          <div class="rangee">${planCol(2)}</div>
+          <div class="serre-tunnel" title="${pt('Tunnel à poules (bordure est)')}"><span class="ic">🐔</span> ${pt('Tunnel à poules')}</div>
+        </div>
+      </div>
+
+      <div class="serre-legend">
+        <span><i style="background:var(--surface2);border:1px solid var(--border)"></i>${pt('Vide')}</span>
+        <span><i style="background:rgba(126,184,160,.5)"></i>${pt('En croissance')}</span>
+        <span><i style="background:rgba(208,138,90,.5)"></i>${pt('Récolté')}</span>
+        <span><i style="border:1px dashed var(--border)"></i>${pt('Zone libre')}</span>
+        <span><span class="dotmine" style="color:var(--accent2)">●</span> ${pt('Mes zones')}</span>
+      </div>
+    </div>
+  `;
+
+  // Restaure le mode « plan seul » si on rafraîchit pendant qu'il est actif.
+  if (_serre.planSolo) serreApplyPlanSolo(true);
+}
+
+// Bloc « Conditions de la serre ». Un seul composant, deux rendus :
+//  · readOnly (locataire, démo) → valeurs en <div> au même gabarit visuel,
+//    sans champ éditable ni bouton d'enregistrement ;
+//  · éditable (admin)           → <input> + « Enregistrer la lecture ».
+// L'écriture est de toute façon bloquée côté base par la RLS
+// serre_lectures_insert (voir sql/014_serre_lectures_admin_insert.sql).
+function ConditionsSerre(L, readOnly) {
+  const shown = v => (v === null || v === undefined || v === '') ? '—' : v;
+  const field = (label, id, val, attrs) => `
+          <div class="serre-field"><label>${label}</label>${readOnly
+            ? `<div class="serre-ro" id="${id}">${shown(val)}</div>`
+            : `<input type="number" ${attrs} id="${id}" value="${val ?? ''}">`}</div>`;
+  return `
     <div class="serre-global">
-      <div class="serre-field"><label>${pt("Température air (°C)")}</label><input type="number" step="0.1" id="serre-tair" value="${L.temp_air ?? ''}"${condRO}></div>
+      ${field(pt('Température air (°C)'), 'serre-tair', L.temp_air, 'step="0.1"')}
       ${[1, 2, 3].map(n => `
       <div class="serre-resv">
         <div class="serre-resv-h">💧 ${pt('Réservoir')} ${n}</div>
         <div class="serre-row">
-          <div class="serre-field"><label>${pt('Niveau (%)')}</label><input type="number" step="1" min="0" max="100" id="serre-r${n}" value="${L['reservoir' + n + '_pct'] ?? ''}"${condRO}></div>
-          <div class="serre-field"><label>${pt('Temp. (°C)')}</label><input type="number" step="0.1" id="serre-rt${n}" value="${L['reservoir' + n + '_temp'] ?? ''}"${condRO}></div>
+          ${field(pt('Niveau (%)'), 'serre-r' + n, L['reservoir' + n + '_pct'], 'step="1" min="0" max="100"')}
+          ${field(pt('Temp. (°C)'), 'serre-rt' + n, L['reservoir' + n + '_temp'], 'step="0.1"')}
         </div>
       </div>`).join('')}
-      ${canEditCond
-        ? `<button class="btn btn-primary btn-sm" onclick="serreSaveLecture()">${pt('Enregistrer la lecture')}</button>`
-        : `<span style="font-size:11px;color:var(--text3);align-self:center;">🔌 ${pt('Relevé automatique (capteurs)')}</span>`}
+      ${readOnly
+        ? `<span style="font-size:11px;color:var(--text3);align-self:center;">🔌 ${pt('Relevé automatique (capteurs)')}</span>`
+        : `<button class="btn btn-primary btn-sm" onclick="serreSaveLecture()">${pt('Enregistrer la lecture')}</button>`}
       ${_serre.lecture ? `<span style="font-size:11px;color:var(--text3);align-self:center;">${pt('Dernière lecture')} : ${new Date(_serre.lecture.horodatage).toLocaleString('fr-CA')}</span>` : ''}
-    </div>
-
-    <div class="serre-sec">${pt('Plan de la serre')} <span style="font-weight:400;text-transform:none;letter-spacing:0;">· ${pt('cliquez une zone pour ses détails et son historique')}</span></div>
-    <div class="serre-plan"><div class="serre-plan-inner">
-      <div class="serre-plan-rowlabel">${pt('Rangée 1')}</div>
-      <div class="serre-plan-row">${planRow(1)}</div>
-      <div class="serre-plan-aisle">↑ ${pt('Allée principale')} ↓</div>
-      <div class="serre-plan-row">${planRow(2)}</div>
-      <div class="serre-plan-rowlabel" style="margin-top:6px;">${pt('Rangée 2')}</div>
-    </div></div>
-
-    <div class="serre-legend">
-      <span><i style="background:var(--surface2);border:1px solid var(--border)"></i>${pt('Vide')}</span>
-      <span><i style="background:rgba(126,184,160,.5)"></i>${pt('En croissance')}</span>
-      <span><i style="background:rgba(208,138,90,.5)"></i>${pt('Récolté')}</span>
-      <span><i style="border:1px dashed var(--border)"></i>${pt('Zone libre')}</span>
-      <span><span class="dotmine" style="color:var(--accent2)">●</span> ${pt('Mes zones')}</span>
-    </div>
-  `;
+    </div>`;
 }
 
-function planRow(p) {
+// Une colonne du plan = une rangée réelle de la serre (10 zones).
+function planCol(p) {
   return _serre.zones.filter(z => z.planche === p).map(z => serrePlanTile(z, p)).join('');
 }
 
-// Une tuile du plan : code de zone + 3 sections (couleur = stade, emoji = culture).
+// Mode « plan seul » : masque le header/nav et le reste de la page pour
+// maximiser la surface du plan. Pas de requestFullscreen() (comportement
+// erratique sur iOS et sortie non contrôlable).
+function serreTogglePlanSolo() {
+  serreApplyPlanSolo(!_serre.planSolo);
+}
+
+function serreApplyPlanSolo(on) {
+  const wrap = document.getElementById('serre-plan-wrap');
+  if (!wrap) return;
+  _serre.planSolo = !!on;
+  wrap.classList.toggle('solo', _serre.planSolo);
+  document.body.classList.toggle('serre-plan-solo', _serre.planSolo);
+  const nav = document.getElementById('navbar');
+  if (nav) nav.style.display = _serre.planSolo ? 'none' : '';
+  document.body.style.overflow = _serre.planSolo ? 'hidden' : '';
+  const btn = document.getElementById('serre-solo-btn');
+  if (btn) btn.innerHTML = _serre.planSolo ? '✕ ' + pt('Quitter le plan seul') : '⛶ ' + pt('Plan seul');
+  if (_serre.planSolo) wrap.scrollIntoView({ block: 'start' });
+}
+
+// Échap quitte le mode « plan seul ».
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && _serre.planSolo) serreApplyPlanSolo(false);
+});
+
+// Une tuile du plan : code de zone + 3 chips de statut (couleur = statut de
+// culture, emoji = ce qui pousse). Aucun texte S1/S2/S3 : l'état de culture se
+// lit directement sur le plan, sans avoir à ouvrir la zone.
 function serrePlanTile(zone, p) {
   const occ = _serre.occ[zone.id] || {};
   const all = _serre.culturesByZone[zone.id] || [];
   const loc = _serre.locByZone[zone.id];
   const isMine = loc && loc.tenant_id === currentProfile?.id;
   const stateClass = !occ.is_occupied ? 'free' : (isMine ? 'mine' : 'other');
-  // Rangée 1 : S1 au bas (près de l'allée centrale) ; Rangée 2 : S1 en haut.
+  // Orientation verticale : S1 reste du côté de l'allée centrale, donc à droite
+  // pour la rangée 1 (colonne de gauche) et à gauche pour la rangée 2.
   const order = p === 1 ? [3, 2, 1] : [1, 2, 3];
   const secs = order.map(s => {
     const cur = all.filter(c => (c.section || 1) === s)[0];
     const cult = cur?.culture;
     const st = cur ? (cur.statut || 'vide') : (occ.is_occupied ? 'vide' : 'libre');
     const emoji = cult ? (SERRE_EMOJI[cult] || '🌱') : '';
-    const title = `${zone.code}S${s}` + (cult ? ` — ${escHtml(cult)} · ${SERRE_STATUT_LABELS[cur.statut] || ''}` : ' — ' + (occ.is_occupied ? pt('vide') : pt('libre')));
-    return `<div class="serre-plan-sec st-${st}" title="${title}"><span class="s">S${s}</span><span>${emoji}</span></div>`;
+    const statutLabel = cur ? (SERRE_STATUT_LABELS[cur.statut] || SERRE_STATUT_LABELS.vide)
+                            : (occ.is_occupied ? pt('vide') : pt('libre'));
+    const title = `${zone.code}S${s} — ` + (cult ? `${escHtml(cult)} · ${statutLabel}` : statutLabel);
+    return `<div class="serre-plan-sec st-${st}" title="${title}" aria-label="${title}">${emoji}</div>`;
   }).join('');
   return `<button class="serre-plan-zone ${stateClass}" onclick="serreOpenZone('${zone.id}')">
     <div class="serre-plan-code">${zone.code}${isMine ? '<span class="dotmine">●</span>' : ''}</div>
