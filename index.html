@@ -6092,17 +6092,26 @@ async function loadSpaces() {
     const ss = document.getElementById('serre-section');
     if (ss) ss.style.display = 'none';
   }
-  // Déléguer les clics sur les boutons réseau
-  document.getElementById('spaces-grid').addEventListener('click', function(e) {
-    const btn = e.target.closest('.net-book-space');
-    if (btn) bookNetworkSpace(btn.dataset.sid, btn.dataset.sname, btn.dataset.url, btn.dataset.key, btn.dataset.cid);
-  });
+  // Déléguer les clics sur les boutons réseau. loadSpaces() est rejoué à
+  // chaque visite de la page : sans ce garde, les écouteurs s'empilaient et
+  // une réservation partait autant de fois que la page avait été ouverte.
+  const gridEl = document.getElementById('spaces-grid');
+  if (!gridEl.dataset.netListener) {
+    gridEl.dataset.netListener = '1';
+    gridEl.addEventListener('click', function(e) {
+      const btn = e.target.closest('.net-book-space');
+      if (btn) bookNetworkSpace(btn.dataset.sid, btn.dataset.sname, btn.dataset.url, btn.dataset.key, btn.dataset.cid);
+    });
+  }
 }
 
-function renderSpaces(spaces) {
+// masquerVide : la recherche peut ne rien donner en local mais trouver des
+// espaces réseau. Afficher « Aucun espace disponible » au-dessus des
+// résultats réseau serait contradictoire.
+function renderSpaces(spaces, masquerVide) {
   const grid = document.getElementById('spaces-grid');
   if (!spaces.length) {
-    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">🏠</div><p>${pt('Aucun espace disponible')}</p></div>`;
+    grid.innerHTML = masquerVide ? '' : `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🏠</div><p>${pt('Aucun espace disponible')}</p></div>`;
     return;
   }
   grid.innerHTML = spaces.map(s => {
@@ -6135,15 +6144,21 @@ function renderSpaces(spaces) {
   }).join('');
 }
 
-function renderNetworkSpaces() {
-  const sharedSpaces = window.networkData.sharedSpaces || [];
+// query : terme de recherche courant. Les espaces réseau sont filtrés comme
+// les espaces locaux — sans ça, la recherche les faisait purement disparaître
+// (renderSpaces réécrit toute la grille, la section réseau n'était jamais
+// réinjectée).
+function renderNetworkSpaces(query) {
+  const q = (query || '').toLowerCase();
+  const sharedSpaces = (window.networkData.sharedSpaces || []).filter(s =>
+    !q || (s.name || '').toLowerCase().includes(q) || (s.location || '').toLowerCase().includes(q));
   if (!sharedSpaces.length) return '';
   // En démo, ajouter un badge d'indication
   const demoNotice = isDemo
     ? '<div style="font-size:11px;color:var(--accent);background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2);border-radius:4px;padding:4px 10px;display:inline-block;margin-bottom:10px;">Mode démo — données fictives pour illustration</div>'
     : '';
   const networkName = window.networkData.network?.name || 'Réseau';
-  const header = '<div style="margin:24px 0 12px;padding-top:20px;border-top:1px solid var(--border);">'
+  const header = '<div style="grid-column:1/-1;margin:24px 0 12px;padding-top:20px;border-top:1px solid var(--border);">'
     + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:2px;">🔗 ' + networkName + '</div>'
     + '<div style="font-size:12px;color:var(--text3)">Ressources partagées par les bâtiments du réseau</div>'
     + demoNotice
@@ -6172,12 +6187,17 @@ function renderNetworkSpaces() {
       + '</div>'
       + '</div>';
   }).join('');
-  return header + '<div class="cards-grid">' + cards + '</div>';
+  return header + '<div class="cards-grid" style="grid-column:1/-1">' + cards + '</div>';
 }
 
 function filterSpaces() {
   const q = document.getElementById('spaces-search').value.toLowerCase();
-  renderSpaces(spacesCache.filter(s => !q || s.name.toLowerCase().includes(q) || (s.location || '').toLowerCase().includes(q)));
+  const locaux = spacesCache.filter(s => !q || s.name.toLowerCase().includes(q) || (s.location || '').toLowerCase().includes(q));
+  const reseau = renderNetworkSpaces(q);
+  // renderSpaces() réécrit la grille : le bloc réseau doit être remis, filtré
+  // sur le même terme.
+  renderSpaces(locaux, !!reseau);
+  document.getElementById('spaces-grid').innerHTML += reseau;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
