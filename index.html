@@ -30,6 +30,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="balanceOps.js"></script>
+<script src="demo-data.js"></script>
 
 <!-- V25.1 Analytics — chargé uniquement après consentement (Loi 25) -->
 <script>
@@ -2624,7 +2625,40 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
 const SUPABASE_URL = CohabitatConfig.supabaseUrl;
 const SUPABASE_ANON_KEY = CohabitatConfig.supabaseAnonKey;
 
-const { createClient } = supabase;
+// Le SDK vient d'un CDN : hors ligne il est absent. Le mode demo n'en a
+// pas besoin (il parle au jeu local), donc on ne veut pas que la page
+// meure a cette ligne — c'est ce qui permet a une tablette sans reseau
+// d'ouvrir la demo sans rien avoir a installer.
+// Le SDK vient d'un CDN : hors ligne il est absent. Le mode demo n'en a
+// pas besoin (il parle au jeu local), donc la page ne doit pas mourir ici
+// — c'est ce qui permet a une tablette sans reseau d'ouvrir la demo sans
+// rien installer. Le client de remplacement echoue a l'usage, pas a la
+// construction : une exception ici interromprait le script et laisserait
+// toutes les variables suivantes non initialisees.
+const SDK_ABSENT = typeof supabase === 'undefined' || !supabase;
+const { createClient } = SDK_ABSENT ? {
+  createClient: function () {
+    var echec = function () {
+      return Promise.resolve({ data: null, error: { message: 'Hors ligne — mode démo seulement' } });
+    };
+    var req = { select: f, insert: f, update: f, upsert: f, delete: f, eq: f, neq: f, in: f, is: f,
+                gt: f, gte: f, lt: f, lte: f, order: f, limit: f, filter: f, or: f, contains: f,
+                single: echec, maybeSingle: echec, then: function (r) { return echec().then(r); } };
+    function f() { return req; }
+    return {
+      _absent: true,
+      from: function () { return req; },
+      rpc: echec,
+      functions: { invoke: echec },
+      auth: {
+        onAuthStateChange: function () { return { data: { subscription: { unsubscribe: function () {} } } }; },
+        getSession: function () { return Promise.resolve({ data: { session: null } }); },
+        signInWithPassword: echec, signUp: echec, signOut: echec, updateUser: echec,
+        resetPasswordForEmail: echec, stopAutoRefresh: function () { return Promise.resolve(); },
+      },
+    };
+  }
+} : supabase;
 // Configuration auth.lock : on remplace le navigatorLock (Web Locks API)
 // par un lock no-op. Le navigatorLock peut rester bloque indefiniment
 // si une operation auth lance un fetch qui hang.
@@ -2652,6 +2686,15 @@ let sb = _createSbClient();
 _attachAuthListener(sb);
 
 function _createSbClient() {
+  // Mode demo : client local, aucune requete sortante. Passe aussi par
+  // ici lors des recreateSb() qui precedent les navigations.
+  //
+  // On lit window._demoMode et non isDemo : cette fonction est definie
+  // avant la declaration `let isDemo`, et toucher a une variable `let`
+  // avant son initialisation leve une exception.
+  if (window._demoMode === true && typeof createDemoClient === 'function') {
+    return createDemoClient(window.COHABITAT_DEMO);
+  }
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { lock: _noOpLock }
   });
@@ -2745,18 +2788,39 @@ async function fedFetch(path, options) {
 // credit chauffeur) passent par ce module pour beneficier du retry auto
 // en cas de coupure reseau. L'idempotency_key cote serveur garantit
 // l'absence de double debit. Voir balanceOps.js pour le contrat.
-const _balanceOps = (typeof createBalanceOps === 'function') ? createBalanceOps({
-  bridgeUrl: FINANCE_BRIDGE_URL,
-  anonKey:   CENTRAL_KEY,
-  getAuthToken: function () {
-    // Cache synchrone : pas de verrou Web Locks, donc pas de deadlock si
-    // l'onglet est passe en background pendant un fetch precedent.
-    return window._cachedAccessToken || null;
-  },
-  storageKey: 'modulimo:cohab:balanceOps:outbox:v1',
-  onChange: function (count, hasStuck) { renderOutboxBanner(count, hasStuck); },
-}) : null;
-if (!_balanceOps) console.error('[balanceOps] module non charge — verifier <script src="balanceOps.js">');
+//
+// Sans centrale (instance autonome, ou mode demonstration), il n'y a ni
+// URL ni cle a fournir : createBalanceOps refuse alors de se construire.
+// Cet echec ne doit pas remonter — une exception ici interromprait le
+// script et laisserait toutes les declarations suivantes non
+// initialisees, ce qui casse la page entiere plutot qu'une seule
+// fonction.
+const _balanceOps = (function () {
+  if (typeof createBalanceOps !== 'function') {
+    console.error('[balanceOps] module non charge — verifier <script src="balanceOps.js">');
+    return null;
+  }
+  if (!CENTRAL_ENABLED || !CENTRAL_KEY) {
+    console.info('[balanceOps] centrale absente — les soldes restent locaux');
+    return null;
+  }
+  try {
+    return createBalanceOps({
+      bridgeUrl: FINANCE_BRIDGE_URL,
+      anonKey:   CENTRAL_KEY,
+      getAuthToken: function () {
+        // Cache synchrone : pas de verrou Web Locks, donc pas de deadlock si
+        // l'onglet est passe en background pendant un fetch precedent.
+        return window._cachedAccessToken || null;
+      },
+      storageKey: 'modulimo:cohab:balanceOps:outbox:v1',
+      onChange: function (count, hasStuck) { renderOutboxBanner(count, hasStuck); },
+    });
+  } catch (e) {
+    console.error('[balanceOps] initialisation impossible :', e.message);
+    return null;
+  }
+})();
 
 // ── HEALTH PROBE CENTRALE ────────────────────────────────────────────
 // Etat global mis a jour par probeCentralHealth(). Utilise pour gater
@@ -3504,8 +3568,14 @@ async function authSubmit() {
 
 async function loginDemo() {
   isDemo = true;
+  window._demoMode = true;
+  // Bascule vers le jeu local : a partir d'ici, plus aucune requete ne
+  // part de la tablette. C'est ce qui rend la demo utilisable hors ligne
+  // et evite de montrer les donnees d'un immeuble reel a un prospect.
+  sb = _createSbClient();
+  _attachAuthListener(sb);
   currentProfile = {
-    id: null,
+    id: (window.COHABITAT_DEMO && window.COHABITAT_DEMO.profiles[0].id) || null,
     email: 'alex.tremblay@modulimo.com',
     full_name: 'Alex Tremblay',
     phone: '+1 514 555-0182',
@@ -3539,6 +3609,9 @@ async function loginDemo() {
 async function logout() {
   if (isDemo) {
     isDemo = false;
+    window._demoMode = false;
+    sb = _createSbClient();
+    _attachAuthListener(sb);
     currentProfile = null;
     currentUser = null;
     showLogin();
@@ -12794,4 +12867,21 @@ async function _tkRefreshBadge() {
     // Afficher la bannière après un court délai (laisser l'app charger)
     setTimeout(function() {
       var b = document.getElementById('consent-banner');
-      if (b) b
+      if (b) b.style.display = 'flex';
+    }, 1200);
+  }
+})();
+</script>
+<script>
+// Ouverture directe en mode demonstration : index.html#demo
+// Sert au raccourci d'une tablette de demo et a l'enveloppe Android,
+// qui charge exactement cette adresse. Sans le fragment, rien ne change.
+(function () {
+  if (window.location.hash !== '#demo') return;
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      if (typeof loginDemo === 'function' && !window._demoMode) loginDemo();
+    }, 150);
+  });
+})();
+</script>
