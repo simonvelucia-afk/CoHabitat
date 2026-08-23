@@ -74,10 +74,71 @@ docker compose exec db psql -U postgres cohabitat \
   de certificat public : Caddy émet le sien. Installer sa racine
   (`/data/caddy/pki`) sur les postes, ou rester en `http://` si le réseau
   est déjà de confiance.
-- **Le module Machine Lunch reste inactif** : ses tables vivent sur la
-  centrale Modulimo. Idem pour la facturation (`list_client_invoices`,
-  `get_invoice_detail`, `request_plan_upgrade`), qui affichera une erreur
-  de chargement tant que la centrale n'est pas jumelée.
+- **Le module Machine Lunch et la facturation demandent la centrale** :
+  leurs tables et fonctions y vivent. La centrale s'installe elle aussi
+  en réseau fermé (dépôt `modulimo-admin`, `deploy/`) : une fois les deux
+  appliances sur le même réseau, renseigner `CENTRAL_ENABLED=true`,
+  `CENTRAL_URL` et `CENTRAL_KEY`, et ces modules reviennent. Sans elle,
+  les écrans correspondants affichent une erreur de chargement — le reste
+  de l'application fonctionne normalement.
+
+## Accès des locataires depuis le réseau de l'immeuble
+
+C'est le mode nominal : un locataire sur le Wi-Fi de l'immeuble ouvre
+`https://cohabitat.pointe-est.lan` dans son navigateur — téléphone,
+tablette ou ordinateur, sans application à installer — et **aucun octet
+ne sort du bâtiment**. Réservations d'espaces, covoiturage, serre,
+billets, soldes et transactions : tout est servi par la machine du local
+technique.
+
+Trois choses à régler pour que ça marche sur tous les appareils :
+
+**1. Le nom doit se résoudre sur le réseau.** Ajouter un enregistrement
+`A` dans le DNS du routeur, pointant `cohabitat.pointe-est.lan` vers
+l'IP de la machine. La plupart des routeurs (OPNsense, pfSense, UniFi,
+même les box grand public) le permettent. À défaut, servir directement
+sur l'adresse IP en mettant cette IP dans `SITE_URL` et `SITE_HOST` —
+moins joli, mais ça fonctionne.
+
+**2. Le certificat doit être accepté.** Un nom en `.lan` ne peut pas
+obtenir de certificat public : Caddy émet le sien, que les navigateurs
+signalent comme inconnu. Deux issues :
+
+- installer la racine de Caddy (`/data/caddy/pki/authorities/local/root.crt`,
+  récupérable avec `docker compose cp web:/data/caddy/pki/authorities/local/root.crt .`)
+  sur les appareils des locataires — propre, mais une manipulation par appareil ;
+- ou servir en `http://` sur un réseau déjà de confiance, en mettant
+  `SITE_URL=http://...`. Les mots de passe circulent alors en clair sur
+  le réseau local : acceptable sur un VLAN dédié, pas sur un Wi-Fi
+  invité partagé.
+
+Si l'immeuble possède un vrai domaine et que la machine peut sortir le
+temps d'un renouvellement, Let's Encrypt avec un challenge DNS donne un
+certificat reconnu partout sans exposer le serveur.
+
+**3. Les appareils doivent atteindre la machine.** Un VLAN « résidents »
+avec une seule règle vers l'IP du serveur suffit, et vaut mieux qu'un
+réseau plat.
+
+### Accès depuis l'extérieur
+
+Un locataire en déplacement passe par le VPN de l'immeuble : une fois le
+tunnel monté, il voit exactement le même site à la même adresse. C'est le
+même tunnel que celui du jumelage entre immeubles — rien de plus à
+installer côté serveur.
+
+### Ce qui a encore besoin d'Internet
+
+| Fonction | Dépendance |
+|---|---|
+| Réservations, covoiturage, serre, billets, soldes | **aucune** |
+| Transactions entre immeubles jumelés | le VPN (pas Internet en soi) |
+| Accès des locataires hors du bâtiment | le VPN |
+| Courriels (mot de passe oublié, avis) | un relais SMTP, ou rien si `MAILER_AUTOCONFIRM=true` |
+| Machine Lunch et facturation | la centrale Modulimo, si elle est déployée |
+
+Autrement dit : en fonctionnement normal, la seule dépendance sortante
+est le VPN, et uniquement pour ce qui traverse réellement les murs.
 
 ## Jumeler deux instances
 
