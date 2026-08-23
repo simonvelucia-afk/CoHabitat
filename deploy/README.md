@@ -1,0 +1,197 @@
+# CoHabitat — appliance autonome
+
+Déploie CoHabitat comme un logiciel installé chez le client : une seule
+machine, un réseau fermé, aucune dépendance à un service en ligne. Les
+immeubles qui le souhaitent se jumellent ensuite deux à deux à travers
+le VPN de l'exploitant, sans passer par une autorité centrale.
+
+---
+
+## Ce que contient la pile
+
+| Service | Rôle | Exposé ? |
+|---|---|---|
+| `db` | PostgreSQL 16 + PostGIS — toutes les données de l'immeuble | non |
+| `auth` | GoTrue — comptes, mots de passe, jetons | non |
+| `rest` | PostgREST — l'API que consomme l'interface | non |
+| `federation` | Passerelle vers les instances jumelées | non |
+| `web` | Caddy — sert l'interface et route tout le reste | **oui** (80/443) |
+
+Un seul port entre dans la machine. La base, l'authentification et l'API
+ne sont joignables que depuis le réseau interne de la pile ; les autres
+instances CoHabitat passent par la même porte que les usagers.
+
+## Prérequis
+
+- Docker et Docker Compose v2
+- 4 Go de RAM, 20 Go de disque (davantage si l'historique est long)
+- Un nom d'hôte résolvable sur le réseau de l'immeuble
+- Node.js 22 sur la machine, seulement pour les scripts d'installation
+
+## Installation
+
+```bash
+cd deploy
+cp .env.example .env
+$EDITOR .env                    # INSTANCE_ID, SITE_URL, SITE_HOST
+
+# Sur une machine connectée, AVANT de transporter le paquet :
+./scripts/fetch-vendor.sh       # librairies tierces en local
+
+./cohabitat init                # secrets + configuration de l'interface
+./cohabitat up                  # démarrage
+```
+
+`init` fabrique tout ce qui est propre à l'instance : le secret JWT
+partagé par GoTrue et PostgREST, les clés `anon` et `service_role`, les
+mots de passe Postgres, et la paire de clés Ed25519 qui donne à
+l'instance son identité dans la fédération. Rien de tout cela n'entre
+dans le dépôt (`.gitignore` de `deploy/`).
+
+### Premier administrateur
+
+L'inscription se fait par l'interface. Ensuite, sur la machine :
+
+```bash
+docker compose exec db psql -U postgres cohabitat \
+  -c "UPDATE profiles SET role='principal_admin' WHERE email='vous@immeuble.lan';"
+```
+
+## Réseau fermé : ce qui change
+
+- **Aucun courriel ne sort.** `MAILER_AUTOCONFIRM=true` confirme les
+  comptes à l'inscription, sinon personne ne pourrait se connecter. La
+  réinitialisation de mot de passe passe alors par un administrateur.
+  Avec un relais SMTP interne, remplir le bloc SMTP et repasser à `false`.
+- **Aucune librairie n'est téléchargée.** `OFFLINE_ASSETS=true` fait
+  pointer l'interface vers `vendor/`, rempli par `fetch-vendor.sh`. Les
+  polices sont facultatives (`--fonts`) ; sans elles, la pile de polices
+  système prend le relais.
+- **Aucune licence n'est vérifiée.** `CENTRAL_ENABLED=false` court-circuite
+  le contrôle de licence et de contrat : c'est indispensable, faute de
+  quoi l'absence de réponse de la centrale bloquerait tous les résidents.
+- **Les certificats sont internes.** Un nom en `.lan` ne peut pas obtenir
+  de certificat public : Caddy émet le sien. Installer sa racine
+  (`/data/caddy/pki`) sur les postes, ou rester en `http://` si le réseau
+  est déjà de confiance.
+- **Le module Machine Lunch reste inactif** : ses tables vivent sur la
+  centrale Modulimo. Idem pour la facturation (`list_client_invoices`,
+  `get_invoice_detail`, `request_plan_upgrade`), qui affichera une erreur
+  de chargement tant que la centrale n'est pas jumelée.
+
+## Jumeler deux instances
+
+Le VPN est fourni par l'exploitant (WireGuard, Tailscale, tunnel
+opérateur) : l'appliance suppose seulement que le pair est joignable à
+une URL. Le jumelage n'échange **que des clés publiques** ; aucun secret
+ne circule, et un pair reste inerte tant qu'un administrateur ne lui a
+pas accordé de droits.
+
+Sur l'immeuble A :
+
+```bash
+./cohabitat peer add https://cohabitat.immeuble-b.lan
+```
+
+A lit l'identité de B, l'enregistre `pending`, puis présente la sienne à
+B — qui l'enregistre `pending` de son côté. Ensuite, **chaque
+administrateur autorise l'autre**, en choisissant ce qu'il ouvre :
+
+```bash
+# sur A                                        # sur B
+./cohabitat peer allow immeuble-b \            ./cohabitat peer allow immeuble-a \
+    --reservations --finance --limit 200           --reservations --limit 0
+```
+
+| Réglage | Effet |
+|---|---|
+| `--reservations` | les usagers du pair peuvent réserver les espaces **explicitement partagés** |
+| `--finance` | les soldes peuvent circuler entre les deux instances |
+| `--limit N` | exposition nette maximale acceptée vis-à-vis de ce pair, en dollars |
+
+Le jumelage n'est pas symétrique : B peut accepter les réservations de A
+sans jamais accepter de mouvement d'argent.
+
+Partager un espace, côté propriétaire :
+
+```sql
+UPDATE common_spaces SET federation_shared = TRUE WHERE name = 'Atelier';
+```
+
+Par défaut, **rien** ne sort de l'immeuble.
+
+État du lien et des créances :
+
+```bash
+./cohabitat peer list      # statut, droits, plafond, dernier contact
+./cohabitat peer ledger    # solde net par pair
+./cohabitat doctor         # santé des services + identité publiée
+```
+
+Couper un lien : `./cohabitat peer suspend <id>` (réversible) ou
+`revoke <id>`.
+
+## Ce qui garantit la cohérence de l'argent
+
+Une réservation croisée touche deux bases que rien ne synchronise. Trois
+règles tiennent l'ensemble :
+
+1. **Le prix fait foi chez le propriétaire.** L'instance qui possède
+   l'espace recalcule le coût et refuse (`price_mismatch`) si le montant
+   annoncé diffère. Un pair compromis ne fixe pas ses propres tarifs.
+2. **On engage avant d'appeler.** Le débit du locataire et la créance
+   sur le pair sont écrits dans la même transaction, *avant* l'appel
+   réseau. Si le VPN tombe ensuite, l'opération reste en file et sera
+   rejouée avec la même clé d'idempotence — le pair ne créera jamais deux
+   réservations. Après épuisement des tentatives, l'argent est rendu au
+   locataire et la créance annulée, toujours dans la même transaction.
+3. **Le plafond borne la casse.** `finance_credit_limit` refuse tout
+   mouvement entrant qui porterait l'exposition nette au-delà de ce qui a
+   été accepté.
+
+Ces règles sont vérifiées par `sql/tests/federation_test.sql` (13
+assertions sur une vraie base) et par les tests du service :
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f ../sql/tests/federation_test.sql
+cd federation && npm test        # 32 tests, aucune dépendance
+```
+
+## Sauvegarde
+
+```bash
+./cohabitat backup /mnt/sauvegardes
+```
+
+Produit deux fichiers : le dump de la base et une archive des secrets.
+**Les deux sont nécessaires** — sans `JWT_SECRET`, les jetons émis ne
+sont plus vérifiables et personne ne peut se reconnecter ; sans la clé
+privée de fédération, les pairs ne reconnaissent plus l'instance.
+Conserver l'archive des secrets ailleurs que le dump.
+
+Restauration : `./cohabitat restore <fichier.sql.gz>`, puis remettre en
+place `.env`, `.env.secrets` et `secrets/`.
+
+## Mises à jour
+
+```bash
+git pull
+./cohabitat migrate     # n'applique que les migrations nouvelles
+./cohabitat up
+```
+
+Chaque fichier SQL appliqué est inscrit avec l'empreinte de son contenu.
+Un fichier déjà appliqué est ignoré ; un fichier modifié après coup
+**arrête** la migration plutôt que de rejouer un script qui n'est pas
+rejouable. Une correction se fait donc par une nouvelle migration.
+
+## Diagnostic
+
+| Symptôme | Piste |
+|---|---|
+| `./cohabitat up` puis page blanche | `docker compose logs web rest` ; vérifier que `SITE_HOST` correspond au nom utilisé dans le navigateur |
+| Connexion refusée à l'inscription | `MAILER_AUTOCONFIRM` à `false` sans SMTP joignable |
+| `401` sur toutes les requêtes de données | `.env.secrets` régénéré après coup : `JWT_SECRET` ne correspond plus aux clés servies dans `generated/config.js` — relancer `./cohabitat init` puis `up` |
+| Espaces du pair absents | `./cohabitat peer list` (statut `active` ?), `federation_shared` côté pair, VPN debout |
+| Réservation « part dès le retour du lien » | normal : le pair était injoignable, la file rejouera |
+| `db-migrate` s'arrête sur un fichier modifié | comportement voulu — créer une nouvelle migration |

@@ -1,0 +1,6 @@
+# Secrets et fichiers propres a une instance : jamais versionnes.
+.env
+.env.secrets
+secrets/
+generated/
+backups/

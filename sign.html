@@ -53,11 +53,14 @@
     <div class="footer">Modulimo — lien sécurisé à usage unique</div>
   </div>
 
+<script src="config.js"></script>
 <script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// Import dynamique : l'URL du SDK vient de config.js, donc un deploiement
+// en reseau ferme peut la faire pointer vers vendor/.
+const { createClient } = await import(CohabitatConfig.assets.supabaseEsm);
 
-const CENTRAL_URL  = 'https://bpxscgrbxjscicpnheep.supabase.co';
-const CENTRAL_ANON = 'sb_publishable_2V-eHOvw1v_Xwr1bpHfHLg_cbHW9ctD';
+const CENTRAL_URL  = CohabitatConfig.central.url;
+const CENTRAL_ANON = CohabitatConfig.central.key;
 const sb = createClient(CENTRAL_URL, CENTRAL_ANON);
 
 const app = document.getElementById('app');

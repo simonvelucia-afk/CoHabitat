@@ -1,20 +1,38 @@
 # CoHabitat — Guide d'installation
 
+Deux façons de déployer, à partir du même code :
+
+- **Hébergé** — interface sur GitHub Pages, base sur Supabase. C'est le
+  mode décrit ci-dessous.
+- **Appliance autonome** — tout tourne sur une machine de l'immeuble, en
+  réseau fermé, sans dépendance à un service en ligne, avec jumelage
+  facultatif entre immeubles par VPN. Voir **[`deploy/README.md`](deploy/README.md)**.
+
+Aucune URL ni clé n'est écrite dans `index.html` : tout ce qui change
+d'un déploiement à l'autre vit dans **`config.js`**.
+
 ## 1. Créer votre projet Supabase
 
 1. Allez sur [supabase.com](https://supabase.com) → Nouveau projet
-2. Dans **SQL Editor**, collez et exécutez tout le contenu de `schema.sql`
+2. Dans **SQL Editor**, exécutez `schema.sql`, puis les fichiers de
+   `sql/` dans l'ordre de leur numéro (`000_` en premier)
 3. Récupérez vos clés: **Project Settings → API**
    - `Project URL` (ex: `https://abcxyz.supabase.co`)
    - `anon public` key
 
-## 2. Configurer index.html
+## 2. Configurer config.js
 
-Ouvrez `index.html` et remplacez à la ligne ~610 :
+Ouvrez `config.js` et renseignez :
 ```js
-const SUPABASE_URL = 'https://VOTRE_PROJECT_ID.supabase.co';
-const SUPABASE_ANON_KEY = 'VOTRE_ANON_KEY';
+supabaseUrl:     'https://VOTRE_PROJECT_ID.supabase.co',
+supabaseAnonKey: 'VOTRE_ANON_KEY',
+siteUrl:         'https://votre-domaine',
 ```
+Le même fichier porte l'URL de la centrale Modulimo (`central`), la
+Machine Lunch, l'analytique et l'emplacement des librairies tierces.
+Mettre `central.enabled` à `false` rend l'instance entièrement autonome :
+plus aucune requête ne sort, la finance reste locale et le contrôle de
+licence est court-circuité.
 
 ## 3. Héberger sur GitHub Pages
 

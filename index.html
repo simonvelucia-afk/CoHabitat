@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CoHabitat — Gestion des ressources communes</title>
-<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/simonvelucia-afk/modulimo-home/main/images/favicon_Modulimo.png">
+<script src="config.js"></script>
+<script>CohabitatConfig.writeHeadAssets(['favicon']);</script>
 <!-- v11 — Machine Lunch online : Plusieurs machine onglet lunch -->
 <script>
 // Intercepter le hash Supabase AVANT l'init du SDK
@@ -25,9 +26,7 @@
   }
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+<script>CohabitatConfig.writeHeadAssets(['supabaseJs', 'jspdf']);</script>
 <script src="balanceOps.js"></script>
 
 <!-- V25.1 Analytics — chargé uniquement après consentement (Loi 25) -->
@@ -36,18 +35,18 @@ window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 
 // GA désactivé par défaut — activé seulement après consentement explicite
-window._gaConsent = localStorage.getItem('ga_consent');
+window._gaConsent = CohabitatConfig.analytics.enabled ? localStorage.getItem('ga_consent') : null;
 
 function _loadGA() {
   if (window._gaLoaded) return;
   window._gaLoaded = true;
   const s = document.createElement('script');
   s.async = true;
-  s.src = 'https://www.googletagmanager.com/gtag/js?id=G-EWP5ER8KFJ';
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + CohabitatConfig.analytics.gaId;
   document.head.appendChild(s);
   s.onload = function() {
     gtag('js', new Date());
-    gtag('config', 'G-EWP5ER8KFJ', {
+    gtag('config', CohabitatConfig.analytics.gaId, {
       page_path: window.location.pathname,
       page_title: document.title,
       anonymize_ip: true
@@ -91,8 +90,7 @@ function trackStep(feature, step, details = {}) {
 }
 </script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=Space+Mono&display=swap" rel="stylesheet">
+<script>CohabitatConfig.writeHeadAssets(['fonts']);</script>
 <style>
 /* ===== VARIABLES & RESET ===== */
 :root {
@@ -2620,8 +2618,8 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
 // CONFIGURATION SUPABASE
 // ==========================================
 // ⚠️  REMPLACEZ CES VALEURS PAR VOS CLÉS SUPABASE
-const SUPABASE_URL = 'https://uwyhrdjlwetcbtskijrs.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3eWhyZGpsd2V0Y2J0c2tpanJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NzMxNjYsImV4cCI6MjA4ODE0OTE2Nn0.NHo_RY4DjTmtkFcjOJ3dFPzNRN1rCwBCDXyIixOSrn4';
+const SUPABASE_URL = CohabitatConfig.supabaseUrl;
+const SUPABASE_ANON_KEY = CohabitatConfig.supabaseAnonKey;
 
 const { createClient } = supabase;
 // Configuration auth.lock : on remplace le navigatorLock (Web Locks API)
@@ -2700,9 +2698,35 @@ function recreateSb() {
 })();
 
 // ── MODULIMO CENTRAL ─────────────────────────────────────────────────
-const CENTRAL_URL = 'https://bpxscgrbxjscicpnheep.supabase.co';
-const CENTRAL_KEY = 'sb_publishable_2V-eHOvw1v_Xwr1bpHfHLg_cbHW9ctD';
+const CENTRAL_ENABLED = CohabitatConfig.central.enabled !== false;
+const CENTRAL_URL = CohabitatConfig.central.url;
+const CENTRAL_KEY = CohabitatConfig.central.key;
 const FINANCE_BRIDGE_URL = CENTRAL_URL + '/functions/v1/finance-bridge';
+
+// ── FEDERATION ENTRE INSTANCES ───────────────────────────────────────
+// En reseau ferme, les immeubles jumeles ne se parlent pas via la
+// centrale : chaque instance expose une passerelle locale qui signe les
+// appels sortants et verifie les appels entrants. L'interface ne connait
+// que cette passerelle — jamais la cle d'un autre immeuble.
+const FEDERATION_ENABLED = CohabitatConfig.federation.enabled === true;
+const FEDERATION_URL     = CohabitatConfig.federation.url || '/federation/v1';
+
+async function fedFetch(path, options) {
+  const token = window._cachedAccessToken;
+  if (!token) throw new Error('session absente');
+  const res = await fetch(FEDERATION_URL + path, {
+    ...(options || {}),
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+      ...((options && options.headers) || {}),
+    },
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (_) { data = null; }
+  return { ok: res.ok, status: res.status, data };
+}
 
 // ── balanceOps : primitive unifiee + outbox localStorage ─────────────
 // Toutes les mutations de solde (debit reservation, transfert dependant,
@@ -2734,6 +2758,8 @@ let _centralProbeTimer    = null;
 let _centralProbeInflight = false;
 
 async function probeCentralHealth() {
+  // Instance autonome (central.enabled=false) : pas de centrale a sonder.
+  if (!CENTRAL_ENABLED) return true;
   if (_centralProbeInflight) return window._centralOnline === true;
   _centralProbeInflight = true;
   const ctrl = new AbortController();
@@ -2773,6 +2799,7 @@ async function probeCentralHealth() {
 }
 
 function startCentralHealthProbe() {
+  if (!CENTRAL_ENABLED) return;
   if (_centralProbeTimer) return;
   probeCentralHealth();
   _centralProbeTimer = setInterval(probeCentralHealth, 60000);
@@ -3068,6 +3095,10 @@ async function initApp() {
 
 // Vérifier les contrats du résident et du propriétaire de l'immeuble
 async function checkContracts(userId) {
+  // Instance autonome : aucune licence ni contrat central a verifier.
+  // Sans ce court-circuit, l'absence de reponse de la centrale bloquerait
+  // tous les residents (voir le cas `!lic` plus bas).
+  if (!CENTRAL_ENABLED) return { blocked: false };
   try {
     const domain = window.location.hostname;
     const today  = new Date().toISOString().slice(0, 10);
@@ -3378,7 +3409,7 @@ async function submitReset() {
 
   try {
     btn.textContent = '⏳ Envoi…';
-    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://cohabitat.modulimo.com' });
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: CohabitatConfig.siteUrl });
     if (error) throw error;
 
     msg.style.background = 'rgba(126,184,160,0.08)';
@@ -3811,6 +3842,7 @@ async function toggleDepResourceAccess(type, resourceId, grant, name) {
 // central est injoignable (l'appelant garde alors la derniere valeur
 // connue plutot que d'afficher 0$ qui serait trompeur).
 async function fetchCentralBalance(depExternalId) {
+  if (!CENTRAL_ENABLED) return null;   // le solde local fait foi
   try {
     // BUG FIX : on utilise window._cachedAccessToken au lieu de
     // sb.auth.getSession(). Cette derniere prend un verrou Web Locks
@@ -3894,6 +3926,36 @@ async function loadAppModules() {
 
 // ── RÉSEAU INTER-BÂTIMENTS ───────────────────────────────────────────────────
 async function loadNetworkData() {
+  // Instances jumelees : la passerelle locale agrege les catalogues des
+  // pairs joignables. Un pair hors-ligne retire ses espaces de la liste
+  // sans faire echouer les autres.
+  if (FEDERATION_ENABLED && !isDemo) {
+    try {
+      const res = await fedFetch('/local/spaces');
+      if (res.ok && res.data) {
+        window.networkData.network = { id: 'federation', name: 'Instances jumelées' };
+        window.networkData.sharedSpaces = (res.data.spaces || []).map(function (s) {
+          return {
+            ...s,
+            _network: true,
+            _federated: true,
+            _peerInstanceId: s._peer_instance_id,
+            _memberName: s._peer_name || s._peer_instance_id,
+            _memberUrl: '', _memberKey: '', _memberClientId: s._peer_instance_id,
+            _priorityHours: 0,
+          };
+        });
+        window.networkData.unreachablePeers = res.data.unreachable || [];
+        return;
+      }
+      console.warn('[federation] catalogue indisponible:', res.status);
+    } catch (e) {
+      console.warn('[federation] passerelle injoignable:', e.message);
+    }
+    window.networkData.sharedSpaces = [];
+    return;
+  }
+
   if (isDemo) {
     // Données réseau fictives pour la démo
     window.networkData.network = { id: 'demo-net', name: 'Réseau Pointe-Est' };
@@ -4016,10 +4078,11 @@ function isInPriorityWindow(priorityHours) {
   return false; // Pour l'instant pas de restriction de fenêtre côté client
 }
 
-async function bookNetworkSpace(spaceId, spaceName, memberUrl, memberKey, memberClientId) {
+async function bookNetworkSpace(spaceId, spaceName, memberUrl, memberKey, memberClientId, peerInstanceId) {
   if (!checkActive()) return;
   // Stocker les infos du bâtiment réseau pour la réservation
-  window._networkBooking = { spaceId, spaceName, memberUrl, memberKey, memberClientId, isNetwork: true };
+  window._networkBooking = { spaceId, spaceName, memberUrl, memberKey, memberClientId,
+                             peerInstanceId: peerInstanceId || null, isNetwork: true };
   currentBookingSpaceId = spaceId;
   document.getElementById('book-space-title').textContent = 'Réserver — ' + spaceName + ' 🔗';
   const today = new Date().toISOString().split('T')[0];
@@ -4031,6 +4094,7 @@ async function bookNetworkSpace(spaceId, spaceName, memberUrl, memberKey, member
 }
 
 async function checkLicence() {
+  if (!CENTRAL_ENABLED) return {};   // aucun module bride hors centrale
   try {
     const domain = window.location.hostname;
     const res = await fetch(
@@ -5382,8 +5446,8 @@ function pageName(page) {
 // ═══════════════════════════════════════════════
 //  LUNCH MACHINE — iframe responsive
 // ═══════════════════════════════════════════════
-const LM_KIOSK_BASE = 'https://simonvelucia-afk.github.io/LunchMachine/';
-const LM_CENTRAL_URL  = 'https://bpxscgrbxjscicpnheep.supabase.co';
+const LM_KIOSK_BASE = CohabitatConfig.lunchMachine.kioskBase;
+const LM_CENTRAL_URL  = CohabitatConfig.lunchMachine.centralUrl;
 // LM_CENTRAL_URL pointe vers le meme projet Supabase que CENTRAL_URL
 // (bpxscgrbxjscicpnheep). Les RPC / tables lunch_* vivent sur la centrale,
 // comme les tables business core (clients, contracts, etc.). On reutilise
@@ -6100,7 +6164,7 @@ async function loadSpaces() {
     gridEl.dataset.netListener = '1';
     gridEl.addEventListener('click', function(e) {
       const btn = e.target.closest('.net-book-space');
-      if (btn) bookNetworkSpace(btn.dataset.sid, btn.dataset.sname, btn.dataset.url, btn.dataset.key, btn.dataset.cid);
+      if (btn) bookNetworkSpace(btn.dataset.sid, btn.dataset.sname, btn.dataset.url, btn.dataset.key, btn.dataset.cid, btn.dataset.peer);
     });
   }
 }
@@ -6181,8 +6245,8 @@ function renderNetworkSpaces(query) {
       + '<div class="card-actions">'
       + (isDemo
           ? '<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Connexion requise pour réserver">🔒 Connexion requise</button>'
-          : (currentProfile?.resident_plan === 'network' && (!currentProfile?.resident_plan_until || new Date(currentProfile.resident_plan_until) > new Date()))
-            ? '<button class="btn btn-secondary btn-sm net-book-space" data-sid="' + s.id + '" data-sname="' + escHtml(s.name).replace(/"/g,'') + '" data-url="' + s._memberUrl + '" data-key="' + s._memberKey + '" data-cid="' + s._memberClientId + '">' + pt('Réserver') + '</button>'
+          : (s._federated || (currentProfile?.resident_plan === 'network' && (!currentProfile?.resident_plan_until || new Date(currentProfile.resident_plan_until) > new Date())))
+            ? '<button class="btn btn-secondary btn-sm net-book-space" data-sid="' + s.id + '" data-sname="' + escHtml(s.name).replace(/"/g,'') + '" data-url="' + s._memberUrl + '" data-key="' + s._memberKey + '" data-cid="' + s._memberClientId + '" data-peer="' + (s._peerInstanceId || '') + '">' + pt('Réserver') + '</button>'
             : '<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Forfait Réseau requis — contactez votre administrateur">🔗 Forfait Réseau requis</button>')
       + '</div>'
       + '</div>';
@@ -7461,7 +7525,73 @@ function openBookSpace(spaceId, spaceName) {
   openModal('modal-book-space');
 }
 
+// Reservation chez une instance jumelee. Contrairement au chemin
+// central historique, l'interface n'ecrit rien chez le pair : elle
+// demande a sa propre passerelle, qui engage le debit localement puis
+// signe l'appel sortant. Si le VPN tombe entre les deux, l'operation
+// reste en file et sera rejouee avec la meme cle d'idempotence.
+async function confirmFederatedBookSpace() {
+  const nb = window._networkBooking;
+  if (!nb) return;
+  const date  = document.getElementById('book-date').value;
+  const start = document.getElementById('book-start').value;
+  const end   = document.getElementById('book-end').value;
+  if (!date || !start || !end || end <= start) {
+    toast('Veuillez remplir tous les champs', 'error');
+    return;
+  }
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const slots = Math.ceil(((eh * 60 + em) - (sh * 60 + sm)) / 15);
+
+  try {
+    const res = await fedFetch('/local/reservations', {
+      method: 'POST',
+      body: JSON.stringify({
+        peer_instance_id: nb.peerInstanceId,
+        space_id:  nb.spaceId,
+        start:     date + 'T' + start + ':00',
+        end:       date + 'T' + end + ':00',
+        slots:     slots,
+        user_name: currentProfile?.full_name || null,
+      }),
+    });
+
+    if (res.ok && res.data && res.data.ok) {
+      window._networkBooking = null;
+      closeModal('modal-book-space');
+      toast('Réservation confirmée chez ' + nb.spaceName + ' ✓', 'success');
+      trackFeature('federation', 'federated_space_booked', { peer: nb.peerInstanceId });
+      await loadProfile();
+      return;
+    }
+
+    if (res.status === 202) {
+      // Le pair est injoignable : le montant est retenu et l'appel sera
+      // rejoue. On le dit clairement plutot que d'afficher un echec.
+      window._networkBooking = null;
+      closeModal('modal-book-space');
+      toast('Immeuble jumelé injoignable — la réservation part dès le retour du lien', 'info');
+      return;
+    }
+
+    const err = (res.data && res.data.error) || 'inconnue';
+    const messages = {
+      space_unavailable: 'Ce créneau vient d\'être pris chez l\'immeuble jumelé',
+      price_mismatch:    'Le tarif a changé — rouvrez la liste des espaces',
+      INSUFFICIENT_FUNDS:'Solde insuffisant',
+      peer_not_found:    'Immeuble jumelé inconnu',
+      reservations_not_allowed: 'Cet immeuble n\'accepte pas les réservations croisées',
+    };
+    toast(messages[err] || ('Réservation refusée (' + err + ')'), 'error');
+  } catch (e) {
+    toast('Passerelle de fédération injoignable : ' + e.message, 'error');
+  }
+}
+
 async function confirmNetworkBookSpace() {
+  const nb0 = window._networkBooking;
+  if (nb0 && nb0.peerInstanceId) return confirmFederatedBookSpace();
   if (!ensureCentralOnline('reservation reseau')) return;
   const nb = window._networkBooking;
   if (!nb) return;
