@@ -151,7 +151,12 @@ services:
       # L'interface est servie telle quelle depuis le depot ; seul
       # config.js est remplace par la version generee a partir du .env.
       - ../:/srv:ro
+      # Fichiers prepares pour le reseau ferme : configuration generee a
+      # partir du .env, et pages dont les URL tierces pointent vers
+      # vendor/. Montes par-dessus ceux du depot.
       - ./generated/config.js:/srv/config.js:ro
+      - ./generated/index.html:/srv/index.html:ro
+      - ./generated/sign.html:/srv/sign.html:ro
       - caddy-data:/data
       - caddy-config:/config
 

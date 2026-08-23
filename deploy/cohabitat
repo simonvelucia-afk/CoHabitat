@@ -51,7 +51,9 @@ cmd_init() {
   fi
   mkdir -p generated
   node scripts/render-config.mjs > generated/config.js
-  ok "configuration de l'interface generee"
+  node scripts/render-index.mjs             > generated/index.html
+  node scripts/render-index.mjs sign.html   > generated/sign.html
+  ok "configuration et pages generees (librairies locales)"
 
   set -a; . ./.env; . ./.env.secrets; set +a
   if [ "${OFFLINE_ASSETS:-true}" != "false" ] && [ ! -f ../vendor/supabase.js ]; then
@@ -62,7 +64,10 @@ cmd_init() {
 
 cmd_up() {
   load_env
-  [ -f generated/config.js ] || node scripts/render-config.mjs > generated/config.js
+  # Toujours regenerer : le depot a pu bouger depuis le dernier init.
+  node scripts/render-config.mjs           > generated/config.js
+  node scripts/render-index.mjs            > generated/index.html
+  node scripts/render-index.mjs sign.html  > generated/sign.html
   compose up -d --build
   ok "pile demarree — ${SITE_URL}"
 }

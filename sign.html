@@ -55,9 +55,9 @@
 
 <script src="config.js"></script>
 <script type="module">
-// Import dynamique : l'URL du SDK vient de config.js, donc un deploiement
-// en reseau ferme peut la faire pointer vers vendor/.
-const { createClient } = await import(CohabitatConfig.assets.supabaseEsm);
+// Import statique : le deploiement en reseau ferme reecrit cette URL vers
+// vendor/ au moment de la construction (deploy/scripts/render-index.mjs).
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const CENTRAL_URL  = CohabitatConfig.central.url;
 const CENTRAL_ANON = CohabitatConfig.central.key;

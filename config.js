@@ -74,8 +74,12 @@
       gaId:    'G-EWP5ER8KFJ'
     },
 
-    // Librairies tierces et polices. En reseau ferme, deploy/ les
-    // sert depuis vendor/ — voir deploy/scripts/fetch-vendor.sh.
+    // Librairies tierces et polices. Ces URL sont ecrites en dur dans
+    // les balises <script>/<link> de la page : un script tiers injecte
+    // a l'execution peut etre bloque par le navigateur sur connexion
+    // lente. Elles sont listees ici parce que le deploiement en reseau
+    // ferme les remplace par leur equivalent local au moment de la
+    // construction — voir deploy/scripts/render-index.mjs.
     assets: {
       supabaseJs:      CDN + '@supabase/supabase-js@2',
       supabaseEsm:     'https://esm.sh/@supabase/supabase-js@2',
@@ -103,31 +107,6 @@
   }
 
   var cfg = merge(DEFAULTS, global.COHABITAT_CONFIG || {});
-
-  // Injection des <link>/<script> tiers depuis le <head>. document.write
-  // est volontaire : il preserve l'ordre d'execution synchrone attendu
-  // par le reste de la page (supabase-js doit exister avant l'init).
-  cfg.writeHeadAssets = function (parts) {
-    var a = cfg.assets;
-    var want = {};
-    (parts || ['favicon', 'supabaseJs', 'jspdf', 'fonts']).forEach(function (p) { want[p] = true; });
-    var out = '';
-    if (want.favicon && a.favicon) {
-      out += '<link rel="icon" type="image/png" href="' + a.favicon + '">';
-    }
-    if (want.supabaseJs && a.supabaseJs) {
-      out += '<scr' + 'ipt src="' + a.supabaseJs + '"></scr' + 'ipt>';
-    }
-    if (want.jspdf && a.jspdf) {
-      out += '<scr' + 'ipt src="' + a.jspdf + '"></scr' + 'ipt>';
-      if (a.jspdfAutotable) out += '<scr' + 'ipt src="' + a.jspdfAutotable + '"></scr' + 'ipt>';
-    }
-    if (want.fonts && a.fontsCss) {
-      if (a.fontsPreconnect) out += '<link rel="preconnect" href="' + a.fontsPreconnect + '">';
-      out += '<link href="' + a.fontsCss + '" rel="stylesheet">';
-    }
-    if (out) document.write(out);
-  };
 
   global.CohabitatConfig = cfg;
 })(window);
