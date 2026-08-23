@@ -127,6 +127,13 @@ services:
       SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?manquant}
       JWT_SECRET: ${JWT_SECRET}
       FEDERATION_PRIVATE_KEY_FILE: /run/secrets/federation_key.pem
+      # Centrale Modulimo, joignable par le VPN. Vide = instance
+      # entierement autonome.
+      SITE_URL: ${SITE_URL}
+      CENTRAL_URL: ${CENTRAL_URL:-}
+      CENTRAL_KEY: ${CENTRAL_KEY:-}
+      CENTRAL_ISSUER: ${CENTRAL_ISSUER:-}
+      FEDERATION_OUTBOX_MAX_ATTEMPTS: ${FEDERATION_OUTBOX_MAX_ATTEMPTS:-20}
     volumes:
       - ./secrets/federation_key.pem:/run/secrets/federation_key.pem:ro
 

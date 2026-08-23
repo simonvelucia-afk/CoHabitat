@@ -26,6 +26,15 @@ export function loadConfig(env = process.env) {
     // Secret HS256 de GoTrue, pour verifier les jetons de nos usagers.
     localJwtSecret:  required('JWT_SECRET'),
     gotrueUrl:       env.GOTRUE_URL || null,
+    // URL publique de cette instance : sert d'emetteur (`iss`) des
+    // assertions presentees a la centrale, et doit donc correspondre au
+    // jwt_issuer inscrit dans son registre des immeubles.
+    siteUrl:         env.SITE_URL || null,
+    centralIssuer:   env.CENTRAL_ISSUER || (env.SITE_URL ? env.SITE_URL.replace(/\/$/, '') + '/auth/v1' : null),
+    // Centrale Modulimo, joignable par le VPN. Absente = instance
+    // entierement autonome : les routes /local/central refusent.
+    centralUrl:      env.CENTRAL_URL || null,
+    centralKey:      env.CENTRAL_KEY || '',
     privateKey:      privateKeyFromPem(keyPem),
     // Delais de reprise de la file sortante (coupure VPN).
     outboxIntervalMs: Number(env.FEDERATION_OUTBOX_INTERVAL_MS || 30000),

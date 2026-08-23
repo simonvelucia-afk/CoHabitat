@@ -75,12 +75,9 @@ docker compose exec db psql -U postgres cohabitat \
   (`/data/caddy/pki`) sur les postes, ou rester en `http://` si le réseau
   est déjà de confiance.
 - **Le module Machine Lunch et la facturation demandent la centrale** :
-  leurs tables et fonctions y vivent. La centrale s'installe elle aussi
-  en réseau fermé (dépôt `modulimo-admin`, `deploy/`) : une fois les deux
-  appliances sur le même réseau, renseigner `CENTRAL_ENABLED=true`,
-  `CENTRAL_URL` et `CENTRAL_KEY`, et ces modules reviennent. Sans elle,
-  les écrans correspondants affichent une erreur de chargement — le reste
-  de l'application fonctionne normalement.
+  leurs tables et fonctions y vivent. Voir « Se rattacher à une centrale »
+  plus bas. Sans elle, les écrans correspondants affichent une erreur de
+  chargement — le reste de l'application fonctionne normalement.
 
 ## Accès des locataires depuis le réseau de l'immeuble
 
@@ -135,7 +132,7 @@ installer côté serveur.
 | Transactions entre immeubles jumelés | le VPN (pas Internet en soi) |
 | Accès des locataires hors du bâtiment | le VPN |
 | Courriels (mot de passe oublié, avis) | un relais SMTP, ou rien si `MAILER_AUTOCONFIRM=true` |
-| Machine Lunch et facturation | la centrale Modulimo, si elle est déployée |
+| Machine Lunch et facturation | la centrale Modulimo, jointe par le VPN si elle est ailleurs |
 
 Autrement dit : en fonctionnement normal, la seule dépendance sortante
 est le VPN, et uniquement pour ce qui traverse réellement les murs.
@@ -191,6 +188,51 @@ Par défaut, **rien** ne sort de l'immeuble.
 
 Couper un lien : `./cohabitat peer suspend <id>` (réversible) ou
 `revoke <id>`.
+
+## Se rattacher à une centrale
+
+Une centrale Modulimo peut servir à la fois des immeubles hébergés et des
+instances installées chez le client. Pour cette instance-ci, le
+rattachement se fait par le VPN, en deux gestes :
+
+```bash
+# sur la centrale, une fois le tunnel monté
+./modulimo building enroll https://cohabitat.pointe-est.lan "Pointe-Est"
+```
+
+```bash
+# ici : CENTRAL_ENABLED=true et CENTRAL_URL dans .env, puis
+./cohabitat init && ./cohabitat up
+```
+
+L'`enroll` lit `/federation/v1/identity` et enregistre la **clé publique**
+de cette instance. Aucun secret ne change de main.
+
+### Ce que fait la passerelle
+
+Les jetons de vos résidents sont signés en HS256 avec un secret qui ne
+sort jamais d'ici : la centrale ne peut donc pas les vérifier. L'interface
+n'appelle plus la centrale directement — elle appelle la passerelle
+locale, qui vérifie le jeton du résident sur place, puis signe une
+assertion de 60 secondes avec la clé privée de fédération. La centrale
+vérifie cette assertion avec la clé publique qu'elle a reçue à
+l'enregistrement.
+
+Conséquence utile : une centrale compromise ne peut pas se faire passer
+pour un de vos résidents, et le rattachement se coupe d'un seul côté en
+retirant l'entrée du registre.
+
+### Quand le lien tombe
+
+L'instance continue de servir l'immeuble. Seuls les écrans qui dépendent
+de la centrale se dégradent — solde central, Machine Lunch, facturation —
+et la bannière hors-ligne s'affiche. Les opérations financières déjà
+engagées repartent avec la même clé d'idempotence au retour du lien : pas
+de double débit.
+
+L'adresse VPN doit rester stable : elle est enregistrée comme émetteur
+(`jwt_issuer`) au moment de l'`enroll`. En changer invalide
+l'enregistrement, qu'il faut alors refaire.
 
 ## Ce qui garantit la cohérence de l'argent
 

@@ -42,9 +42,12 @@ const config = {
   supabaseUrl: need('SITE_URL'),
   supabaseAnonKey: need('ANON_KEY'),
   siteUrl: need('SITE_URL'),
+  // Instance auto-hebergee : les appels a la centrale passent
+  // obligatoirement par la passerelle locale, qui signe une assertion
+  // Ed25519. La centrale ne sait pas verifier nos jetons HS256.
   central: centralEnabled
-    ? { enabled: true, url: need('CENTRAL_URL'), key: need('CENTRAL_KEY') }
-    : { enabled: false, url: '', key: '' },
+    ? { enabled: true, url: need('CENTRAL_URL'), key: env.CENTRAL_KEY || '', viaFederation: true }
+    : { enabled: false, url: '', key: '', viaFederation: false },
   lunchMachine: {
     kioskBase: env.LUNCH_KIOSK_URL || '',
     centralUrl: centralEnabled ? (env.CENTRAL_URL || '') : '',

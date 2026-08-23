@@ -400,8 +400,85 @@ export function createApp({ config, db, fetchImpl = fetch, now = () => new Date(
     },
   };
 
+  // ── Relais vers la centrale Modulimo ─────────────────────────────
+  // Une instance auto-hebergee signe ses jetons en HS256 avec un secret
+  // local : la centrale ne peut pas les verifier, et lui confier le
+  // secret reviendrait a lui permettre de fabriquer le jeton de
+  // n'importe quel resident.
+  //
+  // L'interface appelle donc la passerelle locale, qui verifie le jeton
+  // du resident ici, puis presente a la centrale une ASSERTION signee
+  // avec la cle privee de federation. La centrale n'a que la cle
+  // publique : elle verifie, elle n'usurpe pas.
+  //
+  // `aud: 'authenticated'` et `iss = jwt_issuer` reproduisent la forme
+  // qu'attend finance-bridge, ce qui evite de toucher a sa logique de
+  // resolution.
+  const CENTRAL_ENDPOINTS = new Set([
+    'health', 'get-balance', 'lunch-purchase', 'debit',
+    'transfer-to-dep', 'record-real-payment',
+  ]);
+
+  async function relayToCentral({ method, path, headers, body }) {
+    if (!config.centralUrl) throw new HttpError(503, 'central_not_configured');
+    const endpoint = path.slice(`${PREFIX}/local/central/`.length);
+    if (!CENTRAL_ENDPOINTS.has(endpoint)) throw new HttpError(404, 'unknown_endpoint');
+
+    const outHeaders = { 'Content-Type': 'application/json' };
+    if (config.centralKey) outHeaders.apikey = config.centralKey;
+
+    // /health est la sonde : elle doit repondre meme avant toute
+    // connexion, donc pas d'assertion et pas d'auth locale.
+    if (endpoint !== 'health') {
+      const { userId } = await authLocalUser(headers);
+      if (!config.centralIssuer) throw new HttpError(503, 'central_issuer_missing');
+      outHeaders.Authorization = 'Bearer ' + signPeerToken(
+        { iss: config.centralIssuer, aud: 'authenticated', sub: userId },
+        config.privateKey,
+        { kid: config.instanceId },
+      );
+      // L'idempotence est portee de bout en bout : un rejeu apres
+      // coupure du VPN ne doit pas produire un second debit.
+      const idem = headers['idempotency-key'] || headers['Idempotency-Key'];
+      if (idem) outHeaders['Idempotency-Key'] = idem;
+    }
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), config.peerTimeoutMs);
+    try {
+      const res = await fetchImpl(
+        `${config.centralUrl.replace(/\/$/, '')}/functions/v1/finance-bridge/${endpoint}`,
+        {
+          method: endpoint === 'health' ? 'GET' : 'POST',
+          signal: ctrl.signal,
+          headers: outHeaders,
+          body: endpoint === 'health' ? undefined : JSON.stringify(body ?? {}),
+        },
+      );
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text.slice(0, 200) }; }
+      // Statut et corps rendus tels quels : l'interface distingue un
+      // refus metier d'une panne de lien sur ces codes.
+      return json(res.status, data ?? {});
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      return json(503, { ok: false, error: 'central_unreachable' });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   // ── Point d'entree ───────────────────────────────────────────────
   async function handle({ method, path, headers = {}, body = null }) {
+    if (path.startsWith(`${PREFIX}/local/central/`)) {
+      try {
+        return await relayToCentral({ method, path, headers, body });
+      } catch (e) {
+        if (e instanceof HttpError) return json(e.status, { error: e.code, ...e.extra });
+        return json(500, { error: 'internal_error' });
+      }
+    }
     const route = routes[`${method} ${path}`];
     if (!route) return json(404, { error: 'not_found' });
     try {
@@ -412,7 +489,7 @@ export function createApp({ config, db, fetchImpl = fetch, now = () => new Date(
     }
   }
 
-  return { handle, callPeer, routes };
+  return { handle, callPeer, routes, relayToCentral };
 }
 
 export { HttpError };

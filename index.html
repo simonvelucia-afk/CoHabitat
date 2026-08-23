@@ -2698,10 +2698,19 @@ function recreateSb() {
 })();
 
 // ── MODULIMO CENTRAL ─────────────────────────────────────────────────
-const CENTRAL_ENABLED = CohabitatConfig.central.enabled !== false;
+const CENTRAL_ENABLED = CohabitatConfig.central.enabled !== false
+                     || CohabitatConfig.central.viaFederation === true;
 const CENTRAL_URL = CohabitatConfig.central.url;
 const CENTRAL_KEY = CohabitatConfig.central.key;
-const FINANCE_BRIDGE_URL = CENTRAL_URL + '/functions/v1/finance-bridge';
+// En instance auto-hebergee, l'interface ne parle pas directement a la
+// centrale : elle passe par la passerelle locale, qui verifie le jeton
+// du resident ici puis signe une assertion Ed25519. La centrale ne peut
+// pas verifier nos jetons HS256, et lui confier le secret local
+// reviendrait a lui permettre de fabriquer n'importe quelle identite.
+const CENTRAL_VIA_FEDERATION = CohabitatConfig.central.viaFederation === true;
+const FINANCE_BRIDGE_URL = CENTRAL_VIA_FEDERATION
+  ? (CohabitatConfig.federation.url || '/federation/v1') + '/local/central'
+  : CENTRAL_URL + '/functions/v1/finance-bridge';
 
 // ── FEDERATION ENTRE INSTANCES ───────────────────────────────────────
 // En reseau ferme, les immeubles jumeles ne se parlent pas via la
@@ -3853,7 +3862,7 @@ async function fetchCentralBalance(depExternalId) {
     // suivants restent en Promise pending forever.
     const accessToken = window._cachedAccessToken;
     if (!accessToken) return null;
-    const res = await fetch(`${CENTRAL_URL}/functions/v1/finance-bridge/get-balance`, {
+    const res = await fetch(`${FINANCE_BRIDGE_URL}/get-balance`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -11776,7 +11785,7 @@ async function recordPayment() {
       const accessToken = window._cachedAccessToken;
       if (!accessToken) { toast('Session expirée', 'error'); return; }
       const idem = 'admin-credit:' + tenantId + ':' + Date.now();
-      const res = await fetch(`${CENTRAL_URL}/functions/v1/finance-bridge/record-real-payment`, {
+      const res = await fetch(`${FINANCE_BRIDGE_URL}/record-real-payment`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,

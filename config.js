@@ -44,7 +44,13 @@
     central: {
       enabled: true,
       url:     'https://bpxscgrbxjscicpnheep.supabase.co',
-      key:     'sb_publishable_2V-eHOvw1v_Xwr1bpHfHLg_cbHW9ctD'
+      key:     'sb_publishable_2V-eHOvw1v_Xwr1bpHfHLg_cbHW9ctD',
+      // true : les appels a la centrale passent par la passerelle de
+      // federation locale, qui signe une assertion Ed25519 a notre place.
+      // Necessaire des que cette instance est auto-hebergee : ses jetons
+      // sont signes HS256 avec un secret local, que la centrale ne peut
+      // pas verifier.
+      viaFederation: false
     },
 
     // Machine Lunch (kiosque en iframe + tables lunch_* sur la centrale).
