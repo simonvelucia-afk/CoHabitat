@@ -1255,6 +1255,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
       <button class="btn btn-primary" onclick="authSubmit()">
         <span id="auth-btn-text">Se connecter</span>
       </button>
+      <div id="login-offline" style="display:none"></div>
       <div class="login-divider">ou</div>
       <button class="btn btn-demo" onclick="loginDemo()">
         🎭 Entrer en mode démo
@@ -3587,7 +3588,11 @@ async function loginDemo() {
   // Rejouer les modules choisis lors d'une presentation precedente, puis
   // offrir le bouton de configuration.
   if (typeof window._demoAppliquerReglages === 'function') window._demoAppliquerReglages();
-  if (typeof window._demoAjouterBouton === 'function') window._demoAjouterBouton();
+  // Le panneau de configuration des modules ne s'affiche que sur un
+  // appareil dedie a la demonstration — entre par #demo, ou l'enveloppe
+  // Android. Un locataire qui clique « mode demo » par curiosite n'a que
+  // faire d'interrupteurs de modules.
+  if (window._demoDedie && typeof window._demoAjouterBouton === 'function') window._demoAjouterBouton();
   // Bascule vers le jeu local : a partir d'ici, plus aucune requete ne
   // part de la tablette. C'est ce qui rend la demo utilisable hors ligne
   // et evite de montrer les donnees d'un immeuble reel a un prospect.
@@ -12925,7 +12930,7 @@ async function _tkRefreshBadge() {
   if (window.location.hash !== '#demo') return;
   window.addEventListener('load', function () {
     setTimeout(function () {
-      if (typeof loginDemo === 'function' && !window._demoMode) loginDemo();
+      if (typeof loginDemo === 'function' && !window._demoMode) { window._demoDedie = true; loginDemo(); }
     }, 150);
   });
 })();
@@ -13124,5 +13129,83 @@ if ('serviceWorker' in navigator) {
       + '<iframe src="' + flux + '" title="Flux de la caméra" allow="autoplay" '
       + 'style="width:100%;height:100%;border:0"></iframe></div>';
   };
+})();
+</script>
+<script>
+/* ============================================================
+ * Détection du serveur injoignable sur l'écran de connexion
+ * ============================================================
+ * En appliance, l'application est servie par la machine de
+ * l'immeuble et reste ouvrable hors ligne grace au cache. Un
+ * locataire en deplacement, sans VPN, voyait donc l'ecran de
+ * connexion, echouait a se connecter sans savoir pourquoi, et
+ * n'avait plus qu'un bouton fonctionnel : le mode demo. Il se
+ * retrouvait devant des donnees fictives sans que rien ne lui
+ * dise que ce n'etait pas son immeuble.
+ *
+ * On sonde donc le serveur d'authentification au chargement et on
+ * l'annonce franchement, en presentant le mode demo pour ce qu'il
+ * est : une exploration, pas ses donnees.
+ * ========================================================== */
+(function () {
+  'use strict';
+
+  var DELAI_MS = 5000;
+  var sondageEnCours = false;
+
+  function bandeau() { return document.getElementById('login-offline'); }
+
+  function afficher(horsLigne) {
+    var el = bandeau();
+    if (!el) return;
+    window._backendOnline = !horsLigne;
+    if (!horsLigne) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = '';
+    el.style.cssText = 'display:block;margin-top:14px;padding:12px 14px;border-radius:var(--radius-sm,8px);'
+      + 'background:#3a2f18;border:1px solid #8a6a1c;color:#ffe8a8;font-size:13px;line-height:1.5;text-align:left';
+    el.innerHTML = '<strong>Serveur injoignable</strong><br>'
+      + 'Connectez-vous au réseau de l’immeuble ou au VPN pour accéder à votre compte. '
+      + 'Le mode démonstration ci-dessous reste disponible : il montre un immeuble fictif, '
+      + 'pas vos données.';
+  }
+
+  // Sonde /auth/v1/health : c'est le service dont depend la connexion,
+  // donc le bon indicateur. Une erreur reseau, un delai depasse ou un
+  // code d'erreur valent « injoignable ».
+  async function sonder() {
+    if (sondageEnCours) return;
+    sondageEnCours = true;
+    try {
+      if (navigator.onLine === false) { afficher(true); return; }
+      var base = (window.CohabitatConfig && CohabitatConfig.supabaseUrl) || '';
+      if (!base) { afficher(true); return; }
+      var ctrl = new AbortController();
+      var minuteur = setTimeout(function () { ctrl.abort(); }, DELAI_MS);
+      try {
+        var res = await fetch(base.replace(/\/$/, '') + '/auth/v1/health', {
+          method: 'GET',
+          signal: ctrl.signal,
+          headers: { apikey: (CohabitatConfig && CohabitatConfig.supabaseAnonKey) || '' },
+        });
+        afficher(!res.ok);
+      } finally {
+        clearTimeout(minuteur);
+      }
+    } catch (e) {
+      afficher(true);
+    } finally {
+      sondageEnCours = false;
+    }
+  }
+
+  window.sonderServeur = sonder;
+
+  window.addEventListener('load', function () {
+    // Laisser la page se poser avant de sonder : inutile de retarder
+    // l'affichage de l'ecran de connexion pour une requete reseau.
+    setTimeout(sonder, 400);
+  });
+  window.addEventListener('online', sonder);
+  window.addEventListener('offline', function () { afficher(true); });
 })();
 </script>
