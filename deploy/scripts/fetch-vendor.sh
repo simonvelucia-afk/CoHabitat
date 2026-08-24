@@ -30,7 +30,6 @@ get "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"                      
 get "https://esm.sh/@supabase/supabase-js@2?bundle"                                          "supabase.esm.js"
 get "https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"                         "jspdf.umd.min.js"
 get "https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"  "jspdf.plugin.autotable.min.js"
-get "https://raw.githubusercontent.com/simonvelucia-afk/modulimo-home/main/images/favicon_Modulimo.png" "favicon.png"
 
 if [ "${1:-}" = "--fonts" ]; then
   echo "[vendor] polices"

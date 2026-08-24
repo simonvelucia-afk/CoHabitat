@@ -21,8 +21,12 @@ done
 
 # Icones de l'application installable.
 if [ -d "$DEPOT/icons" ]; then
+  # Vider d'abord : sans cela un fichier retire du depot resterait
+  # indefiniment embarque dans l'APK.
+  rm -rf "$DEST/icons"
   mkdir -p "$DEST/icons"
-  cp "$DEPOT/icons/"* "$DEST/icons/" 2>/dev/null || true
+  # Seules les images : la note de provenance n'a rien a faire dans l'APK.
+  cp "$DEPOT/icons/"*.png "$DEST/icons/" 2>/dev/null || true
   echo "  + icons/"
 fi
 
@@ -54,7 +58,7 @@ window.COHABITAT_CONFIG = {
     supabaseJs: 'vendor/supabase.js',
     jspdf: 'vendor/jspdf.umd.min.js',
     jspdfAutotable: 'vendor/jspdf.plugin.autotable.min.js',
-    fontsCss: null, fontsPreconnect: null, favicon: null
+    fontsCss: null, fontsPreconnect: null
   }
 };
 CFG
