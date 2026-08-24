@@ -1,10 +1,18 @@
 /* Service worker — permet a l'application de s'ouvrir sans reseau.
  *
- * Strategie : « cache d'abord, mise a jour en arriere-plan ». La page
- * s'affiche instantanement depuis le cache, et la version fraiche est
- * recuperee en silence pour la prochaine ouverture. C'est ce qui convient
- * a une demonstration (aucune attente, aucune dependance au reseau) sans
- * figer l'application sur une version perimee.
+ * Strategie : « reseau d'abord, cache en repli ». En ligne, le
+ * comportement est exactement celui d'avant ce fichier : tout vient du
+ * serveur, rien n'est perime. Hors ligne, le cache prend le relais et
+ * l'application s'ouvre quand meme.
+ *
+ * Ce choix est volontairement conservateur. Servir les scripts depuis le
+ * cache en priorite exposerait a un melange de versions apres un
+ * deploiement — un index.html neuf avec un balanceOps.js d'hier — ce qui
+ * casse de facon difficile a diagnostiquer. Sur un site en production,
+ * ce risque ne vaut pas les quelques millisecondes gagnees.
+ *
+ * Seuls les fichiers reellement stables (icones, manifeste) sont servis
+ * depuis le cache en premier.
  *
  * Changer VERSION invalide l'ancien cache : a incrementer quand les
  * fichiers du noyau changent.
@@ -62,25 +70,20 @@ self.addEventListener('fetch', (e) => {
     return rep;
   };
 
-  // La PAGE est cherchee sur le reseau d'abord, avec repli sur le cache.
-  // Sinon, un deploiement ne serait visible qu'a la deuxieme ouverture :
-  // l'usager verrait l'ancienne version apres chaque mise a jour du site.
-  // Hors ligne, le repli sur le cache rend le comportement identique.
-  if (req.mode === 'navigate' || url.pathname.endsWith('/index.html')) {
+  // Fichiers stables : le cache d'abord, sans risque de melange.
+  if (/\.(png|svg|webmanifest|woff2?)$/.test(url.pathname)) {
     e.respondWith(
-      fetch(req).then(mettreEnCache).catch(() => caches.match(req).then(
-        (c) => c || caches.match('./index.html')
-      ))
+      caches.match(req).then((enCache) => enCache || fetch(req).then(mettreEnCache))
     );
     return;
   }
 
-  // Le reste (scripts, icones, manifeste) : cache d'abord pour
-  // l'affichage instantane, rafraichi en arriere-plan.
+  // Page et scripts : le reseau d'abord. Le cache ne sert que lorsque le
+  // reseau ne repond pas — donc hors ligne, ou sur une tablette de
+  // demonstration.
   e.respondWith(
-    caches.match(req).then((enCache) => {
-      const reseau = fetch(req).then(mettreEnCache).catch(() => enCache);
-      return enCache || reseau;
-    })
+    fetch(req).then(mettreEnCache).catch(() =>
+      caches.match(req).then((c) => c || (req.mode === 'navigate' ? caches.match('./index.html') : undefined))
+    )
   );
 });
