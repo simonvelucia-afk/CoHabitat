@@ -80,6 +80,14 @@ case "$PHASE" in
       [ -f "$f" ] || continue
       apply_once "$f"
     done
+    # Rattrapage des droits : ALTER DEFAULT PRIVILEGES ne couvre que les
+    # objets crees apres coup et par le meme role. Un GRANT explicite
+    # garantit que toutes les tables et vues du schema public, y compris
+    # celles d'une base plus ancienne, restent accessibles a PostgREST.
+    # RLS reste seul juge de ce que chaque compte voit.
+    $PSQL -c "GRANT ALL ON ALL TABLES    IN SCHEMA public TO anon, authenticated, service_role"
+    $PSQL -c "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role"
+    $PSQL -c "GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role"
     $PSQL -c "NOTIFY pgrst, 'reload schema'"
     echo "[migrate] schema applicatif a jour"
     ;;

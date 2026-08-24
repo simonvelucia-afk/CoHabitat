@@ -48,9 +48,14 @@ GRANT USAGE ON SCHEMA public     TO anon, authenticated, service_role;
 GRANT USAGE ON SCHEMA extensions TO anon, authenticated, service_role;
 GRANT USAGE ON SCHEMA auth       TO anon, authenticated, service_role;
 
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES    TO service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role;
+-- Les droits de table sont accordes largement ; c'est RLS qui filtre
+-- reellement, table par table, comme sur une instance Supabase hebergee.
+-- Sans ces droits, PostgREST repond « permission denied for table ... »
+-- avant meme d'evaluer la moindre politique, et aucune page de
+-- l'application ne charge.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES    TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 
 -- ============================================================
 -- 3) Extensions
