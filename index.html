@@ -6,6 +6,17 @@
 <title>CoHabitat — Gestion des ressources communes</title>
 <script src="config.js"></script>
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/simonvelucia-afk/modulimo-home/main/images/favicon_Modulimo.png">
+
+<!-- Application installable : « Ajouter a l'ecran d'accueil » donne une
+     icone, le plein ecran sans barre d'adresse, et le fonctionnement
+     hors ligne. Rien de tout cela n'est possible depuis un onglet. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f0f0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CoHabitat">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <!-- v11 — Machine Lunch online : Plusieurs machine onglet lunch -->
 <script>
 // Intercepter le hash Supabase AVANT l'init du SDK
@@ -3569,6 +3580,10 @@ async function authSubmit() {
 async function loginDemo() {
   isDemo = true;
   window._demoMode = true;
+  // Rejouer les modules choisis lors d'une presentation precedente, puis
+  // offrir le bouton de configuration.
+  if (typeof window._demoAppliquerReglages === 'function') window._demoAppliquerReglages();
+  if (typeof window._demoAjouterBouton === 'function') window._demoAjouterBouton();
   // Bascule vers le jeu local : a partir d'ici, plus aucune requete ne
   // part de la tablette. C'est ce qui rend la demo utilisable hors ligne
   // et evite de montrer les donnees d'un immeuble reel a un prospect.
@@ -3974,7 +3989,19 @@ async function syncCentralBalanceToProfile() {
 }
 
 async function loadAppModules() {
-  if (isDemo) return;
+  if (isDemo) {
+    // En demonstration, les modules viennent du jeu local : c'est ce que
+    // pilote le panneau de configuration, et cela permet de montrer un
+    // immeuble sans serre ou sans auto-partage selon l'interlocuteur.
+    const { data: reglages } = await sb.from('system_settings')
+      .select('key, value')
+      .in('key', ['module_trips', 'module_lunch', 'module_serre']);
+    const actif = (k) => (reglages || []).find(r => r.key === k)?.value !== 'false';
+    window.appModules.trips = actif('module_trips');
+    window.appModules.lunch = actif('module_lunch');
+    window.appModules.serre = actif('module_serre');
+    return;
+  }
   // 1. Lire les préférences locales (admin local peut désactiver dans son enveloppe)
   const { data: localSettings } = await sb.from('system_settings')
     .select('key, value')
@@ -12884,4 +12911,135 @@ async function _tkRefreshBadge() {
     }, 150);
   });
 })();
+</script>
+<script>
+/* ============================================================
+ * Panneau de configuration de la demonstration
+ * ============================================================
+ * Visible uniquement en mode demonstration. Permet d'activer ou
+ * de couper les modules optionnels en pleine presentation, pour
+ * montrer l'application telle qu'elle serait chez l'interlocuteur
+ * — un immeuble sans serre, sans auto-partage, etc.
+ *
+ * Les interrupteurs appellent saveModuleSetting(), exactement la
+ * meme fonction que le panneau d'administration : il n'y a donc
+ * qu'un seul mecanisme de modules, pas un pour la demo et un pour
+ * la production.
+ * ========================================================== */
+(function () {
+  'use strict';
+
+  var CLE = 'cohabitat:demo:modules';
+
+  function memoriser() {
+    if (!window.COHABITAT_DEMO) return;
+    var etat = {};
+    (window.COHABITAT_DEMO.system_settings || []).forEach(function (r) {
+      if (r.key.indexOf('module_') === 0) etat[r.key] = r.value;
+    });
+    try { localStorage.setItem(CLE, JSON.stringify(etat)); } catch (e) {}
+  }
+
+  // Rejoue les choix de la presentation precedente : un rechargement en
+  // plein rendez-vous ne doit pas tout remettre a zero.
+  window._demoAppliquerReglages = function () {
+    if (!window.COHABITAT_DEMO) return;
+    var etat;
+    try { etat = JSON.parse(localStorage.getItem(CLE) || '{}'); } catch (e) { return; }
+    (window.COHABITAT_DEMO.system_settings || []).forEach(function (r) {
+      if (etat[r.key] !== undefined) r.value = etat[r.key];
+    });
+  };
+
+  var MODULES = [
+    { cle: 'module_trips', titre: '🚗 Auto-partage', detail: 'Covoiturage, véhicules, demandes de passagers' },
+    { cle: 'module_lunch', titre: '🍱 Machine Lunch', detail: 'Kiosque et commandes — nécessite la centrale' },
+    { cle: 'module_serre', titre: '🌱 Serre',        detail: 'Zones de culture louées au mois, capteurs' },
+  ];
+
+  function valeur(cle) {
+    var r = (window.COHABITAT_DEMO.system_settings || []).find(function (x) { return x.key === cle; });
+    return r ? r.value !== 'false' : true;
+  }
+
+  function interrupteur(m) {
+    var on = valeur(m.cle);
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--border)">'
+      + '<div><div style="font-size:14px">' + m.titre + '</div>'
+      + '<div style="font-size:12px;color:var(--text3);margin-top:2px">' + m.detail + '</div></div>'
+      + '<label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0">'
+      + '<input type="checkbox" id="mod-' + m.cle + '"' + (on ? ' checked' : '')
+      + ' onchange="_demoBasculerModule(\'' + m.cle + '\', this.checked)" style="opacity:0;width:0;height:0;position:absolute">'
+      + '<span id="mod-track-' + m.cle + '" style="position:absolute;cursor:pointer;inset:0;border-radius:22px;transition:.3s;background:'
+      + (on ? 'var(--accent2)' : 'var(--border)') + '"></span>'
+      + '<span id="mod-thumb-' + m.cle + '" style="position:absolute;height:16px;width:16px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;left:'
+      + (on ? '21px' : '3px') + '"></span>'
+      + '</label></div>';
+  }
+
+  window._demoBasculerModule = function (cle, actif) {
+    // saveModuleSetting ecrit dans system_settings (ici le jeu local),
+    // met a jour window.appModules, rafraichit la serre et reconstruit
+    // la navigation. On ne duplique rien.
+    Promise.resolve(saveModuleSetting(cle, actif)).then(memoriser);
+  };
+
+  window._demoReinitialiser = function () {
+    try { localStorage.removeItem(CLE); } catch (e) {}
+    location.reload();
+  };
+
+  window._demoOuvrirConfig = function () {
+    var fond = document.getElementById('demo-config');
+    if (fond) { fond.remove(); return; }
+    fond = document.createElement('div');
+    fond.id = 'demo-config';
+    fond.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;'
+      + 'align-items:center;justify-content:center;padding:24px';
+    fond.onclick = function (e) { if (e.target === fond) fond.remove(); };
+    fond.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);'
+      + 'max-width:460px;width:100%;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5)">'
+      + '<div style="font-family:var(--font-display,inherit);font-size:1.1rem;margin-bottom:4px">Configuration de la démonstration</div>'
+      + '<div style="font-size:12px;color:var(--text3);margin-bottom:16px">'
+      + 'Activez ou coupez les modules pour montrer l’application telle qu’elle serait dans cet immeuble. '
+      + 'Ce sont les mêmes réglages qu’un administrateur pilote en production.</div>'
+      + MODULES.map(interrupteur).join('')
+      + '<div style="display:flex;gap:10px;margin-top:18px">'
+      + '<button class="btn btn-secondary btn-sm" onclick="_demoReinitialiser()">Réinitialiser la démo</button>'
+      + '<button class="btn btn-primary btn-sm" style="margin-left:auto" '
+      + 'onclick="document.getElementById(\'demo-config\').remove()">Fermer</button>'
+      + '</div></div>';
+    document.body.appendChild(fond);
+  };
+
+  // Bouton d'acces, ajoute seulement en mode demonstration.
+  window._demoAjouterBouton = function () {
+    if (document.getElementById('demo-config-btn')) return;
+    var b = document.createElement('button');
+    b.id = 'demo-config-btn';
+    b.type = 'button';
+    b.title = 'Configuration de la démonstration';
+    b.textContent = '⚙';
+    b.onclick = window._demoOuvrirConfig;
+    b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;width:44px;height:44px;'
+      + 'border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text);'
+      + 'font-size:18px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.4)';
+    document.body.appendChild(b);
+  };
+})();
+</script>
+<script>
+// Enregistrement du service worker : c'est lui qui rend l'application
+// ouvrable sans reseau une fois installee. Requiert une origine sure
+// (https, ou localhost) — sur une origine non sure, l'appel echoue
+// silencieusement et l'application fonctionne comme avant.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      console.info('[pwa] service worker actif', reg.scope);
+    }).catch(function (e) {
+      console.info('[pwa] service worker non enregistre :', e.message);
+    });
+  });
+}
 </script>

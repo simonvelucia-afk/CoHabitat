@@ -14,10 +14,17 @@ DEST="$ICI/app/src/main/assets"
 
 mkdir -p "$DEST"
 rm -f "$DEST"/*.html "$DEST"/*.js
-for f in index.html balanceOps.js demo-data.js; do
+for f in index.html balanceOps.js demo-data.js manifest.webmanifest; do
   cp "$DEPOT/$f" "$DEST/$f"
   echo "  + $f"
 done
+
+# Icones de l'application installable.
+if [ -d "$DEPOT/icons" ]; then
+  mkdir -p "$DEST/icons"
+  cp "$DEPOT/icons/"* "$DEST/icons/" 2>/dev/null || true
+  echo "  + icons/"
+fi
 
 # Librairies tierces si elles ont ete rapatriees (deploy/scripts/fetch-vendor.sh).
 # Facultatif : le mode demonstration fonctionne sans, l'interface tolere

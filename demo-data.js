@@ -275,20 +275,30 @@
     return String(valeur) === String(attendu);
   }
 
+  var compteur = 0;
+  function idDemo(table) { return 'demo-' + table + '-' + (++compteur); }
+
   function creerRequete(table, donnees) {
-    var lignes = (donnees[table] || []).slice();
+    // On travaille sur une copie pour filtrer, mais les ecritures visent
+    // le tableau reel : une reservation creee pendant une demonstration
+    // doit apparaitre dans la liste juste apres.
+    if (!donnees[table]) donnees[table] = [];
+    var source = donnees[table];
+    var lignes = source.slice();
     var tris = [];
     var borne = null;
     var mode = null;   // 'single' | 'maybeSingle'
+    var op = null;     // ecriture differee : les filtres arrivent APRES
+                       // .update()/.delete() dans l'API supabase-js
 
     var req = {
       // La projection est ignoree : les lignes du jeu portent deja
       // leurs jointures. On garde la methode pour le chainage.
       select: function () { return req; },
-      insert: function () { return req; },
-      update: function () { return req; },
-      upsert: function () { return req; },
-      delete: function () { return req; },
+      insert: function (rows) { op = { kind: 'insert', rows: rows }; return req; },
+      update: function (patch) { op = { kind: 'update', patch: patch }; return req; },
+      upsert: function (row) { op = { kind: 'upsert', row: row }; return req; },
+      delete: function () { op = { kind: 'delete' }; return req; },
 
       eq: function (col, val) { lignes = lignes.filter(function (r) { return egal(r[col], val); }); return req; },
       neq: function (col, val) { lignes = lignes.filter(function (r) { return !egal(r[col], val); }); return req; },
@@ -327,6 +337,40 @@
       maybeSingle: function () { mode = 'maybeSingle'; return req.then.call(req); },
 
       then: function (resolve, reject) {
+        // Ecritures : elles s'appliquent aux lignes retenues par les
+        // filtres accumules, puis retournent ce qu'elles ont touche.
+        if (op) {
+          var touchees = [];
+          if (op.kind === 'insert' || op.kind === 'upsert') {
+            var brutes = op.kind === 'insert' ? op.rows : [op.row];
+            if (!Array.isArray(brutes)) brutes = [brutes];
+            brutes.forEach(function (r) {
+              var existante = r && r.id ? source.find(function (x) { return String(x.id) === String(r.id); }) : null;
+              if (existante && op.kind === 'upsert') {
+                Object.assign(existante, r);
+                touchees.push(existante);
+              } else {
+                var ligne = Object.assign({ id: (r && r.id) || idDemo(table), created_at: new Date().toISOString() }, r);
+                source.push(ligne);
+                touchees.push(ligne);
+              }
+            });
+          } else if (op.kind === 'update') {
+            lignes.forEach(function (r) { Object.assign(r, op.patch); touchees.push(r); });
+          } else if (op.kind === 'delete') {
+            lignes.forEach(function (r) {
+              var i = source.indexOf(r);
+              if (i >= 0) source.splice(i, 1);
+              touchees.push(r);
+            });
+          }
+          var reponse = mode === 'single' || mode === 'maybeSingle'
+            ? { data: touchees[0] || null, error: null }
+            : { data: touchees, error: null };
+          var pe = Promise.resolve(reponse);
+          return resolve ? pe.then(resolve, reject) : pe;
+        }
+
         var out = lignes.slice();
         tris.forEach(function (t) {
           out.sort(function (a, b) { return (t.asc ? 1 : -1) * compare(a[t.col], b[t.col]); });
