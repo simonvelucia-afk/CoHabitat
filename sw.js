@@ -60,7 +60,10 @@ self.addEventListener('fetch', (e) => {
   if (url.pathname.includes('/rest/v1/') ||
       url.pathname.includes('/auth/v1/') ||
       url.pathname.includes('/functions/v1/') ||
-      url.pathname.includes('/federation/')) return;
+      url.pathname.includes('/federation/') ||
+      // Un flux video n'a rien a faire dans un cache : hors ligne, mieux
+      // vaut un cadre vide qu'un lecteur fige sur une page mise en cache.
+      url.pathname.includes('/stream/')) return;
 
   const mettreEnCache = (rep) => {
     if (rep && rep.ok && rep.type === 'basic') {
