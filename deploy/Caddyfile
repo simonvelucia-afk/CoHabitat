@@ -34,6 +34,14 @@
 		reverse_proxy federation:8080
 	}
 
+	# Flux video, servi sous la meme origine pour eviter le blocage du
+	# contenu mixte en https. Decommenter et pointer vers le serveur
+	# camera du batiment (go2rtc ecoute sur 1984 par defaut).
+	# handle /stream/* {
+	# 	uri strip_prefix /stream
+	# 	reverse_proxy 192.168.0.118:1984
+	# }
+
 	handle {
 		root * /srv
 		file_server

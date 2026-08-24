@@ -53,6 +53,17 @@ const config = {
     centralUrl: centralEnabled ? (env.CENTRAL_URL || '') : '',
   },
   federation: { enabled: String(env.FEDERATION_ENABLED || 'true') !== 'false', url: '/federation/v1' },
+  // Camera : affichage seul sur la page Espaces. baseUrl vide = meme
+  // origine, ce qui suppose le proxy /stream dans le Caddyfile.
+  cameras: {
+    enabled:     String(env.CAMERA_ENABLED || 'false') === 'true',
+    visibility:  env.CAMERA_VISIBILITY === 'tenants' ? 'tenants' : 'admin',
+    baseUrl:     env.CAMERA_BASE_URL || '',
+    streamPath:  env.CAMERA_STREAM_PATH || '/stream/stream.html?src=',
+    camera:      env.CAMERA_ID || 'cam1',
+    label:       env.CAMERA_LABEL || 'Caméra',
+    description: env.CAMERA_DESCRIPTION || 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.',
+  },
   analytics: { enabled: false, gaId: '' },
   assets: offline
     ? {
