@@ -12019,17 +12019,51 @@ async function loadSettings() {
   settingsCache = Object.fromEntries((data || []).map(s => [s.key, s]));
 }
 
+const MODULE_DESCRIPTIONS = {
+  module_trips: 'Module Auto-partage : covoiturage, véhicules et demandes de passagers',
+  module_lunch: 'Module Machine Lunch : kiosque et commandes (nécessite la centrale Modulimo)',
+  module_serre: 'Module Serre : zones de culture louées au mois et capteurs'
+};
+
 async function saveModuleSetting(key, enabled) {
-  // upsert et non update : sur une base ou la ligne n'existe pas encore,
-  // un UPDATE ne toucherait rien et l'interrupteur reviendrait en place
-  // sans rien dire.
-  const { error } = await sb.from('system_settings').upsert({
-    key,
-    value: enabled ? 'true' : 'false',
-    updated_by: currentProfile?.id || null,
-    updated_at: new Date().toISOString()
-  }, { onConflict: 'key' });
-  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  // UPDATE d'abord, INSERT seulement si aucune ligne n'a ete touchee.
+  //
+  // Un upsert part toujours par un INSERT, et la politique RLS de
+  // system_settings ne couvre que SELECT et UPDATE (voir schema.sql) :
+  // l'upsert etait donc refuse en 403 « new row violates row-level
+  // security policy » meme quand la ligne existait deja. La migration 020
+  // ajoute la politique INSERT manquante ; cette ecriture en deux temps
+  // fait fonctionner les interrupteurs sans attendre son application, tant
+  // que les lignes existent.
+  const valeur = enabled ? 'true' : 'false';
+  const horodatage = new Date().toISOString();
+  const auteur = currentProfile?.id || null;
+
+  let { data: touchees, error } = await sb.from('system_settings')
+    .update({ value: valeur, updated_by: auteur, updated_at: horodatage })
+    .eq('key', key)
+    .select('key');
+
+  if (!error && (!touchees || touchees.length === 0)) {
+    // La ligne n'existe pas encore : la creer. Necessite la migration 020.
+    ({ error } = await sb.from('system_settings').insert({
+      key,
+      value: valeur,
+      description: MODULE_DESCRIPTIONS[key] || key,
+      updated_by: auteur,
+      updated_at: horodatage
+    }));
+  }
+
+  if (error) {
+    // Remettre l'interrupteur dans son etat reel : sans cela il restait
+    // affiche dans la position demandee alors que rien n'avait ete
+    // enregistre.
+    const box = document.getElementById('mod-' + key);
+    if (box) box.checked = !enabled;
+    toast('Erreur: ' + error.message, 'error');
+    return;
+  }
 
   // Mettre à jour le toggle visuellement
   const track = document.getElementById('mod-track-' + key);
@@ -12902,7 +12936,7 @@ async function _tkRefreshBadge() {
   <p>
     Nous utilisons Google Analytics pour mesurer l'utilisation de la plateforme de façon anonyme.
     Aucune donnée personnelle n'est transmise sans votre accord.
-    <a href="#" onclick="showSection('conditions');closeBanner();return false;">En savoir plus</a>
+    <a href="#" onclick="openConditions();closeBanner();return false;">En savoir plus</a>
   </p>
   <div class="cb-btns">
     <button id="btn-consent-refuse" onclick="setConsent('denied')">Refuser</button>
@@ -12911,15 +12945,51 @@ async function _tkRefreshBadge() {
 </div>
 
 <script>
-(function() {
-  var consent = localStorage.getItem('ga_consent');
-  if (!consent) {
-    // Afficher la bannière après un court délai (laisser l'app charger)
-    setTimeout(function() {
-      var b = document.getElementById('consent-banner');
-      if (b) b.style.display = 'flex';
-    }, 1200);
+// Bandeau de consentement Loi 25.
+//
+// setConsent() et closeBanner() etaient appelees par les boutons du
+// bandeau mais n'etaient definies nulle part : « Uncaught ReferenceError:
+// setConsent is not defined ». Accepter ou refuser ne faisait donc rien.
+// Elles sont attachees a window parce que le balisage les appelle depuis
+// des attributs onclick.
+// showSection() n'a jamais existe non plus : le lien « En savoir plus »
+// levait la meme ReferenceError. Selon que l'on est sur l'ecran de
+// connexion ou dans l'application, les conditions s'ouvrent en modale ou
+// dans leur page.
+window.openConditions = function openConditions() {
+  var connecte = document.getElementById('app');
+  connecte = connecte && connecte.style.display !== 'none';
+  if (connecte && typeof navigateTo === 'function') { navigateTo('conditions'); return; }
+  if (typeof showLoginConditions === 'function') { showLoginConditions(); }
+};
+
+window.closeBanner = function closeBanner() {
+  var b = document.getElementById('consent-banner');
+  if (b) b.style.display = 'none';
+};
+
+window.setConsent = function setConsent(choix) {
+  var valeur = choix === 'granted' ? 'granted' : 'denied';
+  try { localStorage.setItem('ga_consent', valeur); } catch (e) {}
+  window._gaConsent = valeur;
+  // Ne charger Google Analytics qu'apres un accord explicite, et seulement
+  // si l'instance a l'analytique activee dans sa configuration.
+  if (valeur === 'granted' && CohabitatConfig.analytics.enabled && typeof _loadGA === 'function') {
+    _loadGA();
   }
+  window.closeBanner();
+};
+
+(function() {
+  var consent = null;
+  try { consent = localStorage.getItem('ga_consent'); } catch (e) {}
+  // Sans analytique configuree, il n'y a rien a consentir : pas de bandeau.
+  if (consent || !CohabitatConfig.analytics.enabled) return;
+  // Afficher la bannière après un court délai (laisser l'app charger)
+  setTimeout(function() {
+    var b = document.getElementById('consent-banner');
+    if (b) b.style.display = 'flex';
+  }, 1200);
 })();
 </script>
 <script>
