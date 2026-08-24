@@ -76,13 +76,19 @@
     // par le meme reverse proxy. Une URL http:// explicite fonctionne
     // tant que CoHabitat est lui aussi en http, mais sera bloquee par le
     // navigateur (contenu mixte) des que le site passe en https.
+    // visibility : 'admin' (defaut) ou 'tenants'. Une camera d'entree
+    // filme des allees et venues identifiables — la diffuser a tout
+    // l'immeuble se justifie beaucoup moins qu'une salle commune.
+    //
+    // Le pilotage PTZ n'est pas dans l'application : il reste dans
+    // l'outil dedie du serveur camera.
     cameras: {
       enabled:     false,
+      visibility:  'admin',
       baseUrl:     '',
       streamPath:  '/stream/stream.html?src=',
-      ptzPath:     '/ptz',
       camera:      'cam1',
-      label:       'Caméra — espaces communs',
+      label:       'Caméra — entrée principale',
       description: 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.'
     },
 

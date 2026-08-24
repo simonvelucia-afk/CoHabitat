@@ -189,60 +189,65 @@ Par défaut, **rien** ne sort de l'immeuble.
 Couper un lien : `./cohabitat peer suspend <id>` (réversible) ou
 `revoke <id>`.
 
-## Brancher la caméra des espaces communs
+## Brancher une caméra
 
-La page Espaces peut afficher une caméra entre la grille des espaces et
-la serre. Le flux **ne transite jamais par CoHabitat** : la page pointe
-directement vers le serveur caméra du bâtiment, et rien n'est enregistré
-côté application.
+La page Espaces peut afficher le flux d'une caméra entre la grille des
+espaces et la serre. **Affichage seulement** : le pilotage PTZ reste dans
+l'outil du serveur caméra, auquel on se connecte directement. Un ordre de
+mouvement mal arrêté fait pivoter une caméra indéfiniment, et ce risque
+n'a pas sa place dans une application que tous les locataires ouvrent.
 
-Le pilotage PTZ n'apparaît que pour les rôles `admin` et
-`principal_admin` — un locataire regarde, il ne bouge pas la caméra.
-
-Dans `.env` de l'appliance, ou dans `config.js` pour un déploiement
-hébergé :
+L'application n'émet donc aucune requête vers le serveur caméra : elle
+pointe l'iframe, rien de plus. Le flux ne transite jamais par CoHabitat
+et rien n'est enregistré côté application.
 
 ```js
 cameras: {
   enabled:    true,
+  visibility: 'admin',       // ou 'tenants'
   baseUrl:    '',            // vide = même origine (recommandé)
   streamPath: '/stream/stream.html?src=',
-  ptzPath:    '/ptz',
-  camera:     'cam1'
+  camera:     'cam1',
+  label:      'Caméra — entrée principale'
 }
 ```
+
+### Qui voit l'image
+
+`visibility` vaut `'admin'` par défaut : la section n'existe alors pas du
+tout pour un locataire, ni image ni cadre.
+
+Le choix mérite réflexion selon ce que filme la caméra. Une salle
+commune, un atelier, une terrasse : diffuser le flux aux locataires a une
+utilité claire — savoir si l'espace est libre — pour un coût faible en
+vie privée. Une **entrée principale ou un stationnement**, c'est autre
+chose : le flux montre les allées et venues de personnes identifiables,
+leurs visiteurs et leurs horaires. Surveiller l'entrée est défendable ;
+la diffuser en direct à tout l'immeuble l'est beaucoup moins, et
+l'objectif de sécurité ne l'exige pas.
+
+Si vous ouvrez malgré tout une caméra d'entrée aux locataires : affichage
+réglementaire à l'entrée, mention dans la politique de confidentialité,
+et politique de conservation explicite côté enregistreur. La Commission
+d'accès à l'information a publié des orientations sur la vidéosurveillance
+en immeuble résidentiel.
+
+### Montage réseau
 
 **Laisser `baseUrl` vide et faire servir le serveur caméra par le même
 reverse proxy** est fortement recommandé. Une URL `http://` explicite
 fonctionne tant que CoHabitat est lui aussi en `http`, mais le navigateur
-la bloquera dès que le site passe en `https` — contenu mixte, sans
-message clair, juste un cadre noir.
+la bloquera dès le passage en `https` — contenu mixte, sans message
+clair, juste un cadre noir.
 
-Ajouter dans le `Caddyfile`, en supposant go2rtc sur 1984 et le service
-PTZ sur 5000, tous deux sur la machine :
+Dans le `Caddyfile`, en supposant go2rtc sur 1984 :
 
 ```
 handle /stream/* {
 	uri strip_prefix /stream
 	reverse_proxy 192.168.0.118:1984
 }
-handle /ptz/* {
-	reverse_proxy 192.168.0.118:5000
-}
 ```
-
-### Un ordre d'arrêt peut se perdre
-
-Le pilotage envoie le mouvement en boucle toutes les 400 ms pendant
-l'appui, et l'arrêt au relâchement — en `keepalive`, pour qu'il parte
-même si la page est masquée dans la foulée. Quitter l'onglet ou
-verrouiller l'appareil déclenche aussi l'arrêt.
-
-Cela ne dispense pas d'un **chien de garde côté serveur caméra** : un
-minuteur d'environ 800 ms qui arrête le mouvement si aucun ordre n'est
-arrivé entre-temps. Sans lui, un ordre d'arrêt perdu au mauvais moment
-laisse la caméra pivoter indéfiniment. Avec les deux, la dérive maximale
-est d'une fraction de seconde.
 
 ## Se rattacher à une centrale
 
