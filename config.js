@@ -67,6 +67,25 @@
       url:     '/federation'
     },
 
+    // Camera des espaces communs, affichee sur la page Espaces entre la
+    // grille et la serre. Desactivee par defaut : sans configuration, la
+    // section n'apparait pas.
+    //
+    // baseUrl vide = meme origine que l'application. C'est le montage
+    // recommande : faire servir le serveur camera sous /stream et /ptz
+    // par le meme reverse proxy. Une URL http:// explicite fonctionne
+    // tant que CoHabitat est lui aussi en http, mais sera bloquee par le
+    // navigateur (contenu mixte) des que le site passe en https.
+    cameras: {
+      enabled:     false,
+      baseUrl:     '',
+      streamPath:  '/stream/stream.html?src=',
+      ptzPath:     '/ptz',
+      camera:      'cam1',
+      label:       'Caméra — espaces communs',
+      description: 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.'
+    },
+
     // Analytique. Coupee automatiquement en reseau ferme : le script
     // Google ne serait de toute facon pas joignable.
     analytics: {

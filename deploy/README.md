@@ -189,6 +189,61 @@ Par défaut, **rien** ne sort de l'immeuble.
 Couper un lien : `./cohabitat peer suspend <id>` (réversible) ou
 `revoke <id>`.
 
+## Brancher la caméra des espaces communs
+
+La page Espaces peut afficher une caméra entre la grille des espaces et
+la serre. Le flux **ne transite jamais par CoHabitat** : la page pointe
+directement vers le serveur caméra du bâtiment, et rien n'est enregistré
+côté application.
+
+Le pilotage PTZ n'apparaît que pour les rôles `admin` et
+`principal_admin` — un locataire regarde, il ne bouge pas la caméra.
+
+Dans `.env` de l'appliance, ou dans `config.js` pour un déploiement
+hébergé :
+
+```js
+cameras: {
+  enabled:    true,
+  baseUrl:    '',            // vide = même origine (recommandé)
+  streamPath: '/stream/stream.html?src=',
+  ptzPath:    '/ptz',
+  camera:     'cam1'
+}
+```
+
+**Laisser `baseUrl` vide et faire servir le serveur caméra par le même
+reverse proxy** est fortement recommandé. Une URL `http://` explicite
+fonctionne tant que CoHabitat est lui aussi en `http`, mais le navigateur
+la bloquera dès que le site passe en `https` — contenu mixte, sans
+message clair, juste un cadre noir.
+
+Ajouter dans le `Caddyfile`, en supposant go2rtc sur 1984 et le service
+PTZ sur 5000, tous deux sur la machine :
+
+```
+handle /stream/* {
+	uri strip_prefix /stream
+	reverse_proxy 192.168.0.118:1984
+}
+handle /ptz/* {
+	reverse_proxy 192.168.0.118:5000
+}
+```
+
+### Un ordre d'arrêt peut se perdre
+
+Le pilotage envoie le mouvement en boucle toutes les 400 ms pendant
+l'appui, et l'arrêt au relâchement — en `keepalive`, pour qu'il parte
+même si la page est masquée dans la foulée. Quitter l'onglet ou
+verrouiller l'appareil déclenche aussi l'arrêt.
+
+Cela ne dispense pas d'un **chien de garde côté serveur caméra** : un
+minuteur d'environ 800 ms qui arrête le mouvement si aucun ordre n'est
+arrivé entre-temps. Sans lui, un ordre d'arrêt perdu au mauvais moment
+laisse la caméra pivoter indéfiniment. Avec les deux, la dérive maximale
+est d'une fraction de seconde.
+
 ## Se rattacher à une centrale
 
 Une centrale Modulimo peut servir à la fois des immeubles hébergés et des

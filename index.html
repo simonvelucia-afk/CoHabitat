@@ -1472,6 +1472,10 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         </div>
       </div>
 
+      <!-- Caméra de surveillance des espaces communs. Masquée tant que
+           cameras.enabled est faux dans config.js. -->
+      <div id="camera-section" style="display:none;margin-top:36px;padding-top:28px;border-top:1px solid var(--border);"></div>
+
       <!-- Section dédiée : Serre communautaire (zones de culture louables au mois) -->
       <div id="serre-section" style="margin-top:36px;padding-top:28px;border-top:1px solid var(--border);">
         <div class="loading"><div class="spinner"></div> Chargement…</div>
@@ -6261,6 +6265,8 @@ async function loadSpaces() {
   renderSpaces(spacesCache);
   // Ajouter les espaces réseau après les espaces locaux
   document.getElementById('spaces-grid').innerHTML += renderNetworkSpaces();
+  // Caméra des espaces communs, entre la grille et la serre.
+  renderCameraSection();
   // Charger la section dédiée « Serre communautaire » en bas de page
   if (window.appModules.serre !== false) {
     loadSerre();
@@ -13054,4 +13060,153 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+</script>
+<script>
+/* ============================================================
+ * Caméra des espaces communs
+ * ============================================================
+ * Affiche le flux de la caméra configurée sur la page Espaces.
+ * Le pilotage PTZ n'apparait que pour les administrateurs : un
+ * locataire regarde, il ne bouge pas la camera.
+ *
+ * Le flux ne transite jamais par CoHabitat — la page pointe
+ * directement vers le serveur camera du batiment. Rien n'est
+ * enregistre ici, et aucune image ne quitte le reseau local.
+ *
+ * Tout est desactive par defaut (cameras.enabled = false) : sans
+ * configuration, la section n'existe pas.
+ * ========================================================== */
+(function () {
+  'use strict';
+
+  // Repetition du mouvement pendant l'appui. Deux raisons : si un ordre
+  // d'arret se perd, la camera s'arrete d'elle-meme au premier chien de
+  // garde cote serveur ; et un telephone qui se verrouille pendant
+  // l'appui cesse d'emettre, donc cesse de faire tourner la camera.
+  var PERIODE_MS = 400;
+  var repetition = null;
+
+  function conf() {
+    return (window.CohabitatConfig && CohabitatConfig.cameras) || { enabled: false };
+  }
+
+  function estAdmin() {
+    var r = (typeof currentProfile !== 'undefined' && currentProfile && currentProfile.role) || '';
+    return r === 'admin' || r === 'principal_admin';
+  }
+
+  function base() {
+    // Vide = meme origine que l'application. C'est le montage recommande :
+    // le serveur camera est servi sous /stream et /ptz par le meme
+    // reverse proxy, ce qui evite le blocage du contenu mixte quand
+    // CoHabitat est en https.
+    return (conf().baseUrl || '').replace(/\/$/, '');
+  }
+
+  function bouton(action, symbole, etiquette) {
+    return '<button type="button" class="ptz-btn" data-ptz="' + action + '" aria-label="' + etiquette + '"'
+      + ' style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text2);'
+      + 'font-size:18px;min-width:44px;min-height:44px;cursor:pointer;touch-action:none;display:flex;'
+      + 'align-items:center;justify-content:center">' + symbole + '</button>';
+  }
+
+  function commandes() {
+    var vide = '<span></span>';
+    return '<div style="margin-top:12px">'
+      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;'
+      + 'color:var(--text2);margin-bottom:8px">Pilotage — administrateur</div>'
+      + '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">'
+      + '<div style="display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:6px">'
+      + vide + bouton('up', '▲', 'Vers le haut') + vide
+      + bouton('left', '◀', 'Vers la gauche')
+      + '<span style="display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:10px">PTZ</span>'
+      + bouton('right', '▶', 'Vers la droite')
+      + vide + bouton('down', '▼', 'Vers le bas') + vide
+      + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:6px">'
+      + bouton('zoom_in', '+', 'Zoom avant') + bouton('zoom_out', '−', 'Zoom arrière')
+      + '</div>'
+      + '<div id="ptz-etat" style="font-size:12px;color:var(--text3)">Prêt</div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--text3);margin-top:8px">Maintenir pour bouger, relâcher pour arrêter.</div>'
+      + '</div>';
+  }
+
+  function etat(texte, couleur) {
+    var el = document.getElementById('ptz-etat');
+    if (el) { el.textContent = texte; el.style.color = couleur || 'var(--text3)'; }
+  }
+
+  function envoyer(action) {
+    var c = conf();
+    return fetch(base() + (c.ptzPath || '/ptz') + '/' + encodeURIComponent(c.camera || 'cam1') + '/' + action, {
+      method: 'POST',
+      // keepalive : l'ordre d'arret part meme si la page est masquee
+      // juste apres — un doigt releve au moment ou l'usager verrouille
+      // son telephone ne doit pas laisser la camera en mouvement.
+      keepalive: action === 'stop',
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      etat(action === 'stop' ? 'Prêt' : 'Mouvement…', action === 'stop' ? null : 'var(--accent)');
+    }).catch(function () {
+      etat('Caméra injoignable', 'var(--accent3)');
+    });
+  }
+
+  function demarrer(action) {
+    arreter(true);
+    envoyer(action);
+    repetition = setInterval(function () { envoyer(action); }, PERIODE_MS);
+  }
+
+  function arreter(silencieux) {
+    if (repetition) { clearInterval(repetition); repetition = null; }
+    if (!silencieux) envoyer('stop');
+  }
+
+  window.renderCameraSection = function () {
+    var section = document.getElementById('camera-section');
+    if (!section) return;
+    var c = conf();
+    if (!c.enabled) { section.style.display = 'none'; return; }
+
+    var flux = base() + (c.streamPath || '/stream/stream.html?src=') + encodeURIComponent(c.camera || 'cam1');
+    section.style.display = '';
+    section.innerHTML =
+      '<div class="section-header"><div class="section-title">'
+      + '<h2>' + escHtml(c.label || 'Caméra — espaces communs') + '</h2>'
+      + '<p>' + escHtml(c.description || 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.') + '</p>'
+      + '</div></div>'
+      + '<div style="background:#000;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;'
+      + 'aspect-ratio:16/9;max-width:760px">'
+      + '<iframe src="' + flux + '" title="Flux de la caméra" allow="autoplay" '
+      + 'style="width:100%;height:100%;border:0"></iframe></div>'
+      + (estAdmin() ? commandes() : '');
+
+    if (!estAdmin()) return;
+
+    section.querySelectorAll('.ptz-btn').forEach(function (b) {
+      var action = b.dataset.ptz;
+      var presser = function (e) { e.preventDefault(); demarrer(action); };
+      var relacher = function (e) { e.preventDefault(); arreter(false); };
+      b.addEventListener('touchstart', presser, { passive: false });
+      b.addEventListener('touchend', relacher, { passive: false });
+      b.addEventListener('touchcancel', relacher, { passive: false });
+      b.addEventListener('mousedown', presser);
+      b.addEventListener('mouseup', relacher);
+      b.addEventListener('mouseleave', relacher);
+    });
+
+    // Filet de securite : quitter la page ou masquer l'onglet arrete la
+    // camera. Sans cela, un changement d'application en plein appui la
+    // laisserait tourner.
+    if (!section.dataset.gardeFou) {
+      section.dataset.gardeFou = '1';
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden && repetition) arreter(false);
+      });
+      window.addEventListener('pagehide', function () { if (repetition) arreter(false); });
+    }
+  };
+})();
 </script>
