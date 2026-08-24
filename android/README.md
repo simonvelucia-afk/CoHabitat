@@ -19,13 +19,26 @@ sans réseau, sans serveur et sans compte.
 
 ## Construire et déployer
 
-```bash
-./sync-assets.sh          # copie l'interface dans l'APK
-```
-
-Puis dans Android Studio : **Open** → dossier `android/` → attendre la
+Dans Android Studio : **Open** → dossier `android/` → attendre la
 synchronisation Gradle → brancher la tablette en USB (débogage USB
 activé) → **Run**.
+
+Il n'y a **rien à lancer au préalable**. La tâche `preparerAssets`
+(`preparer-assets.gradle.kts`) est branchée sur `preBuild` : elle copie
+l'interface, réécrit les URL tierces vers `vendor/` et génère la
+configuration de démonstration à chaque construction, sur Windows comme
+sur Mac et Linux. Modifier `index.html` suffit ; la construction suivante
+reprend la nouvelle version, et ne refait rien si rien n'a bougé.
+
+Elle échoue volontairement si une URL de CDN subsiste dans `index.html`
+sans équivalent local — une montée de version de librairie non
+répercutée. Le message nomme les deux fichiers à mettre à jour.
+
+Pour préparer les fichiers sans construire l'APK :
+
+```
+gradle :app:preparerAssets
+```
 
 Pour un APK autonome à installer sans Android Studio :
 
@@ -37,9 +50,6 @@ Le fichier sort dans `app/build/outputs/apk/debug/`. Il s'installe par
 USB (`adb install`) ou par copie sur la tablette. Aucun compte
 développeur Google n'est nécessaire pour installer sur ses propres
 appareils.
-
-À relancer `./sync-assets.sh` après chaque modification de l'interface,
-avant de reconstruire.
 
 ## Ce qui est embarqué
 
