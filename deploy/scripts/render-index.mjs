@@ -27,8 +27,6 @@ const REMPLACEMENTS = [
   ['https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js',
    'vendor/jspdf.plugin.autotable.min.js'],
   ['https://esm.sh/@supabase/supabase-js@2', 'vendor/supabase.esm.js'],
-  ['https://raw.githubusercontent.com/simonvelucia-afk/modulimo-home/main/images/favicon_Modulimo.png',
-   'vendor/favicon.png'],
 ];
 
 // Les polices sont facultatives : sans vendor/fonts.css, la pile de

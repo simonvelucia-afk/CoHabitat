@@ -17,7 +17,7 @@
  * Changer VERSION invalide l'ancien cache : a incrementer quand les
  * fichiers du noyau changent.
  */
-const VERSION = 'cohabitat-v1';
+const VERSION = 'cohabitat-v2';
 
 // Le strict necessaire pour ouvrir l'application hors ligne. Les
 // librairies tierces ne sont pas listees : elles viennent d'un CDN, et
@@ -31,6 +31,8 @@ const NOYAU = [
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './icons/icon-maskable-512.png',
+  './icons/favicon.png',
 ];
 
 self.addEventListener('install', (e) => {

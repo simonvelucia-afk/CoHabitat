@@ -54,7 +54,7 @@ window.COHABITAT_CONFIG = {
     supabaseJs: 'vendor/supabase.js',
     jspdf: 'vendor/jspdf.umd.min.js',
     jspdfAutotable: 'vendor/jspdf.plugin.autotable.min.js',
-    fontsCss: null, fontsPreconnect: null, favicon: null
+    fontsCss: null, fontsPreconnect: null
   }
 };
 CFG

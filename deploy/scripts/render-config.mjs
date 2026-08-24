@@ -75,7 +75,6 @@ const config = {
         // systeme declaree dans la feuille de style : lisible, sobre.
         fontsCss: env.VENDOR_FONTS === 'true' ? 'vendor/fonts.css' : null,
         fontsPreconnect: null,
-        favicon: 'vendor/favicon.png',
       }
     : {},
 };

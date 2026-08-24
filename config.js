@@ -111,8 +111,7 @@
       jspdf:           CDN + 'jspdf@2.5.2/dist/jspdf.umd.min.js',
       jspdfAutotable:  CDN + 'jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js',
       fontsCss:        'https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=Space+Mono&display=swap',
-      fontsPreconnect: 'https://fonts.googleapis.com',
-      favicon:         'https://raw.githubusercontent.com/simonvelucia-afk/modulimo-home/main/images/favicon_Modulimo.png'
+      fontsPreconnect: 'https://fonts.googleapis.com'
     }
   };
 
