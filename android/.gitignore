@@ -4,5 +4,6 @@ build/
 local.properties
 *.iml
 .idea/
-# Les assets sont regeneres par sync-assets.sh
+# Les assets sont regeneres a chaque construction par la tache
+# preparerAssets (preparer-assets.gradle.kts).
 app/src/main/assets/
