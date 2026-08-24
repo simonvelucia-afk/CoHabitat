@@ -3,6 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Prepare les fichiers web embarques avant chaque construction. Plus rien
+// a lancer a la main : voir android/preparer-assets.gradle.kts.
+apply(from = "../preparer-assets.gradle.kts")
+
 android {
     namespace = "com.modulimo.cohabitat"
     compileSdk = 34
