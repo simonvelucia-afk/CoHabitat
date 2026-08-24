@@ -1,0 +1,9 @@
+<resources>
+    <!-- Plein ecran sombre : l'interface a son propre fond, on evite
+         le flash blanc au demarrage. -->
+    <style name="Theme.CoHabitat" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">#0f0f0f</item>
+        <item name="android:statusBarColor">#0f0f0f</item>
+        <item name="android:navigationBarColor">#0f0f0f</item>
+    </style>
+</resources>

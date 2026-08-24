@@ -1,20 +1,89 @@
 # CoHabitat — Guide d'installation
 
+Deux façons de déployer, à partir du même code :
+
+- **Hébergé** — interface sur GitHub Pages, base sur Supabase. C'est le
+  mode décrit ci-dessous.
+- **Appliance autonome** — tout tourne sur une machine de l'immeuble, en
+  réseau fermé, sans dépendance à un service en ligne, avec jumelage
+  facultatif entre immeubles par VPN. Voir **[`deploy/README.md`](deploy/README.md)**.
+
+Aucune URL ni clé n'est écrite dans `index.html` : tout ce qui change
+d'un déploiement à l'autre vit dans **`config.js`**.
+
+## Ajouter un immeuble
+
+Chaque immeuble est une instance séparée : sa propre base, ses propres
+comptes, ses propres données. Rien n'est partagé entre immeubles — c'est
+ce qui permet d'en vendre un sans toucher aux autres.
+
+Le seul fichier qui diffère d'un immeuble à l'autre est **`config.js`**.
+Tout le reste du code est identique.
+
+### En hébergé (GitHub Pages + Supabase)
+
+```bash
+node deploy/scripts/new-building.mjs \
+  --id pointe-est --nom "Pointe-Est" \
+  --site https://cohabitat.pointe-est.com \
+  --supabase https://abcxyz.supabase.co \
+  --cle eyJhbGciOi... > config.js
+```
+
+Le script produit le `config.js` de l'immeuble et rappelle les cinq
+étapes restantes : appliquer le schéma au nouveau projet Supabase,
+régler les URL d'authentification, publier le dépôt, promouvoir le
+premier administrateur, enregistrer l'immeuble à la centrale.
+
+**Un dépôt par immeuble**, parce que GitHub Pages ne sert qu'un seul
+site par dépôt et qu'un domaine personnalisé y est attaché. La façon la
+moins pénible de tenir plusieurs dépôts à jour :
+
+```bash
+# une fois, dans le dépôt de l'immeuble
+git remote add upstream https://github.com/simonvelucia-afk/CoHabitat.git
+
+# à chaque mise à jour
+git fetch upstream && git merge upstream/main
+git checkout --ours config.js && git add config.js   # garder sa config
+```
+
+Comme `config.js` est le seul fichier propre à l'immeuble, c'est le seul
+conflit possible, et il se résout toujours de la même façon.
+
+> Si le nombre d'immeubles devient inconfortable, un hébergeur statique
+> qui accepte plusieurs domaines par site (Cloudflare Pages, Netlify)
+> permet de revenir à un seul dépôt, `config.js` choisissant l'instance
+> d'après `window.location.hostname`. GitHub Pages ne le permet pas.
+
+### En appliance (réseau fermé)
+
+Pas de dépôt ni d'URL à créer : le même checkout sert tous les
+immeubles, et `deploy/scripts/render-config.mjs` génère `config.js` à
+partir du `.env` de la machine. Voir [`deploy/README.md`](deploy/README.md).
+
 ## 1. Créer votre projet Supabase
 
 1. Allez sur [supabase.com](https://supabase.com) → Nouveau projet
-2. Dans **SQL Editor**, collez et exécutez tout le contenu de `schema.sql`
+2. Dans **SQL Editor**, exécutez `schema.sql`, puis les fichiers de
+   `sql/` dans l'ordre de leur numéro (`000_` en premier)
 3. Récupérez vos clés: **Project Settings → API**
    - `Project URL` (ex: `https://abcxyz.supabase.co`)
    - `anon public` key
 
-## 2. Configurer index.html
+## 2. Configurer config.js
 
-Ouvrez `index.html` et remplacez à la ligne ~610 :
+Ouvrez `config.js` et renseignez :
 ```js
-const SUPABASE_URL = 'https://VOTRE_PROJECT_ID.supabase.co';
-const SUPABASE_ANON_KEY = 'VOTRE_ANON_KEY';
+supabaseUrl:     'https://VOTRE_PROJECT_ID.supabase.co',
+supabaseAnonKey: 'VOTRE_ANON_KEY',
+siteUrl:         'https://votre-domaine',
 ```
+Le même fichier porte l'URL de la centrale Modulimo (`central`), la
+Machine Lunch, l'analytique et l'emplacement des librairies tierces.
+Mettre `central.enabled` à `false` rend l'instance entièrement autonome :
+plus aucune requête ne sort, la finance reste locale et le contrôle de
+licence est court-circuité.
 
 ## 3. Héberger sur GitHub Pages
 

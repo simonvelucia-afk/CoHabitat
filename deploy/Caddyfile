@@ -1,0 +1,63 @@
+# Point d'entree unique de l'appliance.
+#
+# L'interface, l'API de donnees, l'authentification et la federation
+# vivent sous le meme nom d'hote : le front n'a donc qu'une seule URL a
+# connaitre (SITE_URL), et les pairs joignent la federation par cette
+# meme adresse a travers le VPN.
+#
+# En reseau ferme, un nom en .lan ou une adresse IP ne peut pas obtenir
+# de certificat Let's Encrypt : Caddy emet alors un certificat interne.
+# Installer sa racine (/data/caddy/pki) sur les postes, ou passer le
+# site en http:// si le reseau est deja de confiance.
+
+{
+	# Pas de tentative ACME quand le nom n'est pas public : voir
+	# ADMIN_EMAIL dans .env pour activer Let's Encrypt.
+	auto_https disable_redirects
+}
+
+{$SITE_HOST:localhost} {
+	encode gzip
+
+	handle /auth/v1/* {
+		uri strip_prefix /auth/v1
+		reverse_proxy auth:9999
+	}
+
+	handle /rest/v1/* {
+		uri strip_prefix /rest/v1
+		reverse_proxy rest:3000
+	}
+
+	# Les chemins de federation sont deja prefixes cote service.
+	handle /federation/* {
+		reverse_proxy federation:8080
+	}
+
+	# Flux video, servi sous la meme origine pour eviter le blocage du
+	# contenu mixte en https. Decommenter et pointer vers le serveur
+	# camera du batiment (go2rtc ecoute sur 1984 par defaut).
+	# handle /stream/* {
+	# 	uri strip_prefix /stream
+	# 	reverse_proxy 192.168.0.118:1984
+	# }
+
+	handle {
+		root * /srv
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output file /data/access.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+	}
+}

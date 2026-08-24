@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+# cohabitat — pilote de l'appliance.
+#
+#   ./cohabitat init                 secrets, config, verification du .env
+#   ./cohabitat up | down | logs     cycle de vie de la pile
+#   ./cohabitat migrate              rejoue les migrations en attente
+#   ./cohabitat backup [dossier]     sauvegarde base + secrets
+#   ./cohabitat restore <fichier>    restauration d'une sauvegarde
+#   ./cohabitat doctor               etat des services et du jumelage
+#
+#   ./cohabitat peer add <url>       jumelage avec une autre instance
+#   ./cohabitat peer list
+#   ./cohabitat peer allow <id> [--reservations] [--finance] [--limit N]
+#   ./cohabitat peer suspend <id> | revoke <id>
+#
+# Le jumelage n'echange que des cles PUBLIQUES, et le pair reste inactif
+# tant qu'un administrateur n'a pas accorde explicitement ses droits.
+
+set -euo pipefail
+cd "$(dirname "$0")"
+
+RED=$'\033[31m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'; DIM=$'\033[2m'; OFF=$'\033[0m'
+die()  { echo "${RED}✗${OFF} $*" >&2; exit 1; }
+ok()   { echo "${GREEN}✓${OFF} $*"; }
+warn() { echo "${YELLOW}!${OFF} $*"; }
+
+compose() { docker compose --env-file .env --env-file .env.secrets "$@"; }
+
+load_env() {
+  [ -f .env ] || die "fichier .env absent — copier .env.example et le remplir"
+  [ -f .env.secrets ] || die "secrets absents — lancer ./cohabitat init"
+  set -a; . ./.env; . ./.env.secrets; set +a
+}
+
+# Requete PostgREST avec la cle service_role, depuis le reseau de la pile.
+api() {
+  local method="$1" path="$2" body="${3:-}"
+  local args=(-sS -X "$method" -H "apikey: $SERVICE_ROLE_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY")
+  [ -n "$body" ] && args+=(-H 'Content-Type: application/json' -H 'Prefer: return=representation' -d "$body")
+  compose exec -T web curl "${args[@]}" "http://rest:3000${path}"
+}
+
+cmd_init() {
+  [ -f .env ] || die "fichier .env absent — copier .env.example et le remplir d'abord"
+  if [ -f .env.secrets ]; then
+    warn "secrets deja presents — conserves (les regenerer invaliderait les sessions et le jumelage)"
+  else
+    node scripts/gen-keys.mjs > .env.secrets
+    chmod 600 .env.secrets
+    ok "secrets generes dans .env.secrets"
+  fi
+  mkdir -p generated
+  node scripts/render-config.mjs > generated/config.js
+  node scripts/render-index.mjs             > generated/index.html
+  node scripts/render-index.mjs sign.html   > generated/sign.html
+  ok "configuration et pages generees (librairies locales)"
+
+  set -a; . ./.env; . ./.env.secrets; set +a
+  if [ "${OFFLINE_ASSETS:-true}" != "false" ] && [ ! -f ../vendor/supabase.js ]; then
+    warn "vendor/ vide : lancer scripts/fetch-vendor.sh sur une machine connectee"
+  fi
+  ok "pret — ./cohabitat up"
+}
+
+cmd_up() {
+  load_env
+  # Toujours regenerer : le depot a pu bouger depuis le dernier init.
+  node scripts/render-config.mjs           > generated/config.js
+  node scripts/render-index.mjs            > generated/index.html
+  node scripts/render-index.mjs sign.html  > generated/sign.html
+  compose up -d --build
+  ok "pile demarree — ${SITE_URL}"
+}
+
+cmd_down()    { load_env; compose down; }
+cmd_logs()    { load_env; compose logs -f --tail=100 "${@:-}"; }
+cmd_migrate() { load_env; compose run --rm db-bootstrap && compose run --rm db-migrate; }
+
+cmd_backup() {
+  load_env
+  local dir="${1:-./backups}"
+  mkdir -p "$dir"
+  local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
+  local out="$dir/cohabitat-$stamp.sql.gz"
+  compose exec -T db pg_dump -U postgres -d "${POSTGRES_DB:-cohabitat}" | gzip > "$out"
+  # Les secrets ne sont pas dans la base : sans eux, la sauvegarde est
+  # illisible par l'appliance (jetons signes avec JWT_SECRET).
+  tar czf "$dir/cohabitat-secrets-$stamp.tar.gz" .env .env.secrets secrets/
+  chmod 600 "$dir/cohabitat-secrets-$stamp.tar.gz"
+  ok "sauvegarde : $out"
+  ok "secrets    : $dir/cohabitat-secrets-$stamp.tar.gz  ${DIM}(a conserver ailleurs)${OFF}"
+}
+
+cmd_restore() {
+  load_env
+  local file="${1:?usage: ./cohabitat restore <fichier.sql.gz>}"
+  [ -f "$file" ] || die "fichier introuvable : $file"
+  read -r -p "Ecraser la base ${POSTGRES_DB:-cohabitat} avec $file ? [oui/non] " a
+  [ "$a" = "oui" ] || die "abandon"
+  gunzip -c "$file" | compose exec -T db psql -U postgres -d "${POSTGRES_DB:-cohabitat}"
+  ok "restauration terminee"
+}
+
+cmd_doctor() {
+  load_env
+  echo "── Services ─────────────────────────────────────────"
+  compose ps --format 'table {{.Service}}\t{{.Status}}' || true
+  echo
+  echo "── Identite ─────────────────────────────────────────"
+  compose exec -T web curl -sS "http://federation:8080/federation/v1/identity" || warn "federation injoignable"
+  echo
+  echo "── Pairs ────────────────────────────────────────────"
+  cmd_peer list
+}
+
+# ── Federation ───────────────────────────────────────────────────────
+peer_identity() {  # identite locale, telle que publiee aux pairs
+  compose exec -T web curl -sS "http://federation:8080/federation/v1/identity"
+}
+
+cmd_peer() {
+  load_env
+  local sub="${1:-list}"; shift || true
+  case "$sub" in
+    list)
+      api GET "/federation_peers?select=instance_id,display_name,base_url,status,allow_reservations,allow_finance,finance_credit_limit,last_seen_at&order=display_name" \
+        | node -e '
+          let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
+            const rows = JSON.parse(s || "[]");
+            if (!rows.length) return console.log("  (aucun pair)");
+            for (const r of rows) {
+              const caps = [r.allow_reservations ? "reservations" : null, r.allow_finance ? "finance" : null]
+                .filter(Boolean).join("+") || "aucun droit";
+              console.log(`  ${r.status.padEnd(10)} ${r.instance_id.padEnd(20)} ${caps.padEnd(24)} plafond ${r.finance_credit_limit} $  ${r.base_url}`);
+            }
+          });'
+      ;;
+
+    add)
+      local url="${1:?usage: ./cohabitat peer add https://adresse-vpn-du-pair}"
+      echo "→ lecture de l'identite du pair"
+      local remote; remote="$(compose exec -T web curl -sS --max-time 10 "${url%/}/federation/v1/identity")" \
+        || die "pair injoignable : $url"
+      local mine; mine="$(peer_identity)"
+      echo "$remote" | grep -q instance_id || die "reponse inattendue : $remote"
+
+      echo "→ enregistrement local du pair (en attente)"
+      node -e '
+        const [remote, url] = [process.argv[1], process.argv[2]];
+        const r = JSON.parse(remote);
+        process.stdout.write(JSON.stringify({
+          instance_id: r.instance_id, display_name: r.display_name || r.instance_id,
+          base_url: url.replace(/\/$/, ""), public_key: r.public_key,
+          status: "pending", introduced_by: "local",
+        }));' "$remote" "$url" > /tmp/cohab-peer.json
+      api POST "/federation_peers" "$(cat /tmp/cohab-peer.json)" >/dev/null || warn "pair peut-etre deja connu"
+      rm -f /tmp/cohab-peer.json
+
+      echo "→ envoi de notre identite au pair"
+      compose exec -T web curl -sS --max-time 10 -X POST \
+        -H 'Content-Type: application/json' \
+        -d "$(node -e '
+             const m = JSON.parse(process.argv[1]);
+             process.stdout.write(JSON.stringify({ ...m, base_url: process.argv[2], introduced_by: "local" }));
+           ' "$mine" "${SITE_URL}")" \
+        "${url%/}/federation/v1/pair" || warn "le pair n a pas accepte la demande"
+      echo
+      ok "jumelage amorce — chaque cote doit maintenant autoriser l'autre :"
+      echo "     ./cohabitat peer allow <instance_id> --reservations --finance --limit 200"
+      ;;
+
+    allow)
+      local id="${1:?usage: ./cohabitat peer allow <instance_id> [--reservations] [--finance] [--limit N]}"; shift
+      local res=false fin=false limit=0
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          --reservations) res=true ;;
+          --finance)      fin=true ;;
+          --limit)        shift; limit="${1:?valeur du plafond}" ;;
+          *) die "option inconnue : $1" ;;
+        esac
+        shift
+      done
+      api PATCH "/federation_peers?instance_id=eq.${id}" \
+        "{\"status\":\"active\",\"allow_reservations\":$res,\"allow_finance\":$fin,\"finance_credit_limit\":$limit,\"updated_at\":\"$(date -u +%FT%TZ)\"}" >/dev/null
+      ok "pair $id actif — reservations=$res finance=$fin plafond=$limit \$"
+      ;;
+
+    suspend|revoke)
+      local id="${1:?usage: ./cohabitat peer $sub <instance_id>}"
+      local st="suspended"; [ "$sub" = "revoke" ] && st="revoked"
+      api PATCH "/federation_peers?instance_id=eq.${id}" "{\"status\":\"$st\"}" >/dev/null
+      ok "pair $id : $st"
+      ;;
+
+    ledger)
+      api GET "/federation_peer_balances?select=instance_id,display_name,net_balance,finance_credit_limit,last_movement_at&order=instance_id"
+      echo
+      ;;
+
+    *) die "sous-commande inconnue : $sub" ;;
+  esac
+}
+
+case "${1:-}" in
+  init)    shift; cmd_init "$@" ;;
+  up)      shift; cmd_up "$@" ;;
+  down)    shift; cmd_down "$@" ;;
+  logs)    shift; cmd_logs "$@" ;;
+  migrate) shift; cmd_migrate "$@" ;;
+  backup)  shift; cmd_backup "$@" ;;
+  restore) shift; cmd_restore "$@" ;;
+  doctor)  shift; cmd_doctor "$@" ;;
+  peer)    shift; cmd_peer "$@" ;;
+  *)
+    awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"
+    exit 1
+    ;;
+esac

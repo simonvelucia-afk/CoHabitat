@@ -1,0 +1,25 @@
+{
+  "name": "CoHabitat — gestion des ressources communes",
+  "short_name": "CoHabitat",
+  "description": "Réservations d'espaces, auto-partage, serre et billets pour votre immeuble.",
+  "lang": "fr-CA",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f0f0f",
+  "theme_color": "#0f0f0f",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mode démonstration",
+      "short_name": "Démo",
+      "description": "Ouvre l'application sur le jeu de démonstration, sans réseau.",
+      "url": "./index.html#demo"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icone : un toit sur deux volumes — deux logements sous un meme abri. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#C8A96E" android:pathData="M54,26L82,48L76,48L76,54L32,54L32,48L26,48Z" />
+    <path android:fillColor="#E8E4DC" android:pathData="M34,58L52,58L52,82L34,82Z" />
+    <path android:fillColor="#7EB8A0" android:pathData="M56,58L74,58L74,82L56,82Z" />
+</vector>

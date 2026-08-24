@@ -70,7 +70,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $$;
@@ -114,12 +114,12 @@ BEGIN
         CREATE POLICY pr_select ON passenger_requests
           FOR SELECT TO authenticated
           USING (
-            status = ''open''
+            status = 'open'
             OR requester_id = auth.uid()
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $$;
@@ -150,7 +150,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $$;
@@ -169,7 +169,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $$;
@@ -220,7 +220,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $$;
@@ -258,7 +258,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $$;
@@ -277,7 +277,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $$;
@@ -330,7 +330,7 @@ BEGIN
             OR EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
           )
       $$;
@@ -349,7 +349,7 @@ BEGIN
             EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
             OR (
               dependent_id IS NOT NULL
@@ -376,7 +376,7 @@ BEGIN
             EXISTS (
               SELECT 1 FROM profiles p
               WHERE p.id = auth.uid()
-                AND p.role IN (''principal_admin'', ''admin'')
+                AND p.role IN ('principal_admin', 'admin')
             )
             OR (
               dependent_id IS NOT NULL

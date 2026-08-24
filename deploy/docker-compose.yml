@@ -1,0 +1,166 @@
+# CoHabitat — appliance autonome pour un immeuble.
+#
+# Cinq services, aucune dependance a un service en ligne : Postgres,
+# l'authentification (GoTrue), l'API de donnees (PostgREST), la
+# passerelle de federation et un serveur web qui sert l'interface et
+# fait office de point d'entree unique.
+#
+# Rien n'est publie hors de la machine sauf le port du serveur web :
+# la base, l'authentification et l'API ne sont joignables que par le
+# reseau interne de la pile. Les autres instances CoHabitat passent par
+# le meme port que les usagers, via le VPN de l'exploitant.
+#
+#   cp .env.example .env && ./cohabitat init && ./cohabitat up
+
+name: cohabitat
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?mot de passe Postgres manquant}
+      POSTGRES_DB: ${POSTGRES_DB:-cohabitat}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-cohabitat}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Pas de ports: la base n'est jamais exposee. Pour une session psql :
+    #   docker compose exec db psql -U postgres cohabitat
+
+  # Roles, schema auth et fonctions auth.* — doit preceder GoTrue.
+  db-bootstrap:
+    image: postgres:16-alpine
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PGHOST: db
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-cohabitat}
+      AUTHENTICATOR_PASSWORD: ${AUTHENTICATOR_PASSWORD:?manquant}
+      AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD:?manquant}
+    volumes:
+      - ./db:/db:ro
+    entrypoint: ["/bin/sh", "/db/migrate.sh", "bootstrap"]
+    restart: "no"
+
+  auth:
+    image: supabase/gotrue:v2.158.1
+    depends_on:
+      db-bootstrap: { condition: service_completed_successfully }
+    restart: unless-stopped
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${SITE_URL}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${AUTH_ADMIN_PASSWORD}@db:5432/${POSTGRES_DB:-cohabitat}?search_path=auth&sslmode=disable
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_URI_ALLOW_LIST: ${SITE_URL},${SITE_URL}/*
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:?manquant}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      # En reseau ferme, aucun courriel ne sort : on confirme d'office.
+      # Mettre a false et renseigner le bloc SMTP si un relais existe.
+      GOTRUE_MAILER_AUTOCONFIRM: ${MAILER_AUTOCONFIRM:-true}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-admin@cohabitat.local}
+      GOTRUE_LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # Schema applicatif : schema.sql puis sql/*.sql, une seule fois chacun.
+  db-migrate:
+    image: postgres:16-alpine
+    depends_on:
+      auth: { condition: service_healthy }
+    environment:
+      PGHOST: db
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-cohabitat}
+    volumes:
+      - ./db:/db:ro
+      - ../schema.sql:/app/schema.sql:ro
+      - ../sql:/app/sql:ro
+    entrypoint: ["/bin/sh", "/db/migrate.sh", "app"]
+    restart: "no"
+
+  rest:
+    image: postgrest/postgrest:v12.2.3
+    depends_on:
+      db-migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${AUTHENTICATOR_PASSWORD}@db:5432/${POSTGRES_DB:-cohabitat}
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_OPENAPI_MODE: ignore-privileges
+
+  federation:
+    build: ./federation
+    depends_on:
+      db-migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+    environment:
+      FEDERATION_PORT: 8080
+      INSTANCE_ID: ${INSTANCE_ID:?identifiant d'instance manquant}
+      INSTANCE_NAME: ${INSTANCE_NAME:-CoHabitat}
+      POSTGREST_URL: http://rest:3000
+      GOTRUE_URL: http://auth:9999
+      SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?manquant}
+      JWT_SECRET: ${JWT_SECRET}
+      FEDERATION_PRIVATE_KEY_FILE: /run/secrets/federation_key.pem
+      # Centrale Modulimo, joignable par le VPN. Vide = instance
+      # entierement autonome.
+      SITE_URL: ${SITE_URL}
+      CENTRAL_URL: ${CENTRAL_URL:-}
+      CENTRAL_KEY: ${CENTRAL_KEY:-}
+      CENTRAL_ISSUER: ${CENTRAL_ISSUER:-}
+      FEDERATION_OUTBOX_MAX_ATTEMPTS: ${FEDERATION_OUTBOX_MAX_ATTEMPTS:-20}
+    volumes:
+      - ./secrets/federation_key.pem:/run/secrets/federation_key.pem:ro
+
+  web:
+    image: caddy:2-alpine
+    depends_on: [rest, federation]
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      SITE_HOST: ${SITE_HOST:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # L'interface est servie telle quelle depuis le depot ; seul
+      # config.js est remplace par la version generee a partir du .env.
+      - ../:/srv:ro
+      # Fichiers prepares pour le reseau ferme : configuration generee a
+      # partir du .env, et pages dont les URL tierces pointent vers
+      # vendor/. Montes par-dessus ceux du depot.
+      - ./generated/config.js:/srv/config.js:ro
+      - ./generated/index.html:/srv/index.html:ro
+      - ./generated/sign.html:/srv/sign.html:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

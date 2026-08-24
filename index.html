@@ -4,7 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CoHabitat — Gestion des ressources communes</title>
+<script src="config.js"></script>
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/simonvelucia-afk/modulimo-home/main/images/favicon_Modulimo.png">
+
+<!-- Application installable : « Ajouter a l'ecran d'accueil » donne une
+     icone, le plein ecran sans barre d'adresse, et le fonctionnement
+     hors ligne. Rien de tout cela n'est possible depuis un onglet. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f0f0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CoHabitat">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <!-- v11 — Machine Lunch online : Plusieurs machine onglet lunch -->
 <script>
 // Intercepter le hash Supabase AVANT l'init du SDK
@@ -29,6 +41,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="balanceOps.js"></script>
+<script src="demo-data.js"></script>
 
 <!-- V25.1 Analytics — chargé uniquement après consentement (Loi 25) -->
 <script>
@@ -36,18 +49,18 @@ window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 
 // GA désactivé par défaut — activé seulement après consentement explicite
-window._gaConsent = localStorage.getItem('ga_consent');
+window._gaConsent = CohabitatConfig.analytics.enabled ? localStorage.getItem('ga_consent') : null;
 
 function _loadGA() {
   if (window._gaLoaded) return;
   window._gaLoaded = true;
   const s = document.createElement('script');
   s.async = true;
-  s.src = 'https://www.googletagmanager.com/gtag/js?id=G-EWP5ER8KFJ';
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + CohabitatConfig.analytics.gaId;
   document.head.appendChild(s);
   s.onload = function() {
     gtag('js', new Date());
-    gtag('config', 'G-EWP5ER8KFJ', {
+    gtag('config', CohabitatConfig.analytics.gaId, {
       page_path: window.location.pathname,
       page_title: document.title,
       anonymize_ip: true
@@ -1242,6 +1255,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
       <button class="btn btn-primary" onclick="authSubmit()">
         <span id="auth-btn-text">Se connecter</span>
       </button>
+      <div id="login-offline" style="display:none"></div>
       <div class="login-divider">ou</div>
       <button class="btn btn-demo" onclick="loginDemo()">
         🎭 Entrer en mode démo
@@ -1458,6 +1472,10 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
           <div class="loading"><div class="spinner"></div> Chargement…</div>
         </div>
       </div>
+
+      <!-- Caméra de surveillance des espaces communs. Masquée tant que
+           cameras.enabled est faux dans config.js. -->
+      <div id="camera-section" style="display:none;margin-top:36px;padding-top:28px;border-top:1px solid var(--border);"></div>
 
       <!-- Section dédiée : Serre communautaire (zones de culture louables au mois) -->
       <div id="serre-section" style="margin-top:36px;padding-top:28px;border-top:1px solid var(--border);">
@@ -2620,10 +2638,43 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
 // CONFIGURATION SUPABASE
 // ==========================================
 // ⚠️  REMPLACEZ CES VALEURS PAR VOS CLÉS SUPABASE
-const SUPABASE_URL = 'https://uwyhrdjlwetcbtskijrs.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3eWhyZGpsd2V0Y2J0c2tpanJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NzMxNjYsImV4cCI6MjA4ODE0OTE2Nn0.NHo_RY4DjTmtkFcjOJ3dFPzNRN1rCwBCDXyIixOSrn4';
+const SUPABASE_URL = CohabitatConfig.supabaseUrl;
+const SUPABASE_ANON_KEY = CohabitatConfig.supabaseAnonKey;
 
-const { createClient } = supabase;
+// Le SDK vient d'un CDN : hors ligne il est absent. Le mode demo n'en a
+// pas besoin (il parle au jeu local), donc on ne veut pas que la page
+// meure a cette ligne — c'est ce qui permet a une tablette sans reseau
+// d'ouvrir la demo sans rien avoir a installer.
+// Le SDK vient d'un CDN : hors ligne il est absent. Le mode demo n'en a
+// pas besoin (il parle au jeu local), donc la page ne doit pas mourir ici
+// — c'est ce qui permet a une tablette sans reseau d'ouvrir la demo sans
+// rien installer. Le client de remplacement echoue a l'usage, pas a la
+// construction : une exception ici interromprait le script et laisserait
+// toutes les variables suivantes non initialisees.
+const SDK_ABSENT = typeof supabase === 'undefined' || !supabase;
+const { createClient } = SDK_ABSENT ? {
+  createClient: function () {
+    var echec = function () {
+      return Promise.resolve({ data: null, error: { message: 'Hors ligne — mode démo seulement' } });
+    };
+    var req = { select: f, insert: f, update: f, upsert: f, delete: f, eq: f, neq: f, in: f, is: f,
+                gt: f, gte: f, lt: f, lte: f, order: f, limit: f, filter: f, or: f, contains: f,
+                single: echec, maybeSingle: echec, then: function (r) { return echec().then(r); } };
+    function f() { return req; }
+    return {
+      _absent: true,
+      from: function () { return req; },
+      rpc: echec,
+      functions: { invoke: echec },
+      auth: {
+        onAuthStateChange: function () { return { data: { subscription: { unsubscribe: function () {} } } }; },
+        getSession: function () { return Promise.resolve({ data: { session: null } }); },
+        signInWithPassword: echec, signUp: echec, signOut: echec, updateUser: echec,
+        resetPasswordForEmail: echec, stopAutoRefresh: function () { return Promise.resolve(); },
+      },
+    };
+  }
+} : supabase;
 // Configuration auth.lock : on remplace le navigatorLock (Web Locks API)
 // par un lock no-op. Le navigatorLock peut rester bloque indefiniment
 // si une operation auth lance un fetch qui hang.
@@ -2651,6 +2702,15 @@ let sb = _createSbClient();
 _attachAuthListener(sb);
 
 function _createSbClient() {
+  // Mode demo : client local, aucune requete sortante. Passe aussi par
+  // ici lors des recreateSb() qui precedent les navigations.
+  //
+  // On lit window._demoMode et non isDemo : cette fonction est definie
+  // avant la declaration `let isDemo`, et toucher a une variable `let`
+  // avant son initialisation leve une exception.
+  if (window._demoMode === true && typeof createDemoClient === 'function') {
+    return createDemoClient(window.COHABITAT_DEMO);
+  }
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { lock: _noOpLock }
   });
@@ -2700,27 +2760,83 @@ function recreateSb() {
 })();
 
 // ── MODULIMO CENTRAL ─────────────────────────────────────────────────
-const CENTRAL_URL = 'https://bpxscgrbxjscicpnheep.supabase.co';
-const CENTRAL_KEY = 'sb_publishable_2V-eHOvw1v_Xwr1bpHfHLg_cbHW9ctD';
-const FINANCE_BRIDGE_URL = CENTRAL_URL + '/functions/v1/finance-bridge';
+const CENTRAL_ENABLED = CohabitatConfig.central.enabled !== false
+                     || CohabitatConfig.central.viaFederation === true;
+const CENTRAL_URL = CohabitatConfig.central.url;
+const CENTRAL_KEY = CohabitatConfig.central.key;
+// En instance auto-hebergee, l'interface ne parle pas directement a la
+// centrale : elle passe par la passerelle locale, qui verifie le jeton
+// du resident ici puis signe une assertion Ed25519. La centrale ne peut
+// pas verifier nos jetons HS256, et lui confier le secret local
+// reviendrait a lui permettre de fabriquer n'importe quelle identite.
+const CENTRAL_VIA_FEDERATION = CohabitatConfig.central.viaFederation === true;
+const FINANCE_BRIDGE_URL = CENTRAL_VIA_FEDERATION
+  ? (CohabitatConfig.federation.url || '/federation/v1') + '/local/central'
+  : CENTRAL_URL + '/functions/v1/finance-bridge';
+
+// ── FEDERATION ENTRE INSTANCES ───────────────────────────────────────
+// En reseau ferme, les immeubles jumeles ne se parlent pas via la
+// centrale : chaque instance expose une passerelle locale qui signe les
+// appels sortants et verifie les appels entrants. L'interface ne connait
+// que cette passerelle — jamais la cle d'un autre immeuble.
+const FEDERATION_ENABLED = CohabitatConfig.federation.enabled === true;
+const FEDERATION_URL     = CohabitatConfig.federation.url || '/federation/v1';
+
+async function fedFetch(path, options) {
+  const token = window._cachedAccessToken;
+  if (!token) throw new Error('session absente');
+  const res = await fetch(FEDERATION_URL + path, {
+    ...(options || {}),
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+      ...((options && options.headers) || {}),
+    },
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (_) { data = null; }
+  return { ok: res.ok, status: res.status, data };
+}
 
 // ── balanceOps : primitive unifiee + outbox localStorage ─────────────
 // Toutes les mutations de solde (debit reservation, transfert dependant,
 // credit chauffeur) passent par ce module pour beneficier du retry auto
 // en cas de coupure reseau. L'idempotency_key cote serveur garantit
 // l'absence de double debit. Voir balanceOps.js pour le contrat.
-const _balanceOps = (typeof createBalanceOps === 'function') ? createBalanceOps({
-  bridgeUrl: FINANCE_BRIDGE_URL,
-  anonKey:   CENTRAL_KEY,
-  getAuthToken: function () {
-    // Cache synchrone : pas de verrou Web Locks, donc pas de deadlock si
-    // l'onglet est passe en background pendant un fetch precedent.
-    return window._cachedAccessToken || null;
-  },
-  storageKey: 'modulimo:cohab:balanceOps:outbox:v1',
-  onChange: function (count, hasStuck) { renderOutboxBanner(count, hasStuck); },
-}) : null;
-if (!_balanceOps) console.error('[balanceOps] module non charge — verifier <script src="balanceOps.js">');
+//
+// Sans centrale (instance autonome, ou mode demonstration), il n'y a ni
+// URL ni cle a fournir : createBalanceOps refuse alors de se construire.
+// Cet echec ne doit pas remonter — une exception ici interromprait le
+// script et laisserait toutes les declarations suivantes non
+// initialisees, ce qui casse la page entiere plutot qu'une seule
+// fonction.
+const _balanceOps = (function () {
+  if (typeof createBalanceOps !== 'function') {
+    console.error('[balanceOps] module non charge — verifier <script src="balanceOps.js">');
+    return null;
+  }
+  if (!CENTRAL_ENABLED || !CENTRAL_KEY) {
+    console.info('[balanceOps] centrale absente — les soldes restent locaux');
+    return null;
+  }
+  try {
+    return createBalanceOps({
+      bridgeUrl: FINANCE_BRIDGE_URL,
+      anonKey:   CENTRAL_KEY,
+      getAuthToken: function () {
+        // Cache synchrone : pas de verrou Web Locks, donc pas de deadlock si
+        // l'onglet est passe en background pendant un fetch precedent.
+        return window._cachedAccessToken || null;
+      },
+      storageKey: 'modulimo:cohab:balanceOps:outbox:v1',
+      onChange: function (count, hasStuck) { renderOutboxBanner(count, hasStuck); },
+    });
+  } catch (e) {
+    console.error('[balanceOps] initialisation impossible :', e.message);
+    return null;
+  }
+})();
 
 // ── HEALTH PROBE CENTRALE ────────────────────────────────────────────
 // Etat global mis a jour par probeCentralHealth(). Utilise pour gater
@@ -2734,6 +2850,8 @@ let _centralProbeTimer    = null;
 let _centralProbeInflight = false;
 
 async function probeCentralHealth() {
+  // Instance autonome (central.enabled=false) : pas de centrale a sonder.
+  if (!CENTRAL_ENABLED) return true;
   if (_centralProbeInflight) return window._centralOnline === true;
   _centralProbeInflight = true;
   const ctrl = new AbortController();
@@ -2773,6 +2891,7 @@ async function probeCentralHealth() {
 }
 
 function startCentralHealthProbe() {
+  if (!CENTRAL_ENABLED) return;
   if (_centralProbeTimer) return;
   probeCentralHealth();
   _centralProbeTimer = setInterval(probeCentralHealth, 60000);
@@ -3068,6 +3187,10 @@ async function initApp() {
 
 // Vérifier les contrats du résident et du propriétaire de l'immeuble
 async function checkContracts(userId) {
+  // Instance autonome : aucune licence ni contrat central a verifier.
+  // Sans ce court-circuit, l'absence de reponse de la centrale bloquerait
+  // tous les residents (voir le cas `!lic` plus bas).
+  if (!CENTRAL_ENABLED) return { blocked: false };
   try {
     const domain = window.location.hostname;
     const today  = new Date().toISOString().slice(0, 10);
@@ -3378,7 +3501,7 @@ async function submitReset() {
 
   try {
     btn.textContent = '⏳ Envoi…';
-    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: 'https://cohabitat.modulimo.com' });
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: CohabitatConfig.siteUrl });
     if (error) throw error;
 
     msg.style.background = 'rgba(126,184,160,0.08)';
@@ -3461,8 +3584,22 @@ async function authSubmit() {
 
 async function loginDemo() {
   isDemo = true;
+  window._demoMode = true;
+  // Rejouer les modules choisis lors d'une presentation precedente, puis
+  // offrir le bouton de configuration.
+  if (typeof window._demoAppliquerReglages === 'function') window._demoAppliquerReglages();
+  // Le panneau de configuration des modules ne s'affiche que sur un
+  // appareil dedie a la demonstration — entre par #demo, ou l'enveloppe
+  // Android. Un locataire qui clique « mode demo » par curiosite n'a que
+  // faire d'interrupteurs de modules.
+  if (window._demoDedie && typeof window._demoAjouterBouton === 'function') window._demoAjouterBouton();
+  // Bascule vers le jeu local : a partir d'ici, plus aucune requete ne
+  // part de la tablette. C'est ce qui rend la demo utilisable hors ligne
+  // et evite de montrer les donnees d'un immeuble reel a un prospect.
+  sb = _createSbClient();
+  _attachAuthListener(sb);
   currentProfile = {
-    id: null,
+    id: (window.COHABITAT_DEMO && window.COHABITAT_DEMO.profiles[0].id) || null,
     email: 'alex.tremblay@modulimo.com',
     full_name: 'Alex Tremblay',
     phone: '+1 514 555-0182',
@@ -3496,6 +3633,9 @@ async function loginDemo() {
 async function logout() {
   if (isDemo) {
     isDemo = false;
+    window._demoMode = false;
+    sb = _createSbClient();
+    _attachAuthListener(sb);
     currentProfile = null;
     currentUser = null;
     showLogin();
@@ -3811,6 +3951,7 @@ async function toggleDepResourceAccess(type, resourceId, grant, name) {
 // central est injoignable (l'appelant garde alors la derniere valeur
 // connue plutot que d'afficher 0$ qui serait trompeur).
 async function fetchCentralBalance(depExternalId) {
+  if (!CENTRAL_ENABLED) return null;   // le solde local fait foi
   try {
     // BUG FIX : on utilise window._cachedAccessToken au lieu de
     // sb.auth.getSession(). Cette derniere prend un verrou Web Locks
@@ -3821,7 +3962,7 @@ async function fetchCentralBalance(depExternalId) {
     // suivants restent en Promise pending forever.
     const accessToken = window._cachedAccessToken;
     if (!accessToken) return null;
-    const res = await fetch(`${CENTRAL_URL}/functions/v1/finance-bridge/get-balance`, {
+    const res = await fetch(`${FINANCE_BRIDGE_URL}/get-balance`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -3857,7 +3998,19 @@ async function syncCentralBalanceToProfile() {
 }
 
 async function loadAppModules() {
-  if (isDemo) return;
+  if (isDemo) {
+    // En demonstration, les modules viennent du jeu local : c'est ce que
+    // pilote le panneau de configuration, et cela permet de montrer un
+    // immeuble sans serre ou sans auto-partage selon l'interlocuteur.
+    const { data: reglages } = await sb.from('system_settings')
+      .select('key, value')
+      .in('key', ['module_trips', 'module_lunch', 'module_serre']);
+    const actif = (k) => (reglages || []).find(r => r.key === k)?.value !== 'false';
+    window.appModules.trips = actif('module_trips');
+    window.appModules.lunch = actif('module_lunch');
+    window.appModules.serre = actif('module_serre');
+    return;
+  }
   // 1. Lire les préférences locales (admin local peut désactiver dans son enveloppe)
   const { data: localSettings } = await sb.from('system_settings')
     .select('key, value')
@@ -3894,6 +4047,36 @@ async function loadAppModules() {
 
 // ── RÉSEAU INTER-BÂTIMENTS ───────────────────────────────────────────────────
 async function loadNetworkData() {
+  // Instances jumelees : la passerelle locale agrege les catalogues des
+  // pairs joignables. Un pair hors-ligne retire ses espaces de la liste
+  // sans faire echouer les autres.
+  if (FEDERATION_ENABLED && !isDemo) {
+    try {
+      const res = await fedFetch('/local/spaces');
+      if (res.ok && res.data) {
+        window.networkData.network = { id: 'federation', name: 'Instances jumelées' };
+        window.networkData.sharedSpaces = (res.data.spaces || []).map(function (s) {
+          return {
+            ...s,
+            _network: true,
+            _federated: true,
+            _peerInstanceId: s._peer_instance_id,
+            _memberName: s._peer_name || s._peer_instance_id,
+            _memberUrl: '', _memberKey: '', _memberClientId: s._peer_instance_id,
+            _priorityHours: 0,
+          };
+        });
+        window.networkData.unreachablePeers = res.data.unreachable || [];
+        return;
+      }
+      console.warn('[federation] catalogue indisponible:', res.status);
+    } catch (e) {
+      console.warn('[federation] passerelle injoignable:', e.message);
+    }
+    window.networkData.sharedSpaces = [];
+    return;
+  }
+
   if (isDemo) {
     // Données réseau fictives pour la démo
     window.networkData.network = { id: 'demo-net', name: 'Réseau Pointe-Est' };
@@ -4016,10 +4199,11 @@ function isInPriorityWindow(priorityHours) {
   return false; // Pour l'instant pas de restriction de fenêtre côté client
 }
 
-async function bookNetworkSpace(spaceId, spaceName, memberUrl, memberKey, memberClientId) {
+async function bookNetworkSpace(spaceId, spaceName, memberUrl, memberKey, memberClientId, peerInstanceId) {
   if (!checkActive()) return;
   // Stocker les infos du bâtiment réseau pour la réservation
-  window._networkBooking = { spaceId, spaceName, memberUrl, memberKey, memberClientId, isNetwork: true };
+  window._networkBooking = { spaceId, spaceName, memberUrl, memberKey, memberClientId,
+                             peerInstanceId: peerInstanceId || null, isNetwork: true };
   currentBookingSpaceId = spaceId;
   document.getElementById('book-space-title').textContent = 'Réserver — ' + spaceName + ' 🔗';
   const today = new Date().toISOString().split('T')[0];
@@ -4031,6 +4215,7 @@ async function bookNetworkSpace(spaceId, spaceName, memberUrl, memberKey, member
 }
 
 async function checkLicence() {
+  if (!CENTRAL_ENABLED) return {};   // aucun module bride hors centrale
   try {
     const domain = window.location.hostname;
     const res = await fetch(
@@ -5382,8 +5567,8 @@ function pageName(page) {
 // ═══════════════════════════════════════════════
 //  LUNCH MACHINE — iframe responsive
 // ═══════════════════════════════════════════════
-const LM_KIOSK_BASE = 'https://simonvelucia-afk.github.io/LunchMachine/';
-const LM_CENTRAL_URL  = 'https://bpxscgrbxjscicpnheep.supabase.co';
+const LM_KIOSK_BASE = CohabitatConfig.lunchMachine.kioskBase;
+const LM_CENTRAL_URL  = CohabitatConfig.lunchMachine.centralUrl;
 // LM_CENTRAL_URL pointe vers le meme projet Supabase que CENTRAL_URL
 // (bpxscgrbxjscicpnheep). Les RPC / tables lunch_* vivent sur la centrale,
 // comme les tables business core (clients, contracts, etc.). On reutilise
@@ -6085,6 +6270,8 @@ async function loadSpaces() {
   renderSpaces(spacesCache);
   // Ajouter les espaces réseau après les espaces locaux
   document.getElementById('spaces-grid').innerHTML += renderNetworkSpaces();
+  // Caméra des espaces communs, entre la grille et la serre.
+  renderCameraSection();
   // Charger la section dédiée « Serre communautaire » en bas de page
   if (window.appModules.serre !== false) {
     loadSerre();
@@ -6100,7 +6287,7 @@ async function loadSpaces() {
     gridEl.dataset.netListener = '1';
     gridEl.addEventListener('click', function(e) {
       const btn = e.target.closest('.net-book-space');
-      if (btn) bookNetworkSpace(btn.dataset.sid, btn.dataset.sname, btn.dataset.url, btn.dataset.key, btn.dataset.cid);
+      if (btn) bookNetworkSpace(btn.dataset.sid, btn.dataset.sname, btn.dataset.url, btn.dataset.key, btn.dataset.cid, btn.dataset.peer);
     });
   }
 }
@@ -6181,8 +6368,8 @@ function renderNetworkSpaces(query) {
       + '<div class="card-actions">'
       + (isDemo
           ? '<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Connexion requise pour réserver">🔒 Connexion requise</button>'
-          : (currentProfile?.resident_plan === 'network' && (!currentProfile?.resident_plan_until || new Date(currentProfile.resident_plan_until) > new Date()))
-            ? '<button class="btn btn-secondary btn-sm net-book-space" data-sid="' + s.id + '" data-sname="' + escHtml(s.name).replace(/"/g,'') + '" data-url="' + s._memberUrl + '" data-key="' + s._memberKey + '" data-cid="' + s._memberClientId + '">' + pt('Réserver') + '</button>'
+          : (s._federated || (currentProfile?.resident_plan === 'network' && (!currentProfile?.resident_plan_until || new Date(currentProfile.resident_plan_until) > new Date())))
+            ? '<button class="btn btn-secondary btn-sm net-book-space" data-sid="' + s.id + '" data-sname="' + escHtml(s.name).replace(/"/g,'') + '" data-url="' + s._memberUrl + '" data-key="' + s._memberKey + '" data-cid="' + s._memberClientId + '" data-peer="' + (s._peerInstanceId || '') + '">' + pt('Réserver') + '</button>'
             : '<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Forfait Réseau requis — contactez votre administrateur">🔗 Forfait Réseau requis</button>')
       + '</div>'
       + '</div>';
@@ -7461,7 +7648,73 @@ function openBookSpace(spaceId, spaceName) {
   openModal('modal-book-space');
 }
 
+// Reservation chez une instance jumelee. Contrairement au chemin
+// central historique, l'interface n'ecrit rien chez le pair : elle
+// demande a sa propre passerelle, qui engage le debit localement puis
+// signe l'appel sortant. Si le VPN tombe entre les deux, l'operation
+// reste en file et sera rejouee avec la meme cle d'idempotence.
+async function confirmFederatedBookSpace() {
+  const nb = window._networkBooking;
+  if (!nb) return;
+  const date  = document.getElementById('book-date').value;
+  const start = document.getElementById('book-start').value;
+  const end   = document.getElementById('book-end').value;
+  if (!date || !start || !end || end <= start) {
+    toast('Veuillez remplir tous les champs', 'error');
+    return;
+  }
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const slots = Math.ceil(((eh * 60 + em) - (sh * 60 + sm)) / 15);
+
+  try {
+    const res = await fedFetch('/local/reservations', {
+      method: 'POST',
+      body: JSON.stringify({
+        peer_instance_id: nb.peerInstanceId,
+        space_id:  nb.spaceId,
+        start:     date + 'T' + start + ':00',
+        end:       date + 'T' + end + ':00',
+        slots:     slots,
+        user_name: currentProfile?.full_name || null,
+      }),
+    });
+
+    if (res.ok && res.data && res.data.ok) {
+      window._networkBooking = null;
+      closeModal('modal-book-space');
+      toast('Réservation confirmée chez ' + nb.spaceName + ' ✓', 'success');
+      trackFeature('federation', 'federated_space_booked', { peer: nb.peerInstanceId });
+      await loadProfile();
+      return;
+    }
+
+    if (res.status === 202) {
+      // Le pair est injoignable : le montant est retenu et l'appel sera
+      // rejoue. On le dit clairement plutot que d'afficher un echec.
+      window._networkBooking = null;
+      closeModal('modal-book-space');
+      toast('Immeuble jumelé injoignable — la réservation part dès le retour du lien', 'info');
+      return;
+    }
+
+    const err = (res.data && res.data.error) || 'inconnue';
+    const messages = {
+      space_unavailable: 'Ce créneau vient d\'être pris chez l\'immeuble jumelé',
+      price_mismatch:    'Le tarif a changé — rouvrez la liste des espaces',
+      INSUFFICIENT_FUNDS:'Solde insuffisant',
+      peer_not_found:    'Immeuble jumelé inconnu',
+      reservations_not_allowed: 'Cet immeuble n\'accepte pas les réservations croisées',
+    };
+    toast(messages[err] || ('Réservation refusée (' + err + ')'), 'error');
+  } catch (e) {
+    toast('Passerelle de fédération injoignable : ' + e.message, 'error');
+  }
+}
+
 async function confirmNetworkBookSpace() {
+  const nb0 = window._networkBooking;
+  if (nb0 && nb0.peerInstanceId) return confirmFederatedBookSpace();
   if (!ensureCentralOnline('reservation reseau')) return;
   const nb = window._networkBooking;
   if (!nb) return;
@@ -11646,7 +11899,7 @@ async function recordPayment() {
       const accessToken = window._cachedAccessToken;
       if (!accessToken) { toast('Session expirée', 'error'); return; }
       const idem = 'admin-credit:' + tenantId + ':' + Date.now();
-      const res = await fetch(`${CENTRAL_URL}/functions/v1/finance-bridge/record-real-payment`, {
+      const res = await fetch(`${FINANCE_BRIDGE_URL}/record-real-payment`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -11731,7 +11984,15 @@ async function loadSettings() {
     module_lunch: '🍱 Module Machine Lunch (kiosque + commandes)',
     module_serre: '🌱 Module Serre (zones de culture louables au mois)'
   };
-  const moduleData = (data || []).filter(s => moduleKeys.includes(s.key));
+  // Valeurs par defaut identiques a la migration 019 : une base qui n'a
+  // pas encore la ligne affiche quand meme son interrupteur, et la ligne
+  // est creee au premier basculement. Sans cela, un module absent de
+  // system_settings restait actif sans aucun moyen de le couper.
+  const moduleDefauts = { module_trips: 'true', module_lunch: 'false', module_serre: 'true' };
+  const moduleData = moduleKeys.map(k => {
+    const existante = (data || []).find(s => s.key === k);
+    return existante || { key: k, value: moduleDefauts[k], description: moduleLabels[k] };
+  });
   const moduleHtml = moduleData.length ? `
     <div style="margin-bottom:20px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:12px;">Modules optionnels</div>
@@ -11759,11 +12020,15 @@ async function loadSettings() {
 }
 
 async function saveModuleSetting(key, enabled) {
-  const { error } = await sb.from('system_settings').update({
+  // upsert et non update : sur une base ou la ligne n'existe pas encore,
+  // un UPDATE ne toucherait rien et l'interrupteur reviendrait en place
+  // sans rien dire.
+  const { error } = await sb.from('system_settings').upsert({
+    key,
     value: enabled ? 'true' : 'false',
-    updated_by: currentProfile.id,
+    updated_by: currentProfile?.id || null,
     updated_at: new Date().toISOString()
-  }).eq('key', key);
+  }, { onConflict: 'key' });
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
 
   // Mettre à jour le toggle visuellement
@@ -12652,4 +12917,295 @@ async function _tkRefreshBadge() {
     // Afficher la bannière après un court délai (laisser l'app charger)
     setTimeout(function() {
       var b = document.getElementById('consent-banner');
-      if (b) b
+      if (b) b.style.display = 'flex';
+    }, 1200);
+  }
+})();
+</script>
+<script>
+// Ouverture directe en mode demonstration : index.html#demo
+// Sert au raccourci d'une tablette de demo et a l'enveloppe Android,
+// qui charge exactement cette adresse. Sans le fragment, rien ne change.
+(function () {
+  if (window.location.hash !== '#demo') return;
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      if (typeof loginDemo === 'function' && !window._demoMode) { window._demoDedie = true; loginDemo(); }
+    }, 150);
+  });
+})();
+</script>
+<script>
+/* ============================================================
+ * Panneau de configuration de la demonstration
+ * ============================================================
+ * Visible uniquement en mode demonstration. Permet d'activer ou
+ * de couper les modules optionnels en pleine presentation, pour
+ * montrer l'application telle qu'elle serait chez l'interlocuteur
+ * — un immeuble sans serre, sans auto-partage, etc.
+ *
+ * Les interrupteurs appellent saveModuleSetting(), exactement la
+ * meme fonction que le panneau d'administration : il n'y a donc
+ * qu'un seul mecanisme de modules, pas un pour la demo et un pour
+ * la production.
+ * ========================================================== */
+(function () {
+  'use strict';
+
+  var CLE = 'cohabitat:demo:modules';
+
+  function memoriser() {
+    if (!window.COHABITAT_DEMO) return;
+    var etat = {};
+    (window.COHABITAT_DEMO.system_settings || []).forEach(function (r) {
+      if (r.key.indexOf('module_') === 0) etat[r.key] = r.value;
+    });
+    try { localStorage.setItem(CLE, JSON.stringify(etat)); } catch (e) {}
+  }
+
+  // Rejoue les choix de la presentation precedente : un rechargement en
+  // plein rendez-vous ne doit pas tout remettre a zero.
+  window._demoAppliquerReglages = function () {
+    if (!window.COHABITAT_DEMO) return;
+    var etat;
+    try { etat = JSON.parse(localStorage.getItem(CLE) || '{}'); } catch (e) { return; }
+    (window.COHABITAT_DEMO.system_settings || []).forEach(function (r) {
+      if (etat[r.key] !== undefined) r.value = etat[r.key];
+    });
+  };
+
+  var MODULES = [
+    { cle: 'module_trips', titre: '🚗 Auto-partage', detail: 'Covoiturage, véhicules, demandes de passagers' },
+    { cle: 'module_lunch', titre: '🍱 Machine Lunch', detail: 'Kiosque et commandes — nécessite la centrale' },
+    { cle: 'module_serre', titre: '🌱 Serre',        detail: 'Zones de culture louées au mois, capteurs' },
+  ];
+
+  function valeur(cle) {
+    var r = (window.COHABITAT_DEMO.system_settings || []).find(function (x) { return x.key === cle; });
+    return r ? r.value !== 'false' : true;
+  }
+
+  function interrupteur(m) {
+    var on = valeur(m.cle);
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--border)">'
+      + '<div><div style="font-size:14px">' + m.titre + '</div>'
+      + '<div style="font-size:12px;color:var(--text3);margin-top:2px">' + m.detail + '</div></div>'
+      + '<label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0">'
+      + '<input type="checkbox" id="mod-' + m.cle + '"' + (on ? ' checked' : '')
+      + ' onchange="_demoBasculerModule(\'' + m.cle + '\', this.checked)" style="opacity:0;width:0;height:0;position:absolute">'
+      + '<span id="mod-track-' + m.cle + '" style="position:absolute;cursor:pointer;inset:0;border-radius:22px;transition:.3s;background:'
+      + (on ? 'var(--accent2)' : 'var(--border)') + '"></span>'
+      + '<span id="mod-thumb-' + m.cle + '" style="position:absolute;height:16px;width:16px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;left:'
+      + (on ? '21px' : '3px') + '"></span>'
+      + '</label></div>';
+  }
+
+  window._demoBasculerModule = function (cle, actif) {
+    // saveModuleSetting ecrit dans system_settings (ici le jeu local),
+    // met a jour window.appModules, rafraichit la serre et reconstruit
+    // la navigation. On ne duplique rien.
+    Promise.resolve(saveModuleSetting(cle, actif)).then(memoriser);
+  };
+
+  window._demoReinitialiser = function () {
+    try { localStorage.removeItem(CLE); } catch (e) {}
+    location.reload();
+  };
+
+  window._demoOuvrirConfig = function () {
+    var fond = document.getElementById('demo-config');
+    if (fond) { fond.remove(); return; }
+    fond = document.createElement('div');
+    fond.id = 'demo-config';
+    fond.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;'
+      + 'align-items:center;justify-content:center;padding:24px';
+    fond.onclick = function (e) { if (e.target === fond) fond.remove(); };
+    fond.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);'
+      + 'max-width:460px;width:100%;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5)">'
+      + '<div style="font-family:var(--font-display,inherit);font-size:1.1rem;margin-bottom:4px">Configuration de la démonstration</div>'
+      + '<div style="font-size:12px;color:var(--text3);margin-bottom:16px">'
+      + 'Activez ou coupez les modules pour montrer l’application telle qu’elle serait dans cet immeuble. '
+      + 'Ce sont les mêmes réglages qu’un administrateur pilote en production.</div>'
+      + MODULES.map(interrupteur).join('')
+      + '<div style="display:flex;gap:10px;margin-top:18px">'
+      + '<button class="btn btn-secondary btn-sm" onclick="_demoReinitialiser()">Réinitialiser la démo</button>'
+      + '<button class="btn btn-primary btn-sm" style="margin-left:auto" '
+      + 'onclick="document.getElementById(\'demo-config\').remove()">Fermer</button>'
+      + '</div></div>';
+    document.body.appendChild(fond);
+  };
+
+  // Bouton d'acces, ajoute seulement en mode demonstration.
+  window._demoAjouterBouton = function () {
+    if (document.getElementById('demo-config-btn')) return;
+    var b = document.createElement('button');
+    b.id = 'demo-config-btn';
+    b.type = 'button';
+    b.title = 'Configuration de la démonstration';
+    b.textContent = '⚙';
+    b.onclick = window._demoOuvrirConfig;
+    b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;width:44px;height:44px;'
+      + 'border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text);'
+      + 'font-size:18px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.4)';
+    document.body.appendChild(b);
+  };
+})();
+</script>
+<script>
+// Enregistrement du service worker : c'est lui qui rend l'application
+// ouvrable sans reseau une fois installee. Requiert une origine sure
+// (https, ou localhost) — sur une origine non sure, l'appel echoue
+// silencieusement et l'application fonctionne comme avant.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      console.info('[pwa] service worker actif', reg.scope);
+    }).catch(function (e) {
+      console.info('[pwa] service worker non enregistre :', e.message);
+    });
+  });
+}
+</script>
+<script>
+/* ============================================================
+ * Caméra des espaces communs
+ * ============================================================
+ * Affiche le flux d'une caméra sur la page Espaces, entre la
+ * grille des espaces et la serre.
+ *
+ * Affichage seulement : le pilotage PTZ reste dans l'outil dédié
+ * du serveur caméra. C'est volontaire — un ordre de mouvement mal
+ * arrêté fait pivoter une caméra indéfiniment, et ce risque n'a
+ * pas sa place dans une application que tous les locataires
+ * ouvrent. L'application ne fait donc aucune requête vers le
+ * serveur caméra : elle se contente de pointer l'iframe.
+ *
+ * Le flux ne transite jamais par CoHabitat et rien n'est
+ * enregistré ici.
+ *
+ * `visibility` decide qui voit l'image :
+ *   'admin'   (defaut) administrateurs seulement
+ *   'tenants'          tous les usagers connectes
+ * Une caméra d'entrée ou de stationnement filme des allées et
+ * venues identifiables : la diffuser à tout l'immeuble se
+ * justifie beaucoup moins qu'une salle commune, d'où le défaut
+ * restrictif.
+ * ========================================================== */
+(function () {
+  'use strict';
+
+  function conf() {
+    return (window.CohabitatConfig && CohabitatConfig.cameras) || { enabled: false };
+  }
+
+  function estAdmin() {
+    var r = (typeof currentProfile !== 'undefined' && currentProfile && currentProfile.role) || '';
+    return r === 'admin' || r === 'principal_admin';
+  }
+
+  window.renderCameraSection = function () {
+    var section = document.getElementById('camera-section');
+    if (!section) return;
+    var c = conf();
+
+    var visible = c.enabled && (c.visibility === 'tenants' || estAdmin());
+    if (!visible) { section.style.display = 'none'; section.innerHTML = ''; return; }
+
+    // baseUrl vide = même origine que l'application, ce qui suppose que le
+    // serveur caméra est servi par le même reverse proxy. Une URL http://
+    // explicite est bloquée par le navigateur dès que le site passe en
+    // https (contenu mixte), sans message : juste un cadre noir.
+    var base = (c.baseUrl || '').replace(/\/$/, '');
+    var flux = base + (c.streamPath || '/stream/stream.html?src=') + encodeURIComponent(c.camera || 'cam1');
+
+    section.style.display = '';
+    section.innerHTML =
+      '<div class="section-header"><div class="section-title">'
+      + '<h2>' + escHtml(c.label || 'Caméra') + '</h2>'
+      + '<p>' + escHtml(c.description || 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.') + '</p>'
+      + '</div></div>'
+      + '<div style="background:#000;border:1px solid var(--border);border-radius:var(--radius);'
+      + 'overflow:hidden;aspect-ratio:16/9;max-width:760px">'
+      + '<iframe src="' + flux + '" title="Flux de la caméra" allow="autoplay" '
+      + 'style="width:100%;height:100%;border:0"></iframe></div>';
+  };
+})();
+</script>
+<script>
+/* ============================================================
+ * Détection du serveur injoignable sur l'écran de connexion
+ * ============================================================
+ * En appliance, l'application est servie par la machine de
+ * l'immeuble et reste ouvrable hors ligne grace au cache. Un
+ * locataire en deplacement, sans VPN, voyait donc l'ecran de
+ * connexion, echouait a se connecter sans savoir pourquoi, et
+ * n'avait plus qu'un bouton fonctionnel : le mode demo. Il se
+ * retrouvait devant des donnees fictives sans que rien ne lui
+ * dise que ce n'etait pas son immeuble.
+ *
+ * On sonde donc le serveur d'authentification au chargement et on
+ * l'annonce franchement, en presentant le mode demo pour ce qu'il
+ * est : une exploration, pas ses donnees.
+ * ========================================================== */
+(function () {
+  'use strict';
+
+  var DELAI_MS = 5000;
+  var sondageEnCours = false;
+
+  function bandeau() { return document.getElementById('login-offline'); }
+
+  function afficher(horsLigne) {
+    var el = bandeau();
+    if (!el) return;
+    window._backendOnline = !horsLigne;
+    if (!horsLigne) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = '';
+    el.style.cssText = 'display:block;margin-top:14px;padding:12px 14px;border-radius:var(--radius-sm,8px);'
+      + 'background:#3a2f18;border:1px solid #8a6a1c;color:#ffe8a8;font-size:13px;line-height:1.5;text-align:left';
+    el.innerHTML = '<strong>Serveur injoignable</strong><br>'
+      + 'Connectez-vous au réseau de l’immeuble ou au VPN pour accéder à votre compte. '
+      + 'Le mode démonstration ci-dessous reste disponible : il montre un immeuble fictif, '
+      + 'pas vos données.';
+  }
+
+  // Sonde /auth/v1/health : c'est le service dont depend la connexion,
+  // donc le bon indicateur. Une erreur reseau, un delai depasse ou un
+  // code d'erreur valent « injoignable ».
+  async function sonder() {
+    if (sondageEnCours) return;
+    sondageEnCours = true;
+    try {
+      if (navigator.onLine === false) { afficher(true); return; }
+      var base = (window.CohabitatConfig && CohabitatConfig.supabaseUrl) || '';
+      if (!base) { afficher(true); return; }
+      var ctrl = new AbortController();
+      var minuteur = setTimeout(function () { ctrl.abort(); }, DELAI_MS);
+      try {
+        var res = await fetch(base.replace(/\/$/, '') + '/auth/v1/health', {
+          method: 'GET',
+          signal: ctrl.signal,
+          headers: { apikey: (CohabitatConfig && CohabitatConfig.supabaseAnonKey) || '' },
+        });
+        afficher(!res.ok);
+      } finally {
+        clearTimeout(minuteur);
+      }
+    } catch (e) {
+      afficher(true);
+    } finally {
+      sondageEnCours = false;
+    }
+  }
+
+  window.sonderServeur = sonder;
+
+  window.addEventListener('load', function () {
+    // Laisser la page se poser avant de sonder : inutile de retarder
+    // l'affichage de l'ecran de connexion pour une requete reseau.
+    setTimeout(sonder, 400);
+  });
+  window.addEventListener('online', sonder);
+  window.addEventListener('offline', function () { afficher(true); });
+})();
+</script>

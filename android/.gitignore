@@ -1,0 +1,8 @@
+# Sorties de construction et fichiers locaux d'Android Studio
+build/
+.gradle/
+local.properties
+*.iml
+.idea/
+# Les assets sont regeneres par sync-assets.sh
+app/src/main/assets/
