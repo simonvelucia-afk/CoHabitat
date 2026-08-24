@@ -297,7 +297,18 @@
       select: function () { return req; },
       insert: function (rows) { op = { kind: 'insert', rows: rows }; return req; },
       update: function (patch) { op = { kind: 'update', patch: patch }; return req; },
-      upsert: function (row) { op = { kind: 'upsert', row: row }; return req; },
+      // onConflict indique la ou les colonnes qui identifient la ligne.
+      // Toutes les tables n'ont pas d'id : system_settings est cle par
+      // `key`, et un upsert qui ne regarderait que l'id y creerait des
+      // doublons au lieu de mettre a jour.
+      upsert: function (row, opts) {
+        op = {
+          kind: 'upsert',
+          row: row,
+          cles: ((opts && opts.onConflict) || 'id').split(',').map(function (c) { return c.trim(); }),
+        };
+        return req;
+      },
       delete: function () { op = { kind: 'delete' }; return req; },
 
       eq: function (col, val) { lignes = lignes.filter(function (r) { return egal(r[col], val); }); return req; },
@@ -344,8 +355,16 @@
           if (op.kind === 'insert' || op.kind === 'upsert') {
             var brutes = op.kind === 'insert' ? op.rows : [op.row];
             if (!Array.isArray(brutes)) brutes = [brutes];
+            var cles = op.cles || ['id'];
             brutes.forEach(function (r) {
-              var existante = r && r.id ? source.find(function (x) { return String(x.id) === String(r.id); }) : null;
+              var existante = null;
+              if (r && op.kind === 'upsert' && cles.every(function (c) { return r[c] !== undefined; })) {
+                existante = source.find(function (x) {
+                  return cles.every(function (c) { return String(x[c]) === String(r[c]); });
+                });
+              } else if (r && r.id) {
+                existante = source.find(function (x) { return String(x.id) === String(r.id); });
+              }
               if (existante && op.kind === 'upsert') {
                 Object.assign(existante, r);
                 touchees.push(existante);

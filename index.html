@@ -11973,7 +11973,15 @@ async function loadSettings() {
     module_lunch: '🍱 Module Machine Lunch (kiosque + commandes)',
     module_serre: '🌱 Module Serre (zones de culture louables au mois)'
   };
-  const moduleData = (data || []).filter(s => moduleKeys.includes(s.key));
+  // Valeurs par defaut identiques a la migration 019 : une base qui n'a
+  // pas encore la ligne affiche quand meme son interrupteur, et la ligne
+  // est creee au premier basculement. Sans cela, un module absent de
+  // system_settings restait actif sans aucun moyen de le couper.
+  const moduleDefauts = { module_trips: 'true', module_lunch: 'false', module_serre: 'true' };
+  const moduleData = moduleKeys.map(k => {
+    const existante = (data || []).find(s => s.key === k);
+    return existante || { key: k, value: moduleDefauts[k], description: moduleLabels[k] };
+  });
   const moduleHtml = moduleData.length ? `
     <div style="margin-bottom:20px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:12px;">Modules optionnels</div>
@@ -12001,11 +12009,15 @@ async function loadSettings() {
 }
 
 async function saveModuleSetting(key, enabled) {
-  const { error } = await sb.from('system_settings').update({
+  // upsert et non update : sur une base ou la ligne n'existe pas encore,
+  // un UPDATE ne toucherait rien et l'interrupteur reviendrait en place
+  // sans rien dire.
+  const { error } = await sb.from('system_settings').upsert({
+    key,
     value: enabled ? 'true' : 'false',
-    updated_by: currentProfile.id,
+    updated_by: currentProfile?.id || null,
     updated_at: new Date().toISOString()
-  }).eq('key', key);
+  }, { onConflict: 'key' });
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
 
   // Mettre à jour le toggle visuellement
