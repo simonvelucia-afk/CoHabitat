@@ -10802,8 +10802,16 @@ async function loadAdmin() {
   // Le concierge n'a acces qu'a l'onglet Billets dans le menu admin.
   const isConciergeOnly = currentProfile?.role === 'concierge';
   // Cacher tous les autres onglets pour le concierge
+  // Parametres reste reserve a l'administrateur principal : c'est de la
+  // que se choisit la configuration de la Machine Lunch, entre autres.
+  // Sans cette exception, la branche « tout afficher » ci-dessous defaisait
+  // la garde posee a l'ouverture de l'application, et un admin ordinaire
+  // voyait un ecran dont la base refuse ensuite chaque ecriture.
+  const estPrincipal = currentProfile?.role === 'principal_admin';
   document.querySelectorAll('#page-admin .admin-tabs .admin-tab').forEach(btn => {
-    if (btn.id === 'admin-tab-tickets') {
+    if (btn.id === 'settings-tab') {
+      btn.style.display = estPrincipal ? '' : 'none';
+    } else if (btn.id === 'admin-tab-tickets') {
       btn.style.display = '';
     } else if (isConciergeOnly) {
       btn.style.display = 'none';
@@ -10818,6 +10826,12 @@ async function adminTab(tab) {
   // Garde-fou : un concierge ne peut acceder qu'a l'onglet Billets.
   if (currentProfile?.role === 'concierge' && tab !== 'tickets') {
     tab = 'tickets';
+  }
+  // Et Parametres reste a l'administrateur principal, meme appele
+  // directement : masquer le bouton ne suffit pas.
+  if (tab === 'settings' && currentProfile?.role !== 'principal_admin') {
+    toast('Réservé à l\'administrateur principal', 'info');
+    tab = 'tenants';
   }
   currentAdminTab = tab;
   document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none');
