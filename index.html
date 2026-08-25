@@ -309,7 +309,7 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   justify-content: space-between;
   height: 60px;
   position: sticky;
-  top: 0;
+  top: var(--haut-bandeau, 0px);
   z-index: 100;
 }
 .nav-logo {
@@ -2000,7 +2000,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
     </div><!-- fin page-admin -->
 
     <!-- ==================== LUNCH MACHINE ==================== -->
-    <div id="page-lunch" class="page" style="padding:0;max-width:none;height:calc(100vh - 60px);background:var(--bg);">
+    <div id="page-lunch" class="page" style="padding:0;max-width:none;height:calc(100vh - 60px - var(--haut-bandeau, 0px));background:var(--bg);">
       <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:20px;padding:40px 20px;width:100%;max-width:600px;margin:0 auto;">
         <div style="font-size:4rem;">🍱</div>
         <div style="font-family:var(--font-serif);font-size:1.8rem;color:var(--text);">Machine Lunch</div>
@@ -3035,6 +3035,17 @@ function majBandeauStatut() {
   if (!bande) return;
   const quelqueChose = [...bande.children].some(e => e.style.display !== 'none');
   bande.style.display = quelqueChose ? 'flex' : 'none';
+
+  // La barre de navigation doit se coller SOUS cette ligne, pas sous le
+  // haut de la fenetre. Les deux etant collantes a top:0, la barre se
+  // glissait derriere des le premier defilement — elle ne bougeait pas,
+  // elle etait recouverte, la ligne ayant un z-index bien superieur.
+  //
+  // La hauteur est mesuree plutot que codee en dur : la ligne fait une
+  // ou deux lignes selon la largeur et selon qu'elle porte une mention
+  // ou les deux.
+  const haut = quelqueChose ? Math.round(bande.getBoundingClientRect().height) : 0;
+  document.documentElement.style.setProperty('--haut-bandeau', haut + 'px');
 }
 
 // Banniere "X operations en attente" rendue par balanceOps.onChange.
@@ -5784,7 +5795,10 @@ function ajusterNav() {
 // change, la decision aussi.
 (function () {
   let attente;
-  const relancer = () => { clearTimeout(attente); attente = setTimeout(ajusterNav, 120); };
+  const relancer = () => { clearTimeout(attente); attente = setTimeout(function () {
+    majBandeauStatut();   // sa hauteur change si elle se replie sur deux lignes
+    ajusterNav();
+  }, 120); };
   window.addEventListener('resize', relancer);
   window.addEventListener('orientationchange', relancer);
 })();
