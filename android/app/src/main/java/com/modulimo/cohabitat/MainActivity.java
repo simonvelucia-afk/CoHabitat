@@ -1,6 +1,9 @@
 package com.modulimo.cohabitat;
 
 import android.annotation.SuppressLint;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.webkit.WebResourceRequest;
@@ -64,11 +67,27 @@ public class MainActivity extends AppCompatActivity {
                 return assetLoader.shouldInterceptRequest(requete.getUrl());
             }
 
-            // Rien ne doit sortir de l'application : un lien externe est
-            // ignore plutot que d'ouvrir une page blanche.
+            // Un lien externe est confie au navigateur du systeme, pas
+            // charge dans la vue web : l'application n'a pas la permission
+            // INTERNET et n'en tirerait qu'une page blanche.
+            //
+            // Auparavant il etait simplement ignore, ce qui donnait un lien
+            // mort — toucher le logo Modulimo ne faisait rien. Le passer au
+            // navigateur ouvre bien la page sans donner pour autant le
+            // reseau a l'application.
             @Override
             public boolean shouldOverrideUrlLoading(WebView vue, WebResourceRequest requete) {
-                return !HOTE.equals(requete.getUrl().getHost());
+                Uri url = requete.getUrl();
+                if (HOTE.equals(url.getHost())) return false;   // page embarquee
+                try {
+                    Intent navigateur = new Intent(Intent.ACTION_VIEW, url);
+                    navigateur.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    MainActivity.this.startActivity(navigateur);
+                } catch (ActivityNotFoundException e) {
+                    // Aucun navigateur installe : ne rien faire plutot que
+                    // laisser l'application s'arreter.
+                }
+                return true;
             }
         });
 

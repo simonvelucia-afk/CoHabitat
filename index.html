@@ -347,13 +347,13 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   display: flex;
   gap: 4px;
   align-items: center;
-  /* La rangee ne pousse jamais la barre au-dela de l'ecran : elle se
-     laisse comprimer, et ajusterNav() bascule sur le menu burger avant
-     que quoi que ce soit soit tronque. overflow:hidden n'est qu'un
-     garde-fou si le script ne s'executait pas. */
+  /* Pas d'overflow:hidden ici, malgre la tentation d'y mettre un
+     garde-fou : les sous-menus sont positionnes en absolu et un ancetre
+     qui decoupe les rend invisibles — ils s'ouvraient sans que rien
+     n'apparaisse. C'est ajusterNav() qui empeche le debordement, en
+     repliant la rangee avant qu'elle ne depasse. */
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
   justify-content: center;
 }
 
