@@ -309,7 +309,7 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   justify-content: space-between;
   height: 60px;
   position: sticky;
-  top: var(--haut-bandeau, 0px);
+  top: 0;
   z-index: 100;
 }
 .nav-logo {
@@ -431,13 +431,22 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   color: var(--accent2);
   font-weight: 500;
 }
-/* Ligne d'etat, au-dessus de la barre de navigation. Elle regroupe ce qui
+/* Le contenu s'arrete au-dessus de la ligne d'etat : sans cette marge,
+   le bas de chaque page passerait dessous. */
+body { padding-bottom: var(--haut-bandeau, 0px); }
+
+/* Ligne d'etat, en bas de l'ecran. Elle regroupe ce qui
    concerne l'etat de l'instance — mode demonstration, centrale
    injoignable — plutot que de melanger ces mentions aux donnees du compte
    dans la barre. */
 #bandeau-statut {
-  position: sticky;
-  top: 0;
+  /* En bas et fixe, pour laisser le haut de l'ecran a la barre de
+     navigation. Les deux etaient collants en haut : la barre venait se
+     glisser derriere et disparaissait au defilement. */
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -445,8 +454,24 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   flex-wrap: wrap;
   gap: 10px;
   background: var(--surface2);
-  border-bottom: 1px solid var(--border);
-  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  padding: 6px 60px 6px 12px;   /* place a droite pour l'engrenage */
+}
+
+/* L'engrenage de configuration vit dans cette ligne plutot que de
+   flotter par-dessus le contenu. */
+#bandeau-statut #demo-config-btn {
+  position: absolute;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0;
 }
 #central-offline-banner {
   color: #ffb3a8;
@@ -674,7 +699,9 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 /* ===== TOASTS ===== */
 #toast-container {
   position: fixed;
-  bottom: 24px;
+  /* Decale au-dessus de la ligne d'etat, sans quoi les notifications
+     recouvrent l'engrenage de configuration. */
+  bottom: calc(24px + var(--haut-bandeau, 0px));
   right: 24px;
   z-index: 1000;
   display: flex;
@@ -2000,7 +2027,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
     </div><!-- fin page-admin -->
 
     <!-- ==================== LUNCH MACHINE ==================== -->
-    <div id="page-lunch" class="page" style="padding:0;max-width:none;height:calc(100vh - 60px - var(--haut-bandeau, 0px));background:var(--bg);">
+    <div id="page-lunch" class="page" style="padding:0;max-width:none;height:calc(100vh - 60px);background:var(--bg);">
       <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:20px;padding:40px 20px;width:100%;max-width:600px;margin:0 auto;">
         <div style="font-size:4rem;">🍱</div>
         <div style="font-family:var(--font-serif);font-size:1.8rem;color:var(--text);">Machine Lunch</div>
@@ -3033,17 +3060,15 @@ function renderCentralBanner() {
 function majBandeauStatut() {
   const bande = document.getElementById('bandeau-statut');
   if (!bande) return;
+  // L'engrenage compte : en demonstration sans avertissement de centrale,
+  // c'est lui seul qui justifie la ligne.
   const quelqueChose = [...bande.children].some(e => e.style.display !== 'none');
   bande.style.display = quelqueChose ? 'flex' : 'none';
 
-  // La barre de navigation doit se coller SOUS cette ligne, pas sous le
-  // haut de la fenetre. Les deux etant collantes a top:0, la barre se
-  // glissait derriere des le premier defilement — elle ne bougeait pas,
-  // elle etait recouverte, la ligne ayant un z-index bien superieur.
-  //
-  // La hauteur est mesuree plutot que codee en dur : la ligne fait une
-  // ou deux lignes selon la largeur et selon qu'elle porte une mention
-  // ou les deux.
+  // Sa hauteur devient la marge basse du contenu, faute de quoi le bas de
+  // chaque page passerait dessous. Elle est mesuree plutot que codee en
+  // dur : la ligne fait une ou deux lignes selon la largeur et selon
+  // qu'elle porte une mention ou les deux.
   const haut = quelqueChose ? Math.round(bande.getBoundingClientRect().height) : 0;
   document.documentElement.style.setProperty('--haut-bandeau', haut + 'px');
 }
@@ -13261,7 +13286,9 @@ async function _tkRefreshBadge() {
 <style>
 #consent-banner {
   position: fixed;
-  bottom: 0; left: 0; right: 0;
+  /* Au-dessus de la ligne d'etat, qui occupe desormais le bas de l'ecran :
+     colle a zero, ce bandeau recouvrait l'engrenage de configuration. */
+  bottom: var(--haut-bandeau, 0px); left: 0; right: 0;
   background: var(--surface, #1a1a1a);
   border-top: 1px solid var(--border, #333);
   padding: 14px 20px;
@@ -13485,10 +13512,12 @@ window.setConsent = function setConsent(choix) {
     b.title = 'Configuration de la démonstration';
     b.textContent = '⚙';
     b.onclick = window._demoOuvrirConfig;
-    b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;width:44px;height:44px;'
-      + 'border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text);'
-      + 'font-size:18px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.4)';
-    document.body.appendChild(b);
+    // Il vit dans la ligne d'etat du bas, avec les mentions de mode
+    // demonstration et de centrale injoignable — plutot que de flotter
+    // par-dessus le contenu. Son apparence vient de la feuille de style.
+    var bande = document.getElementById('bandeau-statut');
+    (bande || document.body).appendChild(b);
+    if (typeof majBandeauStatut === 'function') majBandeauStatut();
   };
 })();
 </script>
