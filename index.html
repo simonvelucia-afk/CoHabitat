@@ -2048,7 +2048,11 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         <div id="lunch-machines-btns" style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:400px;">
           <div style="color:var(--text3);font-size:13px;">Chargement…</div>
         </div>
-        <div style="border-top:1px solid var(--border);padding-top:18px;margin-top:6px;width:100%;max-width:400px;display:flex;flex-direction:column;gap:8px;align-items:center;">
+        <!-- Invitation a l'essai : elle s'adresse aux visiteurs du site public
+             qui n'ont pas de compte. Masquee en demonstration, ou toute
+             l'application est deja fictive et ou les cartes de machines
+             ouvrent le meme kiosque — voir onLunchPageShow(). -->
+        <div id="lunch-essai" style="border-top:1px solid var(--border);padding-top:18px;margin-top:6px;width:100%;max-width:400px;display:flex;flex-direction:column;gap:8px;align-items:center;">
           <div style="font-size:12px;color:var(--text3);text-align:center;">Pas de compte ou simple curiosité ?</div>
           <button onclick="openLunchDemo()" class="btn btn-secondary" style="width:100%;">
             🧪 Faire l'essai en mode démo
@@ -6065,6 +6069,14 @@ function getLmToken() {
 async function onLunchPageShow() {
   const container = document.getElementById('lunch-machines-btns');
   if (!container) return;
+
+  // En demonstration, « Faire l'essai en mode demo » n'a plus d'objet :
+  // l'application entiere est deja une demonstration, et les cartes de
+  // machines ouvrent exactement le meme kiosque. Deux chemins vers le
+  // meme endroit, dont un qui promet de basculer dans un mode ou l'on se
+  // trouve deja.
+  const essai = document.getElementById('lunch-essai');
+  if (essai) essai.style.display = window._demoMode ? 'none' : 'flex';
   container.innerHTML = '<div style="color:var(--text3);font-size:13px;">Chargement…</div>';
 
   try {
