@@ -3795,6 +3795,12 @@ async function loginDemo() {
     { created_at: new Date(Date.now() - 18*86400000).toISOString(), description: 'Réservation Terrasse', amount: -8.00, balance_after: 4.00 },
     { created_at: new Date(Date.now() - 21*86400000).toISOString(), description: 'Crédit par administrateur — Paiement mensuel', amount: 100.00, balance_after: 12.00 },
   ];
+  // La branche demonstration de loadAppModules n'etait jamais atteinte :
+  // seul le parcours authentifie l'appelait. Les modules restaient donc
+  // aux valeurs par defaut, et window.lunchReglages n'existait pas — d'ou
+  // une machine annoncee « centrale injoignable » alors que le jeu de
+  // demonstration la donne en mode demonstration.
+  await loadAppModules();
   await loadNetworkData();
   showApp();
   toast('Mode démo activé — consultation uniquement', 'info');
@@ -4288,7 +4294,8 @@ async function loadAppModules() {
     // immeuble sans serre ou sans auto-partage selon l'interlocuteur.
     const { data: reglages } = await sb.from('system_settings')
       .select('key, value')
-      .in('key', ['module_trips', 'module_lunch', 'module_serre']);
+      .in('key', ['module_trips', 'module_lunch', 'module_serre',
+                  'lunch_mode', 'lunch_local_url']);
     const actif = (k) => (reglages || []).find(r => r.key === k)?.value !== 'false';
     window.appModules.trips = actif('module_trips');
     window.appModules.lunch = actif('module_lunch');
@@ -4300,7 +4307,7 @@ async function loadAppModules() {
   const { data: localSettings } = await sb.from('system_settings')
     .select('key, value')
     .in('key', ['module_trips', 'module_lunch', 'module_serre', 'finance_central_enabled',
-                'lunch_local', 'lunch_local_url']);
+                'lunch_mode', 'lunch_local_url']);
   const localTrips = localSettings?.find(s => s.key === 'module_trips')?.value !== 'false';
   const localLunch = localSettings?.find(s => s.key === 'module_lunch')?.value !== 'false';
   const localSerre = localSettings?.find(s => s.key === 'module_serre')?.value !== 'false';
