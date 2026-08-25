@@ -2048,7 +2048,11 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         <div id="lunch-machines-btns" style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:400px;">
           <div style="color:var(--text3);font-size:13px;">Chargement…</div>
         </div>
-        <div style="border-top:1px solid var(--border);padding-top:18px;margin-top:6px;width:100%;max-width:400px;display:flex;flex-direction:column;gap:8px;align-items:center;">
+        <!-- Invitation a l'essai : elle s'adresse aux visiteurs du site public
+             qui n'ont pas de compte. Masquee en demonstration, ou toute
+             l'application est deja fictive et ou les cartes de machines
+             ouvrent le meme kiosque — voir onLunchPageShow(). -->
+        <div id="lunch-essai" style="border-top:1px solid var(--border);padding-top:18px;margin-top:6px;width:100%;max-width:400px;display:flex;flex-direction:column;gap:8px;align-items:center;">
           <div style="font-size:12px;color:var(--text3);text-align:center;">Pas de compte ou simple curiosité ?</div>
           <button onclick="openLunchDemo()" class="btn btn-secondary" style="width:100%;">
             🧪 Faire l'essai en mode démo
@@ -3791,6 +3795,12 @@ async function loginDemo() {
     { created_at: new Date(Date.now() - 18*86400000).toISOString(), description: 'Réservation Terrasse', amount: -8.00, balance_after: 4.00 },
     { created_at: new Date(Date.now() - 21*86400000).toISOString(), description: 'Crédit par administrateur — Paiement mensuel', amount: 100.00, balance_after: 12.00 },
   ];
+  // La branche demonstration de loadAppModules n'etait jamais atteinte :
+  // seul le parcours authentifie l'appelait. Les modules restaient donc
+  // aux valeurs par defaut, et window.lunchReglages n'existait pas — d'ou
+  // une machine annoncee « centrale injoignable » alors que le jeu de
+  // demonstration la donne en mode demonstration.
+  await loadAppModules();
   await loadNetworkData();
   showApp();
   toast('Mode démo activé — consultation uniquement', 'info');
@@ -4178,20 +4188,103 @@ async function syncCentralBalanceToProfile() {
 //
 // Dans les deux cas le solde vit sur la centrale : le mode local rend le
 // kiosque joignable sans internet, il ne rend pas les achats autonomes.
+const MODES_LUNCH = ['demo', 'local', 'central'];
+
 function lireReglagesLunch(reglages) {
   const val = (k) => (reglages || []).find(r => r.key === k)?.value;
+  const m = val('lunch_mode');
   window.lunchReglages = {
-    local: val('lunch_local') === 'true',
-    url:   (val('lunch_local_url') || '').trim()
+    mode: MODES_LUNCH.includes(m) ? m : 'central',
+    url:  (val('lunch_local_url') || '').trim()
   };
 }
 
 function adresseKiosque() {
-  const r = window.lunchReglages || {};
+  const r = window.lunchReglages || { mode: 'central' };
+  if (r.mode === 'demo') return CohabitatConfig.lunchMachine.demoUrl;
   // Une adresse locale vide ferait ouvrir « ?machine=... » sur rien : on
   // retombe alors sur l'adresse livree, plutot que sur une page blanche.
-  if (r.local && r.url) return r.url;
+  if (r.mode === 'local' && r.url) return r.url;
   return CohabitatConfig.lunchMachine.kioskBase;
+}
+
+// Le kiosque tourne sur des donnees fictives quand la machine est en
+// demonstration : c'est le seul mode ou aucune transaction n'a lieu.
+function kiosqueEnDemonstration() {
+  return (window.lunchReglages || {}).mode === 'demo';
+}
+
+// Etat de la liaison : constate, jamais choisi. En local il n'y a rien a
+// joindre, en demonstration rien a dire ; seul le mode central depend
+// d'un lien, et window._centralOnline le porte deja.
+function etatLiaisonLunch() {
+  const r = window.lunchReglages || { mode: 'central' };
+  if (r.mode === 'demo')  return { texte: 'Données fictives — aucune transaction, aucun lien requis.', couleur: 'var(--text3)' };
+  if (r.mode === 'local') return r.url
+    ? { texte: 'Machine jointe à ' + r.url + ' — le solde reste géré par la centrale.', couleur: 'var(--text3)' }
+    : { texte: 'Aucune adresse saisie : l\'adresse livrée avec l\'instance sera employée.', couleur: 'var(--accent3, #e07060)' };
+  if (window._centralOnline === true)  return { texte: '● Liaison à la centrale établie.', couleur: '#7eb8a0' };
+  if (window._centralOnline === false) return { texte: '● Centrale injoignable — les achats seront refusés.', couleur: 'var(--accent3, #e07060)' };
+  return { texte: '○ Liaison à la centrale non encore vérifiée.', couleur: 'var(--text3)' };
+}
+
+function afficherEtatLiaisonLunch() {
+  const el = document.getElementById('lunch-etat-liaison');
+  if (!el) return;
+  const e = etatLiaisonLunch();
+  el.textContent = e.texte;
+  el.style.color = e.couleur;
+}
+
+// Enregistrement du mode. Meme ecriture en deux temps que les
+// interrupteurs de modules : UPDATE puis INSERT si la ligne manque.
+async function enregistrerModeLunch(mode) {
+  if (!MODES_LUNCH.includes(mode)) return;
+  const precedent = (window.lunchReglages || {}).mode || 'central';
+
+  // Passer de local a central demande une consolidation des donnees : en
+  // mode local la machine a vendu sur ses propres registres, que la
+  // centrale ignore. Basculer sans les remonter laisserait des ventes
+  // sans contrepartie et des soldes qui ne concordent pas.
+  //
+  // Cette consolidation n'existe pas encore : elle vit du cote de la
+  // machine et de la centrale, pas ici. Faute de pouvoir la declencher,
+  // l'ecran le dit et demande une confirmation explicite plutot que de
+  // laisser croire qu'elle a lieu.
+  if (precedent === 'local' && mode === 'central') {
+    const ok = confirm(
+      'Passage du mode local au mode central.\n\n'
+      + 'En mode local, la machine a pu enregistrer des ventes que la centrale '
+      + 'ignore. Une consolidation de ces donnees est necessaire avant que les '
+      + 'soldes concordent — elle n\'est pas effectuee par ce changement.\n\n'
+      + 'Confirmer le changement de configuration ?');
+    if (!ok) {
+      const sel = document.getElementById('lunch-mode');
+      if (sel) sel.value = precedent;
+      return;
+    }
+  }
+
+  const groupe = document.getElementById('lunch-url-groupe');
+  if (groupe) groupe.style.display = (mode === 'local') ? 'block' : 'none';
+
+  const payload = { value: mode, updated_by: currentProfile?.id || null,
+                    updated_at: new Date().toISOString() };
+  let { data: touchees, error } = await sb.from('system_settings')
+    .update(payload).eq('key', 'lunch_mode').select('key');
+  if (!error && (!touchees || touchees.length === 0)) {
+    ({ error } = await sb.from('system_settings').insert({
+      key: 'lunch_mode', description: 'Configuration de la Machine Lunch', ...payload }));
+  }
+  if (error) {
+    const s = document.getElementById('lunch-mode');
+    if (s) s.value = (window.lunchReglages || {}).mode || 'central';
+    toast('Erreur: ' + error.message, 'error');
+    return;
+  }
+  window.lunchReglages = { ...(window.lunchReglages || {}), mode };
+  afficherEtatLiaisonLunch();
+  toast('Configuration de la machine enregistrée', 'success');
 }
 
 async function loadAppModules() {
@@ -4201,7 +4294,8 @@ async function loadAppModules() {
     // immeuble sans serre ou sans auto-partage selon l'interlocuteur.
     const { data: reglages } = await sb.from('system_settings')
       .select('key, value')
-      .in('key', ['module_trips', 'module_lunch', 'module_serre']);
+      .in('key', ['module_trips', 'module_lunch', 'module_serre',
+                  'lunch_mode', 'lunch_local_url']);
     const actif = (k) => (reglages || []).find(r => r.key === k)?.value !== 'false';
     window.appModules.trips = actif('module_trips');
     window.appModules.lunch = actif('module_lunch');
@@ -4213,7 +4307,7 @@ async function loadAppModules() {
   const { data: localSettings } = await sb.from('system_settings')
     .select('key, value')
     .in('key', ['module_trips', 'module_lunch', 'module_serre', 'finance_central_enabled',
-                'lunch_local', 'lunch_local_url']);
+                'lunch_mode', 'lunch_local_url']);
   const localTrips = localSettings?.find(s => s.key === 'module_trips')?.value !== 'false';
   const localLunch = localSettings?.find(s => s.key === 'module_lunch')?.value !== 'false';
   const localSerre = localSettings?.find(s => s.key === 'module_serre')?.value !== 'false';
@@ -6065,6 +6159,14 @@ function getLmToken() {
 async function onLunchPageShow() {
   const container = document.getElementById('lunch-machines-btns');
   if (!container) return;
+
+  // En demonstration, « Faire l'essai en mode demo » n'a plus d'objet :
+  // l'application entiere est deja une demonstration, et les cartes de
+  // machines ouvrent exactement le meme kiosque. Deux chemins vers le
+  // meme endroit, dont un qui promet de basculer dans un mode ou l'on se
+  // trouve deja.
+  const essai = document.getElementById('lunch-essai');
+  if (essai) essai.style.display = window._demoMode ? 'none' : 'flex';
   container.innerHTML = '<div style="color:var(--text3);font-size:13px;">Chargement…</div>';
 
   try {
@@ -10700,8 +10802,16 @@ async function loadAdmin() {
   // Le concierge n'a acces qu'a l'onglet Billets dans le menu admin.
   const isConciergeOnly = currentProfile?.role === 'concierge';
   // Cacher tous les autres onglets pour le concierge
+  // Parametres reste reserve a l'administrateur principal : c'est de la
+  // que se choisit la configuration de la Machine Lunch, entre autres.
+  // Sans cette exception, la branche « tout afficher » ci-dessous defaisait
+  // la garde posee a l'ouverture de l'application, et un admin ordinaire
+  // voyait un ecran dont la base refuse ensuite chaque ecriture.
+  const estPrincipal = currentProfile?.role === 'principal_admin';
   document.querySelectorAll('#page-admin .admin-tabs .admin-tab').forEach(btn => {
-    if (btn.id === 'admin-tab-tickets') {
+    if (btn.id === 'settings-tab') {
+      btn.style.display = estPrincipal ? '' : 'none';
+    } else if (btn.id === 'admin-tab-tickets') {
       btn.style.display = '';
     } else if (isConciergeOnly) {
       btn.style.display = 'none';
@@ -10716,6 +10826,12 @@ async function adminTab(tab) {
   // Garde-fou : un concierge ne peut acceder qu'a l'onglet Billets.
   if (currentProfile?.role === 'concierge' && tab !== 'tickets') {
     tab = 'tickets';
+  }
+  // Et Parametres reste a l'administrateur principal, meme appele
+  // directement : masquer le bouton ne suffit pas.
+  if (tab === 'settings' && currentProfile?.role !== 'principal_admin') {
+    toast('Réservé à l\'administrateur principal', 'info');
+    tab = 'tenants';
   }
   currentAdminTab = tab;
   document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none');
@@ -12462,19 +12578,17 @@ async function loadSettings() {
   if (!form) return;
 
   // Modules activables — affichés en premier avec des toggles
-  const moduleKeys = ['module_trips', 'module_lunch', 'module_serre', 'lunch_local'];
+  const moduleKeys = ['module_trips', 'module_lunch', 'module_serre'];
   const moduleLabels = {
     module_trips: '🚗 Module Auto-partage (covoiturage + véhicules)',
     module_lunch: '🍱 Module Machine Lunch (kiosque + commandes)',
-    module_serre: '🌱 Module Serre (zones de culture louables au mois)',
-    lunch_local: '🖥 Machine Lunch sur le réseau local (adresse ci-dessous)'
+    module_serre: '🌱 Module Serre (zones de culture louables au mois)'
   };
   // Valeurs par defaut identiques a la migration 019 : une base qui n'a
   // pas encore la ligne affiche quand meme son interrupteur, et la ligne
   // est creee au premier basculement. Sans cela, un module absent de
   // system_settings restait actif sans aucun moyen de le couper.
-  const moduleDefauts = { module_trips: 'true', module_lunch: 'false', module_serre: 'true',
-                          lunch_local: 'false' };
+  const moduleDefauts = { module_trips: 'true', module_lunch: 'false', module_serre: 'true' };
   const moduleData = moduleKeys.map(k => {
     const existante = (data || []).find(s => s.key === k);
     return existante || { key: k, value: moduleDefauts[k], description: moduleLabels[k] };
@@ -12496,13 +12610,39 @@ async function loadSettings() {
         </label>
       </div>`).join('')}
     </div>` : '';
-  form.innerHTML = moduleHtml + (data || []).filter(s => !moduleKeys.includes(s.key)).map(s => `
+  // Machine Lunch : un choix a trois branches, pas un interrupteur. La
+  // liaison a la centrale n'en fait pas partie — elle ne se choisit pas,
+  // elle se constate, et l'application l'affiche.
+  const modeCourant = (data || []).find(s => s.key === 'lunch_mode')?.value || 'central';
+  const urlCourante = (data || []).find(s => s.key === 'lunch_local_url')?.value || '';
+  const lunchHtml = window.appModules.lunch ? `
+    <div style="margin-bottom:20px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:12px;">Machine Lunch</div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label for="lunch-mode">Configuration de la machine</label>
+        <select id="lunch-mode" onchange="enregistrerModeLunch(this.value)">
+          <option value="demo"    ${modeCourant === 'demo'    ? 'selected' : ''}>Démonstration — données fictives, aucune transaction</option>
+          <option value="local"   ${modeCourant === 'local'   ? 'selected' : ''}>Local — machine sur le réseau du bâtiment</option>
+          <option value="central" ${modeCourant === 'central' ? 'selected' : ''}>Central — adresse livrée avec l'instance</option>
+        </select>
+      </div>
+      <div class="form-group" id="lunch-url-groupe" style="margin-bottom:10px;display:${modeCourant === 'local' ? 'block' : 'none'};">
+        <label for="setting-lunch_local_url">Adresse du kiosque sur le réseau du bâtiment</label>
+        <input type="text" id="setting-lunch_local_url" value="${escHtml(urlCourante)}"
+               placeholder="https://lunch.immeuble.lan/">
+      </div>
+      <div id="lunch-etat-liaison" style="font-size:12px;color:var(--text3);"></div>
+    </div>` : '';
+
+  form.innerHTML = moduleHtml + lunchHtml
+    + (data || []).filter(s => !moduleKeys.includes(s.key) && !s.key.startsWith('lunch_')).map(s => `
     <div class="form-group">
       <label>${escHtml(s.description || s.key)}</label>
       <input type="text" id="setting-${s.key}" value="${escHtml(s.value)}">
     </div>
   `).join('');
   settingsCache = Object.fromEntries((data || []).map(s => [s.key, s]));
+  afficherEtatLiaisonLunch();
 }
 
 const MODULE_DESCRIPTIONS = {
