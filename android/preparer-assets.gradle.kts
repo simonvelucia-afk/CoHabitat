@@ -16,6 +16,23 @@ import java.io.File
 val depot: File = rootProject.projectDir.parentFile      // racine du depot CoHabitat
 val dest: File  = file("src/main/assets")
 
+// Le kiosque LunchMachine, embarque pour que la demonstration montre le
+// parcours de commande hors ligne.
+//
+// Il vit dans un autre depot. Plutot que d'en garder une copie ici, qui
+// vieillirait en silence, il est telecharge et mis en cache sous build/.
+// Sans reseau au premier build, la tache continue sans lui : l'interface
+// affiche alors son explication au lieu d'ouvrir le kiosque.
+//
+// Son mode ?demo=1 est autonome — donnees fictives, soldes fictifs, aucun
+// appel reseau — ce qui est exactement ce qu'il faut sur une tablette sans
+// permission INTERNET.
+val kiosqueDepot = "https://raw.githubusercontent.com/simonvelucia-afk/LunchMachine/refs/heads/main"
+val kiosqueFichiers = listOf("index.html", "balanceOps.js")
+// Cree des la configuration : inputs.dir refuse un dossier absent, meme
+// declare optionnel.
+val kiosqueCache: File = File(layout.buildDirectory.get().asFile, "lunch-kiosk").apply { mkdirs() }
+
 // URL distantes -> equivalents locaux. A garder aligne avec
 // deploy/scripts/render-index.mjs.
 val substitutions = listOf(
@@ -41,7 +58,7 @@ window.COHABITAT_CONFIG = {
   central:    { enabled: false, url: '', key: '', viaFederation: false },
   federation: { enabled: false, url: '' },
   analytics:  { enabled: false, gaId: '' },
-  lunchMachine: { kioskBase: '', centralUrl: '' },
+  lunchMachine: { kioskBase: '', demoUrl: 'lunch-kiosk/index.html', centralUrl: '' },
   assets: {
     supabaseJs: 'vendor/supabase.js',
     jspdf: 'vendor/jspdf.umd.min.js',
@@ -64,6 +81,9 @@ val preparerAssets by tasks.registering {
     )
     inputs.dir(File(depot, "icons"))
     outputs.dir(dest)
+    // Sans cela, la tache se croirait a jour apres un premier build sans
+    // reseau et n'embarquerait jamais le kiosque telecharge depuis.
+    inputs.dir(kiosqueCache)
 
     doLast {
         require(File(depot, "index.html").exists()) {
@@ -92,6 +112,27 @@ val preparerAssets by tasks.registering {
         // SDK Supabase.
         val vendorSrc = File(depot, "vendor")
         if (vendorSrc.isDirectory) vendorSrc.copyRecursively(File(dest, "vendor"), overwrite = true)
+
+        // Kiosque LunchMachine : telecharge une fois, garde en cache.
+        var kiosquePret = true
+        kiosqueFichiers.forEach { nom ->
+            val cible = File(kiosqueCache, nom)
+            if (cible.exists() && cible.length() > 0) return@forEach
+            try {
+                java.net.URI("$kiosqueDepot/$nom").toURL().openStream().use { flux ->
+                    cible.outputStream().use { flux.copyTo(it) }
+                }
+                logger.lifecycle("[assets] kiosque : $nom telecharge (${cible.length()} o)")
+            } catch (e: Exception) {
+                kiosquePret = false
+                logger.lifecycle("[assets] kiosque indisponible ($nom : ${e.message}) — " +
+                    "l'application affichera son explication au lieu du kiosque")
+            }
+        }
+        if (kiosquePret) {
+            val vers = File(dest, "lunch-kiosk").apply { mkdirs() }
+            kiosqueFichiers.forEach { File(kiosqueCache, it).copyTo(File(vers, it), overwrite = true) }
+        }
 
         // config.js du depot definit CohabitatConfig en fusionnant la
         // configuration ci-dessus avec ses defauts : sans lui, l'interface

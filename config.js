@@ -53,9 +53,30 @@
       viaFederation: false
     },
 
-    // Machine Lunch (kiosque en iframe + tables lunch_* sur la centrale).
+    // Machine Lunch.
+    //
+    // Deux adresses distinctes, longtemps confondues sous une seule :
+    //
+    //   kioskBase  l'adresse ou est servi le kiosque d'une vraie machine.
+    //              Chaque instance y met la sienne : LUNCH_KIOSK_URL cote
+    //              appliance, pour la servir depuis le batiment et n'y
+    //              acceder de l'exterieur que par le VPN.
+    //
+    //   demoUrl    le kiosque d'essai (?demo=1), a donnees fictives. Celui
+    //              la n'a rien a voir avec une machine : c'est une vitrine
+    //              pour le site public. Vide sur une instance de batiment,
+    //              qui n'a pas de visiteurs de passage.
+    //
+    // Attention : le kiosque parle a la centrale Modulimo, pas a la
+    // machine. Le servir depuis le batiment le rend local, mais ne rend
+    // pas les achats independants de la centrale — le solde y vit.
+    //
+    // Attention aussi au contenu mixte : une page servie en https ne peut
+    // pas charger un kiosque en http, meme sur le reseau local. Il doit
+    // repondre en https, ou passer par le meme Caddy que CoHabitat.
     lunchMachine: {
       kioskBase:  'https://simonvelucia-afk.github.io/LunchMachine/',
+      demoUrl:    'https://simonvelucia-afk.github.io/LunchMachine/',
       centralUrl: 'https://bpxscgrbxjscicpnheep.supabase.co'
     },
 

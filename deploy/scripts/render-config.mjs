@@ -49,7 +49,12 @@ const config = {
     ? { enabled: true, url: need('CENTRAL_URL'), key: env.CENTRAL_KEY || '', viaFederation: true }
     : { enabled: false, url: '', key: '', viaFederation: false },
   lunchMachine: {
+    // Adresse de la machine sur le reseau du batiment. Joignable par VPN
+    // depuis l'exterieur ; rien n'est publie sur internet.
     kioskBase: env.LUNCH_KIOSK_URL || '',
+    // Le kiosque d'essai est une vitrine du site public : une instance de
+    // batiment n'en a pas l'usage.
+    demoUrl: env.LUNCH_DEMO_URL || '',
     centralUrl: centralEnabled ? (env.CENTRAL_URL || '') : '',
   },
   federation: { enabled: String(env.FEDERATION_ENABLED || 'true') !== 'false', url: '/federation/v1' },

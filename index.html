@@ -347,13 +347,13 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   display: flex;
   gap: 4px;
   align-items: center;
-  /* La rangee ne pousse jamais la barre au-dela de l'ecran : elle se
-     laisse comprimer, et ajusterNav() bascule sur le menu burger avant
-     que quoi que ce soit soit tronque. overflow:hidden n'est qu'un
-     garde-fou si le script ne s'executait pas. */
+  /* Pas d'overflow:hidden ici, malgre la tentation d'y mettre un
+     garde-fou : les sous-menus sont positionnes en absolu et un ancetre
+     qui decoupe les rend invisibles — ils s'ouvraient sans que rien
+     n'apparaisse. C'est ajusterNav() qui empeche le debordement, en
+     repliant la rangee avant qu'elle ne depasse. */
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
   justify-content: center;
 }
 
@@ -431,13 +431,22 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   color: var(--accent2);
   font-weight: 500;
 }
-/* Ligne d'etat, au-dessus de la barre de navigation. Elle regroupe ce qui
+/* Le contenu s'arrete au-dessus de la ligne d'etat : sans cette marge,
+   le bas de chaque page passerait dessous. */
+body { padding-bottom: var(--haut-bandeau, 0px); }
+
+/* Ligne d'etat, en bas de l'ecran. Elle regroupe ce qui
    concerne l'etat de l'instance — mode demonstration, centrale
    injoignable — plutot que de melanger ces mentions aux donnees du compte
    dans la barre. */
 #bandeau-statut {
-  position: sticky;
-  top: 0;
+  /* En bas et fixe, pour laisser le haut de l'ecran a la barre de
+     navigation. Les deux etaient collants en haut : la barre venait se
+     glisser derriere et disparaissait au defilement. */
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -445,8 +454,24 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   flex-wrap: wrap;
   gap: 10px;
   background: var(--surface2);
-  border-bottom: 1px solid var(--border);
-  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  padding: 6px 60px 6px 12px;   /* place a droite pour l'engrenage */
+}
+
+/* L'engrenage de configuration vit dans cette ligne plutot que de
+   flotter par-dessus le contenu. */
+#bandeau-statut #demo-config-btn {
+  position: absolute;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0;
 }
 #central-offline-banner {
   color: #ffb3a8;
@@ -660,6 +685,19 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   border-top: 1px solid var(--border);
 }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Deux colonnes qui se replient en une sur un ecran etroit. minmax(0,1fr)
+   et non 1fr : une colonne 1fr ne descend pas sous la largeur de son
+   contenu, si bien qu'un contenu large la pousse hors de l'ecran — c'est
+   ce qui faisait deborder la page Profil de 74 px sur un telephone. */
+.grille-paire {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+}
+@media (max-width: 640px) {
+  .grille-paire { grid-template-columns: minmax(0, 1fr); }
+}
 .form-section-title {
   font-size: 0.78rem;
   font-weight: 600;
@@ -674,7 +712,9 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 /* ===== TOASTS ===== */
 #toast-container {
   position: fixed;
-  bottom: 24px;
+  /* Decale au-dessus de la ligne d'etat, sans quoi les notifications
+     recouvrent l'engrenage de configuration. */
+  bottom: calc(24px + var(--haut-bandeau, 0px));
   right: 24px;
   z-index: 1000;
   display: flex;
@@ -1683,7 +1723,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
       </div>
 
       <!-- Infos personnelles -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+      <div class="grille-paire" style="margin-bottom:24px;">
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;">
           <h3 style="font-size:1rem;margin-bottom:16px;color:var(--accent);">👤 Informations personnelles</h3>
           <div class="form-group">
@@ -3033,8 +3073,17 @@ function renderCentralBanner() {
 function majBandeauStatut() {
   const bande = document.getElementById('bandeau-statut');
   if (!bande) return;
+  // L'engrenage compte : en demonstration sans avertissement de centrale,
+  // c'est lui seul qui justifie la ligne.
   const quelqueChose = [...bande.children].some(e => e.style.display !== 'none');
   bande.style.display = quelqueChose ? 'flex' : 'none';
+
+  // Sa hauteur devient la marge basse du contenu, faute de quoi le bas de
+  // chaque page passerait dessous. Elle est mesuree plutot que codee en
+  // dur : la ligne fait une ou deux lignes selon la largeur et selon
+  // qu'elle porte une mention ou les deux.
+  const haut = quelqueChose ? Math.round(bande.getBoundingClientRect().height) : 0;
+  document.documentElement.style.setProperty('--haut-bandeau', haut + 'px');
 }
 
 // Banniere "X operations en attente" rendue par balanceOps.onChange.
@@ -4116,6 +4165,35 @@ async function syncCentralBalanceToProfile() {
   currentProfile.virtual_balance = centralBal;
 }
 
+// Ou vit le kiosque de la Machine Lunch.
+//
+// Deux configurations, choisies par l'administrateur dans les reglages :
+//
+//   locale   la machine est sur le reseau du batiment, a une adresse fixe
+//            saisie dans lunch_local_url. De l'exterieur on la joint par
+//            le VPN, comme le reste de l'immeuble.
+//
+//   centrale l'adresse livree avec l'instance (config.js) sert, et la
+//            connexion a la centrale Modulimo est requise.
+//
+// Dans les deux cas le solde vit sur la centrale : le mode local rend le
+// kiosque joignable sans internet, il ne rend pas les achats autonomes.
+function lireReglagesLunch(reglages) {
+  const val = (k) => (reglages || []).find(r => r.key === k)?.value;
+  window.lunchReglages = {
+    local: val('lunch_local') === 'true',
+    url:   (val('lunch_local_url') || '').trim()
+  };
+}
+
+function adresseKiosque() {
+  const r = window.lunchReglages || {};
+  // Une adresse locale vide ferait ouvrir « ?machine=... » sur rien : on
+  // retombe alors sur l'adresse livree, plutot que sur une page blanche.
+  if (r.local && r.url) return r.url;
+  return CohabitatConfig.lunchMachine.kioskBase;
+}
+
 async function loadAppModules() {
   if (isDemo) {
     // En demonstration, les modules viennent du jeu local : c'est ce que
@@ -4128,18 +4206,21 @@ async function loadAppModules() {
     window.appModules.trips = actif('module_trips');
     window.appModules.lunch = actif('module_lunch');
     window.appModules.serre = actif('module_serre');
+    lireReglagesLunch(reglages);
     return;
   }
   // 1. Lire les préférences locales (admin local peut désactiver dans son enveloppe)
   const { data: localSettings } = await sb.from('system_settings')
     .select('key, value')
-    .in('key', ['module_trips', 'module_lunch', 'module_serre', 'finance_central_enabled']);
+    .in('key', ['module_trips', 'module_lunch', 'module_serre', 'finance_central_enabled',
+                'lunch_local', 'lunch_local_url']);
   const localTrips = localSettings?.find(s => s.key === 'module_trips')?.value !== 'false';
   const localLunch = localSettings?.find(s => s.key === 'module_lunch')?.value !== 'false';
   const localSerre = localSettings?.find(s => s.key === 'module_serre')?.value !== 'false';
   // Phase 3C : si finance_central_enabled=true, l'UI lit le solde depuis
   // la centrale Modulimo via finance-bridge au lieu de profiles.virtual_balance.
   window._financeCentralEnabled = localSettings?.find(s => s.key === 'finance_central_enabled')?.value === 'true';
+  lireReglagesLunch(localSettings);
 
   // 2. Vérifier la licence centrale (définit l'enveloppe max)
   const licence = await checkLicence();
@@ -5784,7 +5865,10 @@ function ajusterNav() {
 // change, la decision aussi.
 (function () {
   let attente;
-  const relancer = () => { clearTimeout(attente); attente = setTimeout(ajusterNav, 120); };
+  const relancer = () => { clearTimeout(attente); attente = setTimeout(function () {
+    majBandeauStatut();   // sa hauteur change si elle se replie sur deux lignes
+    ajusterNav();
+  }, 120); };
   window.addEventListener('resize', relancer);
   window.addEventListener('orientationchange', relancer);
 })();
@@ -5862,6 +5946,8 @@ function pageName(page) {
 // ═══════════════════════════════════════════════
 //  LUNCH MACHINE — iframe responsive
 // ═══════════════════════════════════════════════
+// Adresse livree avec l'instance. L'adresse effectivement employee passe
+// par adresseKiosque(), qui tient compte du reglage local de l'immeuble.
 const LM_KIOSK_BASE = CohabitatConfig.lunchMachine.kioskBase;
 const LM_CENTRAL_URL  = CohabitatConfig.lunchMachine.centralUrl;
 // LM_CENTRAL_URL pointe vers le meme projet Supabase que CENTRAL_URL
@@ -6235,6 +6321,32 @@ async function lunchQueueLeave(machineId) {
 // machine au bout du fil, et l'application n'a de toute facon pas la
 // permission reseau : ouvrir un onglet ne donnerait qu'une page blanche.
 // Mieux vaut le dire — la file d'attente, elle, fonctionne vraiment.
+// Ouvre le kiosque embarque en surcouche plein ecran.
+//
+// Pas window.open : dans une WebView Android les fenetres multiples sont
+// desactivees par defaut, l'appel echoue silencieusement. Une surcouche
+// fonctionne partout et garde l'application dessous, prete a reprendre.
+function ouvrirKiosqueLocal(url) {
+  let fond = document.getElementById('kiosque-local');
+  if (fond) fond.remove();
+  fond = document.createElement('div');
+  fond.id = 'kiosque-local';
+  fond.style.cssText = 'position:fixed;inset:0;z-index:100000;background:var(--bg,#0f0f0f);'
+    + 'display:flex;flex-direction:column;';
+  fond.innerHTML = `
+    <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+                padding:8px 14px;background:var(--surface,#1a1a1a);
+                border-bottom:1px solid var(--border,#333);">
+      <span style="font-size:13px;color:var(--text2,#9a9890);">🖥 Kiosque — démonstration</span>
+      <button onclick="document.getElementById('kiosque-local').remove()"
+        style="background:none;border:1px solid var(--border,#333);color:var(--text,#e8e6df);
+               border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;
+               font-family:var(--font-sans,system-ui);">Fermer ✕</button>
+    </div>
+    <iframe src="${escHtml(url)}" style="flex:1;width:100%;border:none;" title="Kiosque"></iframe>`;
+  document.body.appendChild(fond);
+}
+
 function expliquerKiosqueDemo(machineId) {
   const machine = (_lunchMachines || []).find(function (m) { return m.id === machineId; });
   const nom = machine ? machine.name : 'la machine';
@@ -6271,10 +6383,14 @@ function expliquerKiosqueDemo(machineId) {
 }
 
 async function openKiosk(machineId, _ignoredPreOpenedTab) {
-  // Le kiosque est une application distincte, servie par la machine
-  // elle-meme. En demonstration il n'y a rien a ouvrir : on l'explique au
-  // lieu de laisser un onglet blanc.
-  if (window._demoMode) return expliquerKiosqueDemo(machineId);
+  // En demonstration, ouvrir le kiosque embarque dans l'APK s'il s'y
+  // trouve. Sinon — build sans reseau, donc sans telechargement — on
+  // explique la situation plutot que de laisser un ecran blanc.
+  if (window._demoMode) {
+    const local = CohabitatConfig.lunchMachine.demoUrl;
+    if (local) return ouvrirKiosqueLocal(local + '?demo=1');
+    return expliquerKiosqueDemo(machineId);
+  }
 
   // Sans centrale joignable, le kiosque ne pourra pas debiter — on refuse
   // d'ouvrir l'onglet plutot que de laisser l'usager arriver devant un
@@ -6289,7 +6405,13 @@ async function openKiosk(machineId, _ignoredPreOpenedTab) {
   const sessionId = (crypto && crypto.randomUUID)
     ? crypto.randomUUID()
     : (Date.now() + '-' + Math.random().toString(16).slice(2));
-  const url = LM_KIOSK_BASE + '?machine=' + machineId + '&chsession=' + sessionId;
+  const base = adresseKiosque();
+  if (!base) {
+    typeof toast === 'function' && toast(
+      'Aucune adresse de kiosque configurée — voir les réglages', 'error');
+    return;
+  }
+  const url = base + '?machine=' + machineId + '&chsession=' + sessionId;
   console.log('[openKiosk] user:', currentProfile.full_name, 'machine:', machineId, 'chsession:', sessionId);
 
   // INSERT d'abord pendant que l'onglet a encore le focus (auth IndexedDB
@@ -6364,8 +6486,18 @@ function openLunchKiosk(machineId) {
 // visiteurs sans compte ou les residents qui veulent explorer le flow
 // sans toucher leur vrai solde.
 function openLunchDemo() {
-  if (window._demoMode) return expliquerKiosqueDemo(null);
-  const url = LM_KIOSK_BASE + '?demo=1';
+  // Le kiosque d'essai n'est pas celui d'une machine : c'est une vitrine
+  // publique, a son adresse propre. Une instance de batiment la laisse
+  // vide et le bouton le dit — voir la configuration.
+  const base = CohabitatConfig.lunchMachine.demoUrl;
+  if (!base) {
+    if (window._demoMode) return expliquerKiosqueDemo(null);
+    typeof toast === 'function' && toast('Essai indisponible sur cette instance', 'info');
+    return;
+  }
+  // Sur la tablette le kiosque est embarque : surcouche plutot qu'onglet.
+  if (window._demoMode) return ouvrirKiosqueLocal(base + '?demo=1');
+  const url = base + '?demo=1';
   const opened = window.open(url, '_blank');
   if (!opened) {
     typeof toast === 'function' && toast('Popup bloque — autorisez les popups pour CoHabitat', 'error');
@@ -12330,17 +12462,19 @@ async function loadSettings() {
   if (!form) return;
 
   // Modules activables — affichés en premier avec des toggles
-  const moduleKeys = ['module_trips', 'module_lunch', 'module_serre'];
+  const moduleKeys = ['module_trips', 'module_lunch', 'module_serre', 'lunch_local'];
   const moduleLabels = {
     module_trips: '🚗 Module Auto-partage (covoiturage + véhicules)',
     module_lunch: '🍱 Module Machine Lunch (kiosque + commandes)',
-    module_serre: '🌱 Module Serre (zones de culture louables au mois)'
+    module_serre: '🌱 Module Serre (zones de culture louables au mois)',
+    lunch_local: '🖥 Machine Lunch sur le réseau local (adresse ci-dessous)'
   };
   // Valeurs par defaut identiques a la migration 019 : une base qui n'a
   // pas encore la ligne affiche quand meme son interrupteur, et la ligne
   // est creee au premier basculement. Sans cela, un module absent de
   // system_settings restait actif sans aucun moyen de le couper.
-  const moduleDefauts = { module_trips: 'true', module_lunch: 'false', module_serre: 'true' };
+  const moduleDefauts = { module_trips: 'true', module_lunch: 'false', module_serre: 'true',
+                          lunch_local: 'false' };
   const moduleData = moduleKeys.map(k => {
     const existante = (data || []).find(s => s.key === k);
     return existante || { key: k, value: moduleDefauts[k], description: moduleLabels[k] };
@@ -13242,7 +13376,9 @@ async function _tkRefreshBadge() {
 <style>
 #consent-banner {
   position: fixed;
-  bottom: 0; left: 0; right: 0;
+  /* Au-dessus de la ligne d'etat, qui occupe desormais le bas de l'ecran :
+     colle a zero, ce bandeau recouvrait l'engrenage de configuration. */
+  bottom: var(--haut-bandeau, 0px); left: 0; right: 0;
   background: var(--surface, #1a1a1a);
   border-top: 1px solid var(--border, #333);
   padding: 14px 20px;
@@ -13466,10 +13602,12 @@ window.setConsent = function setConsent(choix) {
     b.title = 'Configuration de la démonstration';
     b.textContent = '⚙';
     b.onclick = window._demoOuvrirConfig;
-    b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;width:44px;height:44px;'
-      + 'border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text);'
-      + 'font-size:18px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.4)';
-    document.body.appendChild(b);
+    // Il vit dans la ligne d'etat du bas, avec les mentions de mode
+    // demonstration et de centrale injoignable — plutot que de flotter
+    // par-dessus le contenu. Son apparence vient de la feuille de style.
+    var bande = document.getElementById('bandeau-statut');
+    (bande || document.body).appendChild(b);
+    if (typeof majBandeauStatut === 'function') majBandeauStatut();
   };
 })();
 </script>
