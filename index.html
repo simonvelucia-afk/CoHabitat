@@ -6379,7 +6379,12 @@ function openLunchKiosk(machineId) {
 // sans toucher leur vrai solde.
 function openLunchDemo() {
   if (window._demoMode) return expliquerKiosqueDemo(null);
-  const url = LM_KIOSK_BASE + '?demo=1';
+  // Le kiosque d'essai n'est pas celui d'une machine : c'est une vitrine
+  // publique, a son adresse propre. Une instance de batiment la laisse
+  // vide et le bouton s'efface — voir la configuration.
+  const base = CohabitatConfig.lunchMachine.demoUrl;
+  if (!base) { typeof toast === 'function' && toast('Essai indisponible sur cette instance', 'info'); return; }
+  const url = base + '?demo=1';
   const opened = window.open(url, '_blank');
   if (!opened) {
     typeof toast === 'function' && toast('Popup bloque — autorisez les popups pour CoHabitat', 'error');

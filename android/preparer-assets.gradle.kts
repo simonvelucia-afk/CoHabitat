@@ -41,7 +41,7 @@ window.COHABITAT_CONFIG = {
   central:    { enabled: false, url: '', key: '', viaFederation: false },
   federation: { enabled: false, url: '' },
   analytics:  { enabled: false, gaId: '' },
-  lunchMachine: { kioskBase: '', centralUrl: '' },
+  lunchMachine: { kioskBase: '', demoUrl: '', centralUrl: '' },
   assets: {
     supabaseJs: 'vendor/supabase.js',
     jspdf: 'vendor/jspdf.umd.min.js',
