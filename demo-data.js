@@ -32,6 +32,7 @@
 
   var MOI = '00000000-0000-0000-0000-0000000000d1';  // Alex Tremblay
   var jours = function (n) { return new Date(Date.now() + n * 86400000).toISOString(); };
+  var minutes = function (n) { return new Date(Date.now() + n * 60000).toISOString(); };
   var heures = function (n) { return new Date(Date.now() + n * 3600000).toISOString(); };
 
   var DEMO = {
@@ -55,6 +56,30 @@
       { id: 'dep-demo-2', parent_id: MOI, name: 'Noah Tremblay', age: 8, pin: '5678',
         allow_spaces: false, allow_trips: false, allow_lunch: true, virtual_balance: 8.25 },
     ],
+
+    // ── Machine Lunch ────────────────────────────────────────
+    // La page Lunch interroge normalement la centrale Modulimo par HTTP
+    // et ouvre le kiosque dans un onglet. Rien de tout cela n'est
+    // joignable hors ligne : ces trois tables et COHABITAT_DEMO_REST les
+    // remplacent, pour que la file d'attente soit reellement utilisable
+    // en demonstration.
+    lunch_machines: [
+      { id: 'demo-lm-1', name: 'Machine — Hall d\u2019entrée', building_id: 'demo', active: true },
+      { id: 'demo-lm-2', name: 'Machine — Salle commune',   building_id: 'demo', active: true },
+    ],
+
+    // Une machine libre, une occupee avec quelqu'un en attente : les trois
+    // etats de la carte sont visibles d'entree de jeu.
+    lunch_queue: [
+      { id: 'lq-1', machine_id: 'demo-lm-2', user_id: 'p-2', full_name: 'Camille Bernard',
+        unit: 'A-101', status: 'active',  joined_at: minutes(-4),
+        expires_at: minutes(6) },
+      { id: 'lq-2', machine_id: 'demo-lm-2', user_id: 'p-3', full_name: 'Julien Moreau',
+        unit: 'C-310', status: 'waiting', joined_at: minutes(-2),
+        expires_at: minutes(8) },
+    ],
+
+    lunch_sessions: [],
 
     // ── Espaces communs ──────────────────────────────────────
     common_spaces: [
@@ -226,7 +251,7 @@
     // ── Reglages ─────────────────────────────────────────────
     system_settings: [
       { key: 'module_trips', value: 'true' },
-      { key: 'module_lunch', value: 'false' },
+      { key: 'module_lunch', value: 'true' },
       { key: 'module_serre', value: 'true' },
       { key: 'finance_central_enabled', value: 'false' },
       { key: 'federation_enabled', value: 'false' },
@@ -436,6 +461,75 @@
     };
   }
 
+  // ── REST de demonstration ────────────────────────────────
+  //
+  // La page Lunch n'utilise pas le client supabase-js : elle appelle
+  // cohFetch(), qui construit des URL PostgREST a la main. Le client de
+  // demonstration ne peut donc rien intercepter. Cette fonction remplace
+  // ces appels et couvre exactement la surface employee par cette page :
+  // filtres `eq`, `order`, `limit`, `select`, et POST / PATCH / DELETE.
+  //
+  // Elle ecrit vraiment dans DEMO, contrairement au reste du mode
+  // demonstration : rejoindre une file, la quitter et voir la place
+  // suivante devenir active n'aurait aucun interet en lecture seule. Les
+  // modifications vivent en memoire et disparaissent au rechargement.
+  function demoRest(chemin, opts) {
+    opts = opts || {};
+    var methode = (opts.method || 'GET').toUpperCase();
+    var coupe = String(chemin).split('?');
+    var table = coupe[0];
+    var params = new URLSearchParams(coupe[1] || '');
+
+    if (!Object.prototype.hasOwnProperty.call(DEMO, table)) return Promise.resolve([]);
+    var source = DEMO[table];
+
+    // Filtres : seule la forme `colonne=eq.valeur` est employee ici.
+    var lignes = source.filter(function (r) {
+      var garde = true;
+      params.forEach(function (v, k) {
+        if (k === 'select' || k === 'order' || k === 'limit') return;
+        if (v.indexOf('eq.') === 0 && String(r[k]) !== v.slice(3)) garde = false;
+      });
+      return garde;
+    });
+
+    var tri = params.get('order');
+    if (tri) {
+      var col = tri.split('.')[0], desc = /\.desc/.test(tri);
+      lignes = lignes.slice().sort(function (a, b) {
+        var x = a[col], y = b[col];
+        return (desc ? -1 : 1) * (x < y ? -1 : x > y ? 1 : 0);
+      });
+    }
+    var borne = params.get('limit');
+    if (borne) lignes = lignes.slice(0, parseInt(borne, 10));
+
+    if (methode === 'GET') return Promise.resolve(lignes);
+
+    var corps = null;
+    try { corps = opts.body ? JSON.parse(opts.body) : null; } catch (e) { corps = null; }
+
+    if (methode === 'POST') {
+      var neuve = Object.assign(
+        { id: table + '-' + Math.random().toString(16).slice(2, 8) }, corps);
+      source.push(neuve);
+      return Promise.resolve([neuve]);
+    }
+    if (methode === 'PATCH') {
+      lignes.forEach(function (r) { Object.assign(r, corps); });
+      return Promise.resolve(lignes);
+    }
+    if (methode === 'DELETE') {
+      lignes.forEach(function (r) {
+        var i = source.indexOf(r);
+        if (i >= 0) source.splice(i, 1);
+      });
+      return Promise.resolve(lignes);
+    }
+    return Promise.resolve([]);
+  }
+
   global.COHABITAT_DEMO = DEMO;
   global.createDemoClient = createDemoClient;
+  global.demoRest = demoRest;
 })(window);

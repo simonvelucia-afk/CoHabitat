@@ -3619,8 +3619,15 @@ async function loginDemo() {
   // et evite de montrer les donnees d'un immeuble reel a un prospect.
   sb = _createSbClient();
   _attachAuthListener(sb);
+  const idDemo = (window.COHABITAT_DEMO && window.COHABITAT_DEMO.profiles[0].id) || null;
+  // currentUser restait nul en demonstration, alors que plusieurs pages
+  // s'identifient par currentUser.id et non par currentProfile.id — la
+  // file d'attente de la Machine Lunch, entre autres, refusait d'agir.
+  // Il n'y a pas de session Supabase derriere : c'est le meme identifiant
+  // que le profil, rien de plus.
+  currentUser = { id: idDemo, email: 'alex.tremblay@modulimo.com' };
   currentProfile = {
-    id: (window.COHABITAT_DEMO && window.COHABITAT_DEMO.profiles[0].id) || null,
+    id: idDemo,
     email: 'alex.tremblay@modulimo.com',
     full_name: 'Alex Tremblay',
     phone: '+1 514 555-0182',
@@ -5689,6 +5696,11 @@ window.addEventListener('message', function(ev) {
 
 // Fetch vers CoHabitat propre (lunch_queue, lunch_sessions — dans ce Supabase)
 async function cohFetch(path, opts) {
+  // En demonstration rien n'est joignable : la page Lunch construit ses
+  // URL PostgREST a la main et echappe donc au client de demonstration.
+  // demoRest() les sert depuis le jeu de donnees local.
+  if (window._demoMode && typeof demoRest === 'function') return demoRest(path, opts);
+
   const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
     ...opts,
     cache: 'no-store',
@@ -5747,14 +5759,21 @@ async function onLunchPageShow() {
       if (data?.value) buildingFilter = data.value;
     } catch(e) {}
 
-    const query = buildingFilter
-      ? `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&building_id=eq.${buildingFilter}&select=id,name,building_id&order=name`
-      : `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&select=id,name,building_id&order=name`;
+    let machines;
+    if (window._demoMode && typeof demoRest === 'function') {
+      // Les machines sont declarees sur la centrale Modulimo, hors de
+      // portee en demonstration.
+      machines = await demoRest('lunch_machines?active=eq.true&order=name');
+    } else {
+      const query = buildingFilter
+        ? `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&building_id=eq.${buildingFilter}&select=id,name,building_id&order=name`
+        : `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&select=id,name,building_id&order=name`;
 
-    const res = await fetch(query, {
-      headers: { 'apikey': CENTRAL_KEY }
-    });
-    const machines = await res.json();
+      const res = await fetch(query, {
+        headers: { 'apikey': CENTRAL_KEY }
+      });
+      machines = await res.json();
+    }
 
     if (!machines || !machines.length) {
       container.innerHTML = '<div style="color:var(--text3);font-size:13px;">Aucune machine disponible.</div>';
@@ -5982,7 +6001,52 @@ async function lunchQueueLeave(machineId) {
 // echouait : a la 2e ouverture, l'onglet CoHabitat passe en background
 // des le focus du popup, Chrome throttle les fetches IndexedDB de
 // supabase-js (sb.auth.getSession pend), l'INSERT n'aboutit jamais.
+// Le kiosque LunchMachine est une application servie par la machine
+// elle-meme, sur son propre ecran. En demonstration il n'y a aucune
+// machine au bout du fil, et l'application n'a de toute facon pas la
+// permission reseau : ouvrir un onglet ne donnerait qu'une page blanche.
+// Mieux vaut le dire — la file d'attente, elle, fonctionne vraiment.
+function expliquerKiosqueDemo(machineId) {
+  const machine = (_lunchMachines || []).find(function (m) { return m.id === machineId; });
+  const nom = machine ? machine.name : 'la machine';
+
+  let fond = document.getElementById('kiosque-demo');
+  if (!fond) {
+    fond = document.createElement('div');
+    fond.id = 'kiosque-demo';
+    fond.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;'
+      + 'display:flex;align-items:center;justify-content:center;padding:24px;';
+    fond.onclick = function (e) { if (e.target === fond) fond.remove(); };
+    document.body.appendChild(fond);
+  }
+  fond.innerHTML = `
+    <div style="background:var(--surface,#1a1a1a);border:1px solid var(--border,#333);
+                border-radius:12px;max-width:460px;padding:24px;">
+      <div style="font-size:1.1rem;font-weight:600;color:var(--text,#e8e6df);margin-bottom:12px;">
+        🖥 Kiosque de ${escHtml(nom)}
+      </div>
+      <p style="font-size:0.95rem;line-height:1.6;color:var(--text2,#9a9890);margin:0 0 14px;">
+        En service, le kiosque s'ouvre sur l'écran de la machine : on y choisit
+        son repas et on paie avec son solde.
+      </p>
+      <p style="font-size:0.95rem;line-height:1.6;color:var(--text2,#9a9890);margin:0 0 18px;">
+        En démonstration, aucune machine n'est raccordée. La file d'attente
+        ci-dessous, elle, fonctionne réellement : rejoignez-la, quittez-la,
+        et voyez la place suivante devenir active.
+      </p>
+      <button onclick="document.getElementById('kiosque-demo').remove()"
+        style="background:var(--accent,#c8a96e);color:#0f0f0f;border:none;border-radius:6px;
+               padding:10px 18px;font-size:0.9rem;font-weight:600;cursor:pointer;
+               font-family:var(--font-sans,system-ui);">Compris</button>
+    </div>`;
+}
+
 async function openKiosk(machineId, _ignoredPreOpenedTab) {
+  // Le kiosque est une application distincte, servie par la machine
+  // elle-meme. En demonstration il n'y a rien a ouvrir : on l'explique au
+  // lieu de laisser un onglet blanc.
+  if (window._demoMode) return expliquerKiosqueDemo(machineId);
+
   // Sans centrale joignable, le kiosque ne pourra pas debiter — on refuse
   // d'ouvrir l'onglet plutot que de laisser l'usager arriver devant un
   // bouton "Acheter" qui echouera.
@@ -6071,6 +6135,7 @@ function openLunchKiosk(machineId) {
 // visiteurs sans compte ou les residents qui veulent explorer le flow
 // sans toucher leur vrai solde.
 function openLunchDemo() {
+  if (window._demoMode) return expliquerKiosqueDemo(null);
   const url = LM_KIOSK_BASE + '?demo=1';
   const opened = window.open(url, '_blank');
   if (!opened) {
