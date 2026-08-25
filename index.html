@@ -307,14 +307,7 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* Hauteur minimale et non fixe : sur une tablette, les dix onglets ne
-     tiennent pas sur une ligne et passent a la suivante. Avec une hauteur
-     figee ils debordaient a droite, hors de l'ecran. */
-  min-height: 60px;
-  flex-wrap: wrap;
-  row-gap: 4px;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  height: 60px;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -349,13 +342,21 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   display: flex;
   gap: 4px;
   align-items: center;
-  /* Les onglets se replient sur plusieurs lignes plutot que de pousser la
-     barre au-dela de l'ecran. */
-  flex-wrap: wrap;
-  justify-content: center;
+  /* La rangee ne pousse jamais la barre au-dela de l'ecran : elle se
+     laisse comprimer, et ajusterNav() bascule sur le menu burger avant
+     que quoi que ce soit soit tronque. overflow:hidden n'est qu'un
+     garde-fou si le script ne s'executait pas. */
   flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
+  justify-content: center;
 }
+
+/* Barre compacte : les onglets ne tiennent pas, le burger prend le
+   relais. La classe est posee par ajusterNav(), pas par une media
+   query — voir le commentaire de cette fonction. */
+#navbar.nav-compact .nav-tabs { display: none; }
+#navbar.nav-compact #burger-btn { display: flex; }
 .nav-tab {
   background: none;
   border: none;
@@ -870,9 +871,12 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   border: none;
   color: var(--text);
   text-align: left;
-  padding: 14px 16px;
+  /* Le tiroir n'est plus reserve aux telephones : sur tablette il porte
+     toute la navigation, et se lit a bout de bras. La place ne manque
+     pas — dix entrees sur un ecran plein. */
+  padding: 16px 18px;
   border-radius: var(--radius-sm);
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-family: var(--font-sans);
   cursor: pointer;
   transition: background var(--transition);
@@ -900,10 +904,9 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   #nav-lang-switcher { display: none !important; }
   #nav-clock { display: none !important; }
 }
-@media (min-width: 769px) {
-  #mobile-drawer { display: none !important; }
-  #burger-btn { display: none !important; }
-}
+/* Pas de regle !important pour le bureau : c'est ajusterNav() qui decide,
+   a partir de la place reellement disponible. Le tiroir reste masque par
+   sa regle de base tant qu'il n'a pas la classe .open. */
 
 /* ===== SERRE — champs partagés (page Espaces + panneau admin) ===== */
 .serre-field { margin-bottom: 8px; }
@@ -5467,13 +5470,16 @@ function buildNav() {
   if (drawer) {
     const pages = [
       { key: 'conditions', label: '📋 ' + t('navConditions') },
-      { key: 'babillard',    label: '📌 ' + t('navBabillard') },
+      // Pas de prefixe ici : la traduction de ces deux entrees porte deja
+      // son emoji, comme dans les onglets. L'ajouter le doublait.
+      { key: 'babillard',    label: t('navBabillard') },
       { key: 'tickets',   label: '🎫 ' + t('navTickets') },
       { key: 'dashboard', label: '🏠 ' + t('navDashboard') },
       { key: 'spaces',    label: '🏢 ' + t('navSpaces') },
       ...(window.appModules.trips ? [{ key: 'trips', label: '🚗 ' + t('navTrips') }] : []),
-      ...(window.appModules.lunch ? [{ key: 'lunch', label: '🍱 ' + t('navLunch') }] : []),
+      ...(window.appModules.lunch ? [{ key: 'lunch', label: t('navLunch') }] : []),
       { key: 'transactions', label: '💳 ' + t('navTransactions') },
+      { key: 'contract',  label: '📄 Mon contrat' },
       { key: 'profile',   label: '👤 ' + t('navProfile') },
       ...(canSeeAdminMenu ? [{ key: 'admin', label: '⚙️ ' + t('navAdmin') }] : [])
     ];
@@ -5507,7 +5513,42 @@ function buildNav() {
   const ddEmail = document.getElementById('dropdown-email');
   if (ddName) ddName.textContent = (isDemo ? anonName(currentProfile?.id) : currentProfile?.full_name) || 'Utilisateur';
   if (ddEmail) ddEmail.textContent = isDemo ? '••••@exemple.com' : (currentProfile?.email || '');
+
+  ajusterNav();
 }
+
+// Bascule vers le menu burger des que les onglets ne tiennent plus sur
+// une ligne.
+//
+// La mesure se fait a l'execution plutot que par une media query, parce
+// que la largeur de la rangee ne depend pas que de l'ecran : le nombre
+// d'onglets varie avec les modules actives, avec le role (un admin en a
+// un de plus) et avec la langue. Un point de bascule fixe basculerait
+// trop tot dans certains cas et trop tard dans d'autres.
+function ajusterNav() {
+  const barre = document.getElementById('navbar');
+  const onglets = document.getElementById('nav-tabs');
+  if (!barre || !onglets) return;
+
+  // Mesurer a l'etat deplie, sinon on mesurerait un element masque.
+  barre.classList.remove('nav-compact');
+  if (getComputedStyle(onglets).display === 'none') return;  // deja masque : petit ecran
+
+  const deborde = onglets.scrollWidth > onglets.clientWidth + 1;
+  barre.classList.toggle('nav-compact', deborde);
+  // En repassant aux onglets, un tiroir reste ouvert flotterait sans
+  // bouton pour le refermer.
+  if (!deborde) closeMobileMenu();
+}
+
+// Rotation de la tablette, fenetre redimensionnee : la place disponible
+// change, la decision aussi.
+(function () {
+  let attente;
+  const relancer = () => { clearTimeout(attente); attente = setTimeout(ajusterNav, 120); };
+  window.addEventListener('resize', relancer);
+  window.addEventListener('orientationchange', relancer);
+})();
 
 function navigateTo(page) {
   if (page === 'trips' && !window.appModules.trips) { toast('Module Auto-partage non activé', 'info'); return; }
