@@ -307,7 +307,14 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 60px;
+  /* Hauteur minimale et non fixe : sur une tablette, les dix onglets ne
+     tiennent pas sur une ligne et passent a la suivante. Avec une hauteur
+     figee ils debordaient a droite, hors de l'ecran. */
+  min-height: 60px;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  padding-top: 4px;
+  padding-bottom: 4px;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -342,14 +349,23 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   display: flex;
   gap: 4px;
   align-items: center;
+  /* Les onglets se replient sur plusieurs lignes plutot que de pousser la
+     barre au-dela de l'ecran. */
+  flex-wrap: wrap;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .nav-tab {
   background: none;
   border: none;
   color: var(--text2);
-  padding: 8px 16px;
+  /* Un peu plus de texte, un peu moins de marge laterale : plus lisible a
+     bout de bras sur une tablette, sans elargir la barre pour autant. */
+  padding: 8px 13px;
   border-radius: var(--radius-sm);
-  font-size: 0.9rem;
+  font-size: 1rem;
+  white-space: nowrap;
   transition: all var(--transition);
 }
 .nav-tab:hover { background: var(--surface2); color: var(--text); }
