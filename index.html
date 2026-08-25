@@ -685,6 +685,19 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   border-top: 1px solid var(--border);
 }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Deux colonnes qui se replient en une sur un ecran etroit. minmax(0,1fr)
+   et non 1fr : une colonne 1fr ne descend pas sous la largeur de son
+   contenu, si bien qu'un contenu large la pousse hors de l'ecran — c'est
+   ce qui faisait deborder la page Profil de 74 px sur un telephone. */
+.grille-paire {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+}
+@media (max-width: 640px) {
+  .grille-paire { grid-template-columns: minmax(0, 1fr); }
+}
 .form-section-title {
   font-size: 0.78rem;
   font-weight: 600;
@@ -1710,7 +1723,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
       </div>
 
       <!-- Infos personnelles -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+      <div class="grille-paire" style="margin-bottom:24px;">
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;">
           <h3 style="font-size:1rem;margin-bottom:16px;color:var(--accent);">👤 Informations personnelles</h3>
           <div class="form-group">
@@ -4152,6 +4165,35 @@ async function syncCentralBalanceToProfile() {
   currentProfile.virtual_balance = centralBal;
 }
 
+// Ou vit le kiosque de la Machine Lunch.
+//
+// Deux configurations, choisies par l'administrateur dans les reglages :
+//
+//   locale   la machine est sur le reseau du batiment, a une adresse fixe
+//            saisie dans lunch_local_url. De l'exterieur on la joint par
+//            le VPN, comme le reste de l'immeuble.
+//
+//   centrale l'adresse livree avec l'instance (config.js) sert, et la
+//            connexion a la centrale Modulimo est requise.
+//
+// Dans les deux cas le solde vit sur la centrale : le mode local rend le
+// kiosque joignable sans internet, il ne rend pas les achats autonomes.
+function lireReglagesLunch(reglages) {
+  const val = (k) => (reglages || []).find(r => r.key === k)?.value;
+  window.lunchReglages = {
+    local: val('lunch_local') === 'true',
+    url:   (val('lunch_local_url') || '').trim()
+  };
+}
+
+function adresseKiosque() {
+  const r = window.lunchReglages || {};
+  // Une adresse locale vide ferait ouvrir « ?machine=... » sur rien : on
+  // retombe alors sur l'adresse livree, plutot que sur une page blanche.
+  if (r.local && r.url) return r.url;
+  return CohabitatConfig.lunchMachine.kioskBase;
+}
+
 async function loadAppModules() {
   if (isDemo) {
     // En demonstration, les modules viennent du jeu local : c'est ce que
@@ -4164,18 +4206,21 @@ async function loadAppModules() {
     window.appModules.trips = actif('module_trips');
     window.appModules.lunch = actif('module_lunch');
     window.appModules.serre = actif('module_serre');
+    lireReglagesLunch(reglages);
     return;
   }
   // 1. Lire les préférences locales (admin local peut désactiver dans son enveloppe)
   const { data: localSettings } = await sb.from('system_settings')
     .select('key, value')
-    .in('key', ['module_trips', 'module_lunch', 'module_serre', 'finance_central_enabled']);
+    .in('key', ['module_trips', 'module_lunch', 'module_serre', 'finance_central_enabled',
+                'lunch_local', 'lunch_local_url']);
   const localTrips = localSettings?.find(s => s.key === 'module_trips')?.value !== 'false';
   const localLunch = localSettings?.find(s => s.key === 'module_lunch')?.value !== 'false';
   const localSerre = localSettings?.find(s => s.key === 'module_serre')?.value !== 'false';
   // Phase 3C : si finance_central_enabled=true, l'UI lit le solde depuis
   // la centrale Modulimo via finance-bridge au lieu de profiles.virtual_balance.
   window._financeCentralEnabled = localSettings?.find(s => s.key === 'finance_central_enabled')?.value === 'true';
+  lireReglagesLunch(localSettings);
 
   // 2. Vérifier la licence centrale (définit l'enveloppe max)
   const licence = await checkLicence();
@@ -5901,6 +5946,8 @@ function pageName(page) {
 // ═══════════════════════════════════════════════
 //  LUNCH MACHINE — iframe responsive
 // ═══════════════════════════════════════════════
+// Adresse livree avec l'instance. L'adresse effectivement employee passe
+// par adresseKiosque(), qui tient compte du reglage local de l'immeuble.
 const LM_KIOSK_BASE = CohabitatConfig.lunchMachine.kioskBase;
 const LM_CENTRAL_URL  = CohabitatConfig.lunchMachine.centralUrl;
 // LM_CENTRAL_URL pointe vers le meme projet Supabase que CENTRAL_URL
@@ -6358,7 +6405,13 @@ async function openKiosk(machineId, _ignoredPreOpenedTab) {
   const sessionId = (crypto && crypto.randomUUID)
     ? crypto.randomUUID()
     : (Date.now() + '-' + Math.random().toString(16).slice(2));
-  const url = LM_KIOSK_BASE + '?machine=' + machineId + '&chsession=' + sessionId;
+  const base = adresseKiosque();
+  if (!base) {
+    typeof toast === 'function' && toast(
+      'Aucune adresse de kiosque configurée — voir les réglages', 'error');
+    return;
+  }
+  const url = base + '?machine=' + machineId + '&chsession=' + sessionId;
   console.log('[openKiosk] user:', currentProfile.full_name, 'machine:', machineId, 'chsession:', sessionId);
 
   // INSERT d'abord pendant que l'onglet a encore le focus (auth IndexedDB
@@ -12409,17 +12462,19 @@ async function loadSettings() {
   if (!form) return;
 
   // Modules activables — affichés en premier avec des toggles
-  const moduleKeys = ['module_trips', 'module_lunch', 'module_serre'];
+  const moduleKeys = ['module_trips', 'module_lunch', 'module_serre', 'lunch_local'];
   const moduleLabels = {
     module_trips: '🚗 Module Auto-partage (covoiturage + véhicules)',
     module_lunch: '🍱 Module Machine Lunch (kiosque + commandes)',
-    module_serre: '🌱 Module Serre (zones de culture louables au mois)'
+    module_serre: '🌱 Module Serre (zones de culture louables au mois)',
+    lunch_local: '🖥 Machine Lunch sur le réseau local (adresse ci-dessous)'
   };
   // Valeurs par defaut identiques a la migration 019 : une base qui n'a
   // pas encore la ligne affiche quand meme son interrupteur, et la ligne
   // est creee au premier basculement. Sans cela, un module absent de
   // system_settings restait actif sans aucun moyen de le couper.
-  const moduleDefauts = { module_trips: 'true', module_lunch: 'false', module_serre: 'true' };
+  const moduleDefauts = { module_trips: 'true', module_lunch: 'false', module_serre: 'true',
+                          lunch_local: 'false' };
   const moduleData = moduleKeys.map(k => {
     const existante = (data || []).find(s => s.key === k);
     return existante || { key: k, value: moduleDefauts[k], description: moduleLabels[k] };
