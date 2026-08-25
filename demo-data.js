@@ -129,30 +129,78 @@
       { id: 'vp-2', vehicle_id: 'vh-2', price_per_minute: 0.05, price_per_km: 0.10, price_per_cargo_slot: 0.50 },
     ],
 
+    // Les colonnes suivent celles de la table `trips` et de la vue
+    // `trips_with_details` (schema.sql) : available_seats et non
+    // seats_available, cargo_available_pct, booked_seats. Les noms
+    // employes ici auparavant n'existaient nulle part, si bien que chaque
+    // carte affichait « Complet » et « Cargo: NaN% ».
     trips: [
+      { id: 'tr-3', title: 'Sortie au parc — Mont-Royal', driver_id: 'p-2', vehicle_id: 'vh-1',
+        departure_time: heures(6), available_seats: 4, cargo_available_pct: 100,
+        estimated_distance_km: 12.4, status: 'published', is_demo: false,
+        departure_point: 'Entrée principale', destination: 'Lac aux Castors' },
       { id: 'tr-1', title: 'Épicerie — Marché Jean-Talon', driver_id: 'p-2', vehicle_id: 'vh-1',
-        departure_time: heures(20), seats_available: 3, status: 'published', is_demo: false,
+        departure_time: heures(20), available_seats: 4, cargo_available_pct: 100,
+        estimated_distance_km: 7.5, status: 'published', is_demo: false,
         departure_point: 'Entrée principale', destination: 'Marché Jean-Talon' },
       { id: 'tr-2', title: 'Centre-ville — bureaux', driver_id: 'p-3', vehicle_id: 'vh-1',
-        departure_time: heures(44), seats_available: 2, status: 'published', is_demo: false,
+        departure_time: heures(44), available_seats: 4, cargo_available_pct: 100,
+        estimated_distance_km: 9.1, status: 'published', is_demo: false,
         departure_point: 'Stationnement B', destination: 'Square Victoria' },
     ],
 
+    // Trois etats differents a l'affichage : presque complet, une place
+    // deja reservee par le visiteur, et largement disponible.
     trips_with_details: [
-      { id: 'tr-1', title: 'Épicerie — Marché Jean-Talon', driver_id: 'p-2', driver_name: 'Camille Bernard',
-        vehicle_id: 'vh-1', vehicle_model: 'Kia Niro EV', departure_time: heures(20),
-        seats_available: 3, seats_total: 4, status: 'published', is_demo: false,
+      { id: 'tr-3', title: 'Sortie au parc — Mont-Royal', driver_id: 'p-2',
+        driver_name: 'Camille Bernard', driver_unit: 'A-101',
+        vehicle_id: 'vh-1', vehicle_model: 'Kia Niro EV', license_plate: 'ABC 123',
+        departure_time: heures(6), available_seats: 4, booked_seats: 3,
+        cargo_available_pct: 100, booked_cargo_pct: 40, estimated_distance_km: 12.4,
+        price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00,
+        status: 'published', is_demo: false,
+        departure_point: 'Entrée principale', destination: 'Lac aux Castors' },
+      { id: 'tr-1', title: 'Épicerie — Marché Jean-Talon', driver_id: 'p-2',
+        driver_name: 'Camille Bernard', driver_unit: 'A-101',
+        vehicle_id: 'vh-1', vehicle_model: 'Kia Niro EV', license_plate: 'ABC 123',
+        departure_time: heures(20), available_seats: 4, booked_seats: 1,
+        cargo_available_pct: 100, booked_cargo_pct: 20, estimated_distance_km: 7.5,
+        price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00,
+        status: 'published', is_demo: false,
         departure_point: 'Entrée principale', destination: 'Marché Jean-Talon' },
-      { id: 'tr-2', title: 'Centre-ville — bureaux', driver_id: 'p-3', driver_name: 'Julien Moreau',
-        vehicle_id: 'vh-1', vehicle_model: 'Kia Niro EV', departure_time: heures(44),
-        seats_available: 2, seats_total: 4, status: 'published', is_demo: false,
+      { id: 'tr-2', title: 'Centre-ville — bureaux', driver_id: 'p-3',
+        driver_name: 'Julien Moreau', driver_unit: 'C-310',
+        vehicle_id: 'vh-1', vehicle_model: 'Kia Niro EV', license_plate: 'ABC 123',
+        departure_time: heures(44), available_seats: 4, booked_seats: 2,
+        cargo_available_pct: 100, booked_cargo_pct: 0, estimated_distance_km: 9.1,
+        price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00,
+        status: 'published', is_demo: false,
         departure_point: 'Stationnement B', destination: 'Square Victoria' },
     ],
 
     trip_bookings: [
-      { id: 'tb-1', trip_id: 'tr-1', passenger_id: MOI, seats_requested: 1, status: 'confirmed',
+      // `status` doit valoir accepted ou pending : renderTripBookings n'offre
+      // le bouton Annuler que pour ces deux valeurs, et statusLabel ne
+      // connait pas « confirmed ». L'embarque `trips` doit aussi porter la
+      // destination, affichee en colonne.
+      { id: 'tb-1', trip_id: 'tr-1', passenger_id: MOI, seats_requested: 1, status: 'accepted',
         total_cost: 4.25, is_demo: false, created_at: jours(-1),
-        trips: { title: 'Épicerie — Marché Jean-Talon', departure_time: heures(20) },
+        pickup_location: 'Entrée principale',
+        trips: { title: 'Épicerie — Marché Jean-Talon', departure_time: heures(20),
+                 destination: 'Marché Jean-Talon' },
+        profiles: { full_name: 'Alex Tremblay', unit: 'B-204' } },
+      { id: 'tb-2', trip_id: 'tr-2', passenger_id: MOI, seats_requested: 2, status: 'pending',
+        total_cost: 6.80, is_demo: false, created_at: jours(-2),
+        pickup_location: 'Stationnement B',
+        trips: { title: 'Centre-ville — bureaux', departure_time: heures(44),
+                 destination: 'Square Victoria' },
+        profiles: { full_name: 'Alex Tremblay', unit: 'B-204' } },
+      // Une course passee, pour que l'onglet montre aussi son historique.
+      { id: 'tb-3', trip_id: 'tr-0', passenger_id: MOI, seats_requested: 1, status: 'accepted',
+        total_cost: 3.15, is_demo: false, created_at: jours(-9),
+        pickup_location: 'Entrée principale',
+        trips: { title: 'Pharmacie — Jean Coutu', departure_time: heures(-160),
+                 destination: 'Jean Coutu Masson' },
         profiles: { full_name: 'Alex Tremblay', unit: 'B-204' } },
     ],
 
