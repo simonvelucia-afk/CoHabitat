@@ -6274,6 +6274,32 @@ async function lunchQueueLeave(machineId) {
 // machine au bout du fil, et l'application n'a de toute facon pas la
 // permission reseau : ouvrir un onglet ne donnerait qu'une page blanche.
 // Mieux vaut le dire — la file d'attente, elle, fonctionne vraiment.
+// Ouvre le kiosque embarque en surcouche plein ecran.
+//
+// Pas window.open : dans une WebView Android les fenetres multiples sont
+// desactivees par defaut, l'appel echoue silencieusement. Une surcouche
+// fonctionne partout et garde l'application dessous, prete a reprendre.
+function ouvrirKiosqueLocal(url) {
+  let fond = document.getElementById('kiosque-local');
+  if (fond) fond.remove();
+  fond = document.createElement('div');
+  fond.id = 'kiosque-local';
+  fond.style.cssText = 'position:fixed;inset:0;z-index:100000;background:var(--bg,#0f0f0f);'
+    + 'display:flex;flex-direction:column;';
+  fond.innerHTML = `
+    <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+                padding:8px 14px;background:var(--surface,#1a1a1a);
+                border-bottom:1px solid var(--border,#333);">
+      <span style="font-size:13px;color:var(--text2,#9a9890);">🖥 Kiosque — démonstration</span>
+      <button onclick="document.getElementById('kiosque-local').remove()"
+        style="background:none;border:1px solid var(--border,#333);color:var(--text,#e8e6df);
+               border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;
+               font-family:var(--font-sans,system-ui);">Fermer ✕</button>
+    </div>
+    <iframe src="${escHtml(url)}" style="flex:1;width:100%;border:none;" title="Kiosque"></iframe>`;
+  document.body.appendChild(fond);
+}
+
 function expliquerKiosqueDemo(machineId) {
   const machine = (_lunchMachines || []).find(function (m) { return m.id === machineId; });
   const nom = machine ? machine.name : 'la machine';
@@ -6310,10 +6336,14 @@ function expliquerKiosqueDemo(machineId) {
 }
 
 async function openKiosk(machineId, _ignoredPreOpenedTab) {
-  // Le kiosque est une application distincte, servie par la machine
-  // elle-meme. En demonstration il n'y a rien a ouvrir : on l'explique au
-  // lieu de laisser un onglet blanc.
-  if (window._demoMode) return expliquerKiosqueDemo(machineId);
+  // En demonstration, ouvrir le kiosque embarque dans l'APK s'il s'y
+  // trouve. Sinon — build sans reseau, donc sans telechargement — on
+  // explique la situation plutot que de laisser un ecran blanc.
+  if (window._demoMode) {
+    const local = CohabitatConfig.lunchMachine.demoUrl;
+    if (local) return ouvrirKiosqueLocal(local + '?demo=1');
+    return expliquerKiosqueDemo(machineId);
+  }
 
   // Sans centrale joignable, le kiosque ne pourra pas debiter — on refuse
   // d'ouvrir l'onglet plutot que de laisser l'usager arriver devant un
@@ -6403,12 +6433,17 @@ function openLunchKiosk(machineId) {
 // visiteurs sans compte ou les residents qui veulent explorer le flow
 // sans toucher leur vrai solde.
 function openLunchDemo() {
-  if (window._demoMode) return expliquerKiosqueDemo(null);
   // Le kiosque d'essai n'est pas celui d'une machine : c'est une vitrine
   // publique, a son adresse propre. Une instance de batiment la laisse
-  // vide et le bouton s'efface — voir la configuration.
+  // vide et le bouton le dit — voir la configuration.
   const base = CohabitatConfig.lunchMachine.demoUrl;
-  if (!base) { typeof toast === 'function' && toast('Essai indisponible sur cette instance', 'info'); return; }
+  if (!base) {
+    if (window._demoMode) return expliquerKiosqueDemo(null);
+    typeof toast === 'function' && toast('Essai indisponible sur cette instance', 'info');
+    return;
+  }
+  // Sur la tablette le kiosque est embarque : surcouche plutot qu'onglet.
+  if (window._demoMode) return ouvrirKiosqueLocal(base + '?demo=1');
   const url = base + '?demo=1';
   const opened = window.open(url, '_blank');
   if (!opened) {
