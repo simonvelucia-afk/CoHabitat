@@ -357,9 +357,6 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
   justify-content: center;
 }
 
-/* Barre serree : l'horloge s'efface pour laisser les onglets tenir. */
-#navbar.nav-serre #nav-clock { display: none; }
-
 /* Groupes et sous-menus */
 .nav-group { position: relative; display: flex; }
 .nav-caret { font-size: .7em; opacity: .6; margin-left: 2px; }
@@ -5565,39 +5562,18 @@ function updateClock() {
 updateClock();
 setInterval(updateClock, 10000);
 
-function buildNav() {
+// Rendu de la rangee d'onglets, isole de buildNav() pour qu'ajusterNav()
+// puisse le rejouer avec une autre structure sans tout reconstruire — et
+// surtout sans rappeler buildNav(), qui l'appelle deja.
+//
+// Un groupe s'ouvre au lieu de naviguer, et sa propre page figure en tete
+// de son sous-menu : le toucher ne declenche ainsi jamais une navigation
+// que l'on n'a pas demandee.
+function rendreOnglets(menu) {
   const tabs = document.getElementById('nav-tabs');
-  const role = currentProfile?.role;
-  const isAdmin = role === 'admin' || role === 'principal_admin';
-  const isConcierge = role === 'concierge';
-  const canSeeAdminMenu = isAdmin || isConcierge;
-
-  // Structure de la navigation, partagee par les onglets et le tiroir.
-  // Les pages secondaires sont regroupees sous celle a laquelle elles se
-  // rattachent : dix entrees de premier niveau ne tenaient pas sur la
-  // largeur d'une tablette, et la plupart n'etaient consultees qu'une
-  // fois de temps en temps.
-  const MENU = [
-    { key: 'babillard', label: t('navBabillard') },
-    { key: 'dashboard', label: '🏠 ' + t('navDashboard'), enfants: [
-      { key: 'transactions', label: '💳 ' + t('navTransactions') }
-    ] },
-    { key: 'spaces', label: '🏢 ' + t('navSpaces') },
-    ...(window.appModules.trips ? [{ key: 'trips', label: '🚗 ' + t('navTrips') }] : []),
-    ...(window.appModules.lunch ? [{ key: 'lunch', label: t('navLunch') }] : []),
-    { key: 'profile', label: '👤 ' + t('navProfile'), enfants: [
-      { key: 'contract',   label: '📄 Mon contrat' },
-      { key: 'conditions', label: '📋 ' + t('navConditions') },
-      { key: 'tickets',    label: '🎫 ' + t('navTickets') }
-    ] },
-    ...(canSeeAdminMenu ? [{ key: 'admin', label: '⚙️ ' + t('navAdmin') }] : [])
-  ];
-
-  // Un groupe s'ouvre au lieu de naviguer, et sa propre page figure en
-  // tete de son sous-menu : le toucher ne declenche ainsi jamais une
-  // navigation que l'on n'a pas demandee.
+  if (!tabs) return;
   let html = '';
-  for (const e of MENU) {
+  for (const e of menu) {
     if (!e.enfants) {
       html += `<button class="nav-tab" data-page="${e.key}" onclick="navigateTo('${e.key}')">${e.label}</button>`;
       continue;
@@ -5611,6 +5587,61 @@ function buildNav() {
     </div>`;
   }
   tabs.innerHTML = html;
+  // Le rendu efface le surlignage : le reposer sur la page ouverte.
+  if (window._pageOuverte) marquerPageActive(window._pageOuverte);
+}
+
+// Surlignage par data-page, et non par comparaison de texte : une page
+// vivant dans un sous-menu n'apparait plus dans le libelle de son parent.
+function marquerPageActive(page) {
+  document.querySelectorAll('.nav-tab, .nav-subtab, .mob-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('[data-page="' + page + '"]').forEach(t => t.classList.add('active'));
+  const fille = document.querySelector('.nav-submenu [data-page="' + page + '"]');
+  if (fille) fille.closest('.nav-group')?.querySelector('.nav-tab')?.classList.add('active');
+}
+
+function buildNav() {
+  const tabs = document.getElementById('nav-tabs');
+  const role = currentProfile?.role;
+  const isAdmin = role === 'admin' || role === 'principal_admin';
+  const isConcierge = role === 'concierge';
+  const canSeeAdminMenu = isAdmin || isConcierge;
+
+  // Structure de la navigation, partagee par les onglets et le tiroir.
+  //
+  // `condense` regroupe en plus Auto-partage et Machine Lunch sous
+  // Espaces. C'est le repli employe quand la rangee ne tient pas : la
+  // barre du haut — logo, langue, horloge, solde, personne connectee —
+  // doit rester visible en toutes circonstances, ce sont les onglets qui
+  // cedent, pas elle.
+  const construireMenu = (condense) => {
+    const trips = window.appModules.trips ? [{ key: 'trips', label: '🚗 ' + t('navTrips') }] : [];
+    const lunch = window.appModules.lunch ? [{ key: 'lunch', label: t('navLunch') }] : [];
+    const espaces = { key: 'spaces', label: '🏢 ' + t('navSpaces') };
+    if (condense && (trips.length || lunch.length)) espaces.enfants = [...trips, ...lunch];
+    return [
+      { key: 'babillard', label: t('navBabillard') },
+      { key: 'dashboard', label: '🏠 ' + t('navDashboard'), enfants: [
+        { key: 'transactions', label: '💳 ' + t('navTransactions') }
+      ] },
+      espaces,
+      ...(condense ? [] : trips),
+      ...(condense ? [] : lunch),
+      { key: 'profile', label: '👤 ' + t('navProfile'), enfants: [
+        { key: 'contract',   label: '📄 Mon contrat' },
+        { key: 'conditions', label: '📋 ' + t('navConditions') },
+        { key: 'tickets',    label: '🎫 ' + t('navTickets') }
+      ] },
+      ...(canSeeAdminMenu ? [{ key: 'admin', label: '⚙️ ' + t('navAdmin') }] : [])
+    ];
+  };
+  window._construireMenu = construireMenu;
+
+  // Le tiroir montre toujours la structure complete : la place n'y manque
+  // pas, rien n'a besoin d'y etre replie une seconde fois.
+  const MENU = construireMenu(false);
+
+  rendreOnglets(construireMenu(!!window._navCondense));
 
   // Mobile drawer — same tabs as nav
   const drawer = document.getElementById('mobile-drawer');
@@ -5668,21 +5699,35 @@ function ajusterNav() {
   const onglets = document.getElementById('nav-tabs');
   if (!barre || !onglets) return;
 
+  if (typeof window._construireMenu !== 'function') return;
+
   // Mesurer a l'etat deplie, sinon on mesurerait un element masque.
-  barre.classList.remove('nav-compact', 'nav-serre');
+  barre.classList.remove('nav-compact');
   if (getComputedStyle(onglets).display === 'none') return;  // deja masque : petit ecran
 
   const deborde = () => onglets.scrollWidth > onglets.clientWidth + 1;
 
-  // Degradation par etapes. Sur une tablette en paysage les onglets
-  // manquaient de quinze pixels : plutot que de rogner leur taille — ce
-  // qui ne tiendrait plus ni en anglais ni avec l'onglet Admin —
-  // l'horloge, purement decorative, cede la place la premiere.
-  if (deborde()) barre.classList.add('nav-serre');
-  // Si cela ne suffit toujours pas, le menu burger prend le relais.
+  // Degradation par etapes. Ce qui cede est toujours la rangee d'onglets —
+  // jamais le logo, la langue, l'horloge, le solde ni la personne
+  // connectee, qui restent visibles en toutes circonstances.
+  //
+  //   1. structure complete ;
+  //   2. Auto-partage et Machine Lunch replies sous Espaces ;
+  //   3. menu burger.
+  //
+  // On repart toujours de l'etape 1 : en tournant la tablette ou en
+  // coupant un module la place peut revenir, et une barre restee repliee
+  // sans raison serait moins claire.
+  window._navCondense = false;
+  rendreOnglets(window._construireMenu(false));
+
+  if (deborde()) {
+    window._navCondense = true;
+    rendreOnglets(window._construireMenu(true));
+  }
+
   const compact = deborde();
   barre.classList.toggle('nav-compact', compact);
-  if (compact) barre.classList.remove('nav-serre');  // le burger rend la place a l'horloge
 
   // En repassant aux onglets, un tiroir reste ouvert flotterait sans
   // bouton pour le refermer.
@@ -5713,11 +5758,11 @@ function navigateTo(page) {
   closeMobileMenu();
   // Quitter le mode « plan seul » de la serre si on change de page
   if (typeof _serre !== 'undefined' && _serre.planSolo) serreApplyPlanSolo(false);
+  window._pageOuverte = page;
   document.querySelectorAll('.page').forEach(p => {
     p.classList.remove('active');
     p.style.display = ''; // reset inline display
   });
-  document.querySelectorAll('.nav-tab, .nav-subtab, .mob-tab').forEach(t => t.classList.remove('active'));
   // Ajuster layout pour page lunch
   const mainEl = document.getElementById('main');
   if (mainEl) {
@@ -5732,17 +5777,7 @@ function navigateTo(page) {
     if (page === 'lunch') { pageEl.style.display = 'flex'; }
   }
 
-  // Surlignage : par data-page et non par comparaison de texte. L'ancienne
-  // methode cherchait le nom de la page dans le libelle de l'onglet, ce
-  // qui ne peut plus fonctionner des qu'une page vit dans un sous-menu —
-  // « Transactions » n'apparait plus dans « Tableau de bord ».
-  document.querySelectorAll('[data-page="' + page + '"]').forEach(t => t.classList.add('active'));
-  // Un groupe dont une page fille est ouverte se signale aussi.
-  const filleActive = document.querySelector('.nav-submenu [data-page="' + page + '"]');
-  if (filleActive) {
-    const groupe = filleActive.closest('.nav-group');
-    if (groupe) groupe.querySelector('.nav-tab')?.classList.add('active');
-  }
+  marquerPageActive(page);
 
   // Arreter le polling lunch_queue des qu'on quitte la page Lunch pour n'importe
   // quelle autre page. Sans ca, le setInterval continue a taper /lunch_queue
