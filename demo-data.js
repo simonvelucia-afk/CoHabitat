@@ -366,9 +366,11 @@
       { id: 'eh-7', module: 'poulailler', date_evenement: jourCourt(-18),  type_evenement: 'sante', quantite: null, description: 'Traitement antiparasitaire, tout le troupeau' },
       // Deux evenements nominatifs : le reste appartient au troupeau.
       { id: 'eh-8', module: 'poulailler', date_evenement: jourCourt(-96),  type_evenement: 'perte', quantite: 1, description: 'Prédation — renard, clôture renforcée depuis', animal_id: 'ea-5' },
-      { id: 'eh-9', module: 'poulailler', date_evenement: jourCourt(-33),  type_evenement: 'sante', quantite: null, description: 'Boiterie légère, rétablie en trois jours', animal_id: 'ea-1' },
+      { id: 'eh-9', module: 'poulailler', date_evenement: jourCourt(-33),  type_evenement: 'sante', quantite: null, description: 'Blessure à une patte — boiterie, puis rétablissement complet en trois jours', animal_id: 'ea-1' },
       // Un projet se consigne en note : les deux Chantecler n'existent pas
       // encore, leur donner une fiche affirmerait un cheptel faux.
+      { id: 'eh-14', module: 'poulailler', date_evenement: jourCourt(-36), type_evenement: 'sante', quantite: null,
+        description: 'Patte enflée remarquée au matin — isolée pour la journée', animal_id: 'ea-1' },
       { id: 'eh-11', module: 'poulailler', date_evenement: jourCourt(-6), type_evenement: 'note', quantite: null,
         description: 'Deux Chantecler prévues au printemps, en remplacement de Doucette et Long Bec (âgées). Le règlement plafonne à 4 : leur départ doit précéder l’arrivée.' },
       // Sablonponie : truites arc-en-ciel, deux recoltes.

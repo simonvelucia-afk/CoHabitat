@@ -1069,6 +1069,19 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .el-lot-c input{font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;
                 background:var(--surface);color:var(--text);font-family:inherit;width:120px}
 .el-lot-c .el-fiche-l{align-self:center;margin-top:0}
+.el-histo-btn{display:block;width:100%;text-align:left;background:none;border:none;padding:2px 0;margin-top:2px;
+  font-family:inherit;font-size:11px;color:var(--text2);cursor:pointer}
+.el-histo-btn:hover{color:var(--text)}
+.el-histo{margin-top:6px;border-top:1px solid var(--border);padding-top:6px}
+.el-histo-l{margin-bottom:6px}
+.el-histo-d{font-size:10px;color:var(--text3);font-family:'Space Mono',monospace}
+.el-histo-t{font-size:11px;color:var(--text2);margin-left:5px}
+.el-histo-x{font-size:11px;color:var(--text);margin-top:1px}
+.el-fiche-edit{border-color:var(--accent2)}
+.el-ed{display:block;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
+.el-ed input,.el-ed textarea{display:block;width:100%;margin-top:3px;font-size:12px;padding:5px 7px;
+  border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);
+  font-family:inherit;text-transform:none;letter-spacing:0;resize:vertical}
 .el-fiche-act{display:flex;gap:6px;padding:0 11px 10px;align-items:center}
 .el-fiche-act select{flex:1;min-width:0;font-size:11px;padding:4px 6px;border:1px solid var(--border);
                      border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit}
@@ -11192,6 +11205,7 @@ function elevageVueLocataire(module, animaux, hist, lots, lecture) {
             ${ELEVAGE_PONTE[a.statut] && meta.prod === 'ponte'
               ? `<div class="el-fiche-l">${ELEVAGE_PONTE[a.statut]}</div>` : ''}
             ${a.notes ? `<div class="el-fiche-n">${escHtml(a.notes)}</div>` : ''}
+            ${elevageHistoire(a.id, hist, meta)}
           </div>
         </div>`).join('')}
     </div>` : '';
@@ -11262,7 +11276,30 @@ function elevageFiches(module) {
     ? `<div class="el-ecart">⚠ ${presents} fiche${presents > 1 ? 's' : ''} active${presents > 1 ? 's' : ''} pour un cheptel de ${cheptel}
         — les fiches ne couvrent pas tout l'élevage, ou un mouvement n'a pas été reporté.</div>` : '';
 
-  const cartes = animaux.map(a => `
+  // Une fiche en cours de modification remplace son corps par un
+  // formulaire. L'etat tient dans _elevage : le rendu reconstruit tout,
+  // il faut donc qu'il sache laquelle etait ouverte.
+  const carteEdition = (a) => `
+    <div class="el-fiche el-fiche-edit">
+      <div class="el-photo" data-icone="${meta.icon}" id="el-apercu-${a.id}">
+        ${a.photo_url ? `<img src="${escHtml(a.photo_url)}" alt="" onerror="this.style.display='none';this.parentElement.classList.add('el-sansphoto')">` : ''}
+      </div>
+      <div class="el-fiche-corps">
+        <label class="el-ed">Nom<input type="text" id="el-ed-nom-${a.id}" value="${escHtml(a.nom)}"></label>
+        <label class="el-ed">Race<input type="text" id="el-ed-race-${a.id}" value="${escHtml(a.race || '')}" placeholder="Rousse"></label>
+        <label class="el-ed">Arrivée<input type="date" id="el-ed-date-${a.id}" value="${a.date_arrivee || ''}"></label>
+        <label class="el-ed">Photo (adresse web)
+          <input type="url" id="el-ed-photo-${a.id}" value="${escHtml(a.photo_url || '')}" placeholder="https://…"
+                 oninput="elevageApercuPhoto('${a.id}')"></label>
+        <label class="el-ed">Notes<textarea id="el-ed-notes-${a.id}" rows="2" placeholder="caractère, signe distinctif…">${escHtml(a.notes || '')}</textarea></label>
+      </div>
+      <div class="el-fiche-act">
+        <button class="btn btn-primary btn-sm" onclick="elevageSauverAnimal('${module}','${a.id}')">Enregistrer</button>
+        <button class="btn btn-secondary btn-sm" onclick="elevageAnnulerEdition('${module}')">Annuler</button>
+      </div>
+    </div>`;
+
+  const cartes = animaux.map(a => a.id === st.edition ? carteEdition(a) : `
     <div class="el-fiche${ELEVAGE_PRESENTS.includes(a.statut) ? '' : ' el-fiche-off'}${ELEVAGE_PONTE[a.statut] && a.statut !== 'adulte' ? ' el-fiche-age' : ''}">
       ${elevagePortrait(a, meta)}
       <div class="el-fiche-corps">
@@ -11274,13 +11311,19 @@ function elevageFiches(module) {
         ${!ELEVAGE_PRESENTS.includes(a.statut) && a.date_arrivee ? `<div class="el-fiche-l">arrivé${meta.genre === 'f' ? 'e' : ''} le ${a.date_arrivee}</div>` : ''}
         ${ELEVAGE_PONTE[a.statut] && meta.prod === 'ponte' ? `<div class="el-fiche-l">${ELEVAGE_PONTE[a.statut]}</div>` : ''}
         ${a.notes ? `<div class="el-fiche-n">${escHtml(a.notes)}</div>` : ''}
-        <div class="el-fiche-l">${evParAnimal[a.id] || 0} événement${(evParAnimal[a.id] || 0) > 1 ? 's' : ''} à son nom</div>
+        ${(evParAnimal[a.id] || 0) === 0
+          ? '<div class="el-fiche-l">aucun événement à son nom</div>'
+          : `<button class="el-histo-btn" onclick="elevageHistoireAnimal('${module}','${a.id}')">
+               ${st.histoire === a.id ? '▾' : '▸'} ${evParAnimal[a.id]} événement${evParAnimal[a.id] > 1 ? 's' : ''} à son nom
+             </button>`}
+        ${st.histoire === a.id ? elevageHistoire(a.id, st.hist, meta) : ''}
       </div>
       <div class="el-fiche-act">
         <select onchange="elevageStatutAnimal('${module}','${a.id}',this.value)" title="Statut">
           ${ELEVAGE_STATUTS.map(v => `<option value="${v}"${a.statut === v ? ' selected' : ''}>${
             elevageStatutLabel(v, meta.genre)}${ELEVAGE_STATUT_AIDE[v] ? ' — ' + ELEVAGE_STATUT_AIDE[v] : ''}</option>`).join('')}
         </select>
+        <button class="btn btn-secondary btn-sm" onclick="elevageEditerAnimal('${module}','${a.id}')" title="Modifier la fiche">✎</button>
         <button class="btn btn-secondary btn-sm" onclick="elevageDelAnimal('${module}','${a.id}','${escHtml(a.nom).replace(/'/g, "\\'")}')">✕</button>
       </div>
     </div>`).join('');
@@ -11494,6 +11537,31 @@ async function elevageDelLot(module, id, espece) {
   loadElevage(module);
 }
 
+// L'histoire d'une bete : ses propres evenements, du plus recent au plus
+// ancien. Le compteur seul ne disait pas ce qui etait arrive — « 1
+// evenement a son nom » obligeait a fouiller le tableau de l'elevage
+// entier pour retrouver une boiterie.
+function elevageHistoire(id, hist, meta) {
+  const siens = (hist || []).filter(e => e.animal_id === id);
+  if (!siens.length) return '';
+  return `<div class="el-histo">
+    ${siens.map(e => `
+      <div class="el-histo-l">
+        <span class="el-histo-d">${e.date_evenement || ''}</span>
+        <span class="el-histo-t">${ELEVAGE_TYPE_LABELS[e.type_evenement] || e.type_evenement}${
+          e.quantite != null ? ' · ' + e.quantite : ''}</span>
+        ${e.description ? `<div class="el-histo-x">${escHtml(e.description)}</div>` : ''}
+      </div>`).join('')}
+  </div>`;
+}
+
+function elevageHistoireAnimal(module, id) {
+  if (!_elevage[module]) return;
+  // Un second clic referme : c'est un depliant, pas une selection.
+  _elevage[module].histoire = _elevage[module].histoire === id ? null : id;
+  renderElevage(module);
+}
+
 async function elevageAddAnimal(module) {
   const v = (id) => (document.getElementById('el-a-' + id + '-' + module) || {}).value || '';
   const nom = v('nom').trim();
@@ -11508,6 +11576,61 @@ async function elevageAddAnimal(module) {
   });
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
   toast('Fiche créée', 'success');
+  loadElevage(module);
+}
+
+// Ouvrir une fiche en modification. L'etat vit dans _elevage plutot que
+// dans le DOM : renderElevage reconstruit tout son contenu a chaque
+// rendu, une classe posee sur la carte ne survivrait pas.
+function elevageEditerAnimal(module, id) {
+  if (!_elevage[module]) return;
+  _elevage[module].edition = id;
+  renderElevage(module);
+}
+
+function elevageAnnulerEdition(module) {
+  if (!_elevage[module]) return;
+  _elevage[module].edition = null;
+  renderElevage(module);
+}
+
+// Apercu de la photo pendant la saisie : une adresse web se verifie a
+// l'oeil, pas apres coup. Un lien mort laisse l'embleme de l'elevage.
+function elevageApercuPhoto(id) {
+  const champ = document.getElementById('el-ed-photo-' + id);
+  const cadre = document.getElementById('el-apercu-' + id);
+  if (!champ || !cadre) return;
+  const url = String(champ.value || '').trim();
+  cadre.innerHTML = '';
+  cadre.classList.toggle('el-sansphoto', !url);
+  if (!url) return;
+  const img = document.createElement('img');
+  img.alt = '';
+  img.onerror = function () { img.remove(); cadre.classList.add('el-sansphoto'); };
+  img.src = url;
+  cadre.appendChild(img);
+}
+
+async function elevageSauverAnimal(module, id) {
+  const v = (champ) => {
+    const el = document.getElementById('el-ed-' + champ + '-' + id);
+    return el ? String(el.value || '').trim() : '';
+  };
+  const nom = v('nom');
+  if (!nom) { toast('Un nom est requis', 'error'); return; }
+  // Un champ vide remet NULL et non la chaine vide : « pas de race
+  // renseignee » n'est pas « race sans nom », et l'affichage teste
+  // l'absence, pas le vide.
+  const { error } = await sb.from('elevage_animaux').update({
+    nom,
+    race: v('race') || null,
+    photo_url: v('photo') || null,
+    date_arrivee: v('date') || null,
+    notes: v('notes') || null
+  }).eq('id', id);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  if (_elevage[module]) _elevage[module].edition = null;
+  toast('Fiche mise à jour', 'success');
   loadElevage(module);
 }
 
