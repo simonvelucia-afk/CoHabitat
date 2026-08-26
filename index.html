@@ -1037,6 +1037,12 @@ tr:hover td { background: rgba(255,255,255,0.02); }
               align-self:center;margin-right:4px}
 .el-cap{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:12px;color:var(--text2);
         background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:18px}
+.el-op{display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:3px 10px;font-size:12px;color:var(--text)}
+.el-op button{background:none;border:none;color:var(--text3);cursor:pointer;font-family:inherit;padding:0;font-size:12px}
+.el-op button:hover{color:var(--accent3,#e07060)}
+.el-cap select{font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;
+  background:var(--surface);color:var(--text);font-family:inherit}
 .el-cap input{font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;
               background:var(--surface);color:var(--text);font-family:inherit}
 .el-ecart{font-size:12px;color:var(--accent3,#e07060);background:rgba(224,112,96,.08);border:1px solid rgba(224,112,96,.3);
@@ -11020,12 +11026,18 @@ async function loadElevage(module) {
   const root = document.getElementById(meta.container);
   if (!root) return;
   root.innerHTML = `<div class="loading"><div class="spinner"></div> Chargement…</div>`;
-  const [hRes, cRes, aRes, capRes, lRes] = await Promise.all([
+  const [hRes, cRes, aRes, capRes, lRes, oRes, pRes] = await Promise.all([
     sb.from('elevage_historique').select('*').eq('module', module).order('date_evenement', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('elevage_couts').select('*').eq('module', module).order('date_cout', { ascending: false }),
     sb.from('elevage_animaux').select('*').eq('module', module).order('statut').order('nom'),
     sb.from('system_settings').select('key, value').eq('key', 'elevage_capacite_' + module).maybeSingle(),
-    sb.from('elevage_lots').select('*').eq('module', module).order('date_mise_en_bassin', { ascending: false })
+    sb.from('elevage_lots').select('*').eq('module', module).order('date_mise_en_bassin', { ascending: false }),
+    sb.from('elevage_operateurs').select('id, user_id, module, profiles:user_id(full_name, unit)').eq('module', module),
+    // La liste des residents ne sert qu'a nommer : inutile de la charger
+    // pour quelqu'un qui n'en a pas le droit.
+    ['admin', 'principal_admin'].includes(currentProfile?.role)
+      ? sb.from('profiles').select('id, full_name, unit, email').neq('role', 'demo').order('full_name')
+      : Promise.resolve({ data: [] })
   ]);
   if (hRes.error || cRes.error) {
     root.innerHTML = `<div class="empty-state"><p>Erreur de chargement — vérifiez la migration <code>sql/011_elevages.sql</code>.<br>${escHtml((hRes.error || cRes.error).message)}</p></div>`;
@@ -11042,6 +11054,13 @@ async function loadElevage(module) {
     // d'afficher l'elevage, pas une erreur.
     lots: lRes.error ? [] : (lRes.data || []),
     lotsIndisponibles: !!lRes.error,
+    // Sans la migration 027 la table n'existe pas : l'elevage doit
+    // continuer de s'afficher, le bloc s'efface seul.
+    operateurs: oRes.error ? [] : (oRes.data || []),
+    operateursIndisponibles: !!oRes.error,
+    // Les comptes techniques (@device.local) n'ont rien a faire dans une
+    // liste de residents — meme filtre que l'ecran des locataires.
+    candidats: (pRes.error ? [] : (pRes.data || [])).filter(t => !isDeviceAccount(t.email)),
     // Vide ou absente = aucun plafond. Un elevage sans regle ne doit pas
     // se voir imposer un ratio invente par l'interface.
     capacite: (function () {
@@ -11095,6 +11114,69 @@ function elevageDetailPaniers(e) {
   return parts.length ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">${parts.join(' · ')}</div>` : '';
 }
 
+// ── Operateurs ──────────────────────────────────────────────────────────
+// Un elevage demande quelqu'un qui s'en occupe au quotidien. Ce n'est pas
+// un travail d'administrateur : jusqu'ici il fallait pourtant nommer un
+// resident administrateur pour qu'il puisse noter une ponte, ce qui lui
+// ouvrait au passage les locataires, les paiements et les reglages.
+//
+// L'operateur peut le vivant — betes, lots, evenements — de SON module
+// seulement. Pas les couts, pas le nombre permis : ce que l'immeuble
+// depense et ce que le reglement autorise restent au conseil.
+function estOperateur(module) {
+  const st = _elevage[module] || {};
+  return (st.operateurs || []).some(o => o.user_id === currentProfile?.id);
+}
+
+function elevageOperateurs(module) {
+  const meta = ELEVAGE_META[module];
+  const st = _elevage[module] || {};
+  const isAdmin = ['admin', 'principal_admin'].includes(currentProfile?.role);
+  const ops = st.operateurs || [];
+  if (st.operateursIndisponibles) {
+    return isAdmin ? `<div class="el-eau" style="border-left-color:var(--text3)">
+      <span>Confier l'élevage à un résident demande la migration <code>sql/027_elevage_operateurs.sql</code>, pas encore passée.</span></div>` : '';
+  }
+  const nom = (o) => (o.profiles?.full_name || 'Résident') + (o.profiles?.unit ? ' · ' + o.profiles.unit : '');
+  const liste = ops.length
+    ? ops.map(o => `<span class="el-op">${escHtml(nom(o))}${isAdmin
+        ? ` <button onclick="elevageRetirerOperateur('${module}','${o.id}','${escHtml(nom(o)).replace(/'/g, "\\'")}')" title="Retirer">✕</button>` : ''}</span>`).join('')
+    : `<span style="color:var(--text3)">personne — l'élevage n'est suivi que par l'administration</span>`;
+
+  return `
+    <div class="el-cap" style="border-left:3px solid var(--accent2)">
+      <span>${meta.icon} <strong>Qui s'en occupe</strong></span>
+      ${liste}
+      ${isAdmin ? `
+        <select id="el-op-choix-${module}" style="min-width:170px">
+          <option value="">— confier à un résident —</option>
+          ${(st.candidats || []).filter(t => !ops.some(o => o.user_id === t.id))
+            .map(t => `<option value="${t.id}">${escHtml(t.full_name || '')}${t.unit ? ' · ' + escHtml(t.unit) : ''}</option>`).join('')}
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="elevageNommerOperateur('${module}')">Confier</button>
+        <span style="color:var(--text3)">Il pourra noter la production et tenir les fiches — ni les coûts, ni le nombre permis.</span>` : ''}
+    </div>`;
+}
+
+async function elevageNommerOperateur(module) {
+  const sel = document.getElementById('el-op-choix-' + module);
+  const uid = sel && sel.value;
+  if (!uid) { toast('Choisissez un résident', 'error'); return; }
+  const { error } = await sb.from('elevage_operateurs')
+    .insert({ user_id: uid, module, granted_by: currentProfile.id });
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Élevage confié', 'success');
+  loadElevage(module);
+}
+
+async function elevageRetirerOperateur(module, id, nom) {
+  if (!confirm(`Retirer ${nom} de la gestion de cet élevage ?`)) return;
+  const { error } = await sb.from('elevage_operateurs').delete().eq('id', id);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Retiré', 'success');
+  loadElevage(module);
+}
+
 // ── Lots de poissons ────────────────────────────────────────────────────
 // On ne nomme pas quarante truites. Un lot entre en bassin, il grossit, on
 // le recolte en plusieurs fois — le cycle des cultures de la serre,
@@ -11146,7 +11228,15 @@ function lotBiomasse(lot) {
 // La sablonponie s'affiche sous les reservoirs de la serre, le poulailler
 // en bas de la page Espaces : le meme ordre que l'ecran d'administration,
 // et le meme motif — les poissons vivent dans ces bassins.
+// Les elevages confies a la personne connectee. Charge une fois par
+// visite : chaque zone y lit son droit sans requete supplementaire.
+let _elevageOperateurDe = [];
+
 async function loadElevagesLocataire() {
+  const { data: mesElevages, error: opErr } = await sb.from('elevage_operateurs')
+    .select('module').eq('user_id', currentProfile?.id || '00000000-0000-0000-0000-000000000000');
+  _elevageOperateurDe = opErr ? [] : (mesElevages || []).map(o => o.module);
+
   const cibles = [
     { module: 'sablonponie', el: 'sablonponie-section', filet: false },
     { module: 'poulailler',  el: 'poulailler-section',  filet: true },
@@ -11252,7 +11342,46 @@ function elevageVueLocataire(module, animaux, hist, lots, lecture) {
         <div class="s">${derniere.date_evenement || ''}</div></div>` : ''}
     </div>
     ${lotsVue}
-    ${portraits}`;
+    ${portraits}
+    ${elevageSaisieOperateur(module, meta)}`;
+}
+
+// L'operateur note sa production la ou il regarde son elevage — sur la
+// page Espaces, pas dans l'ecran d'administration ou il n'a rien a faire.
+// Le geste quotidien, rien de plus : ce qui a ete ramasse, et une note.
+function elevageSaisieOperateur(module, meta) {
+  if (!_elevageOperateurDe.includes(module)) return '';
+  const today = new Date().toISOString().split('T')[0];
+  return `
+    <div class="el-cap" style="border-left:3px solid var(--accent2);margin-top:14px;margin-bottom:0">
+      <span>✎ <strong>Vous vous occupez de cet élevage</strong></span>
+      <input type="date" id="el-op-date-${module}" value="${today}" style="width:150px">
+      <select id="el-op-type-${module}" style="min-width:130px">
+        <option value="${meta.prod}">${ELEVAGE_TYPE_LABELS[meta.prod]}</option>
+        <option value="note">Note</option>
+        <option value="sante">Santé</option>
+      </select>
+      <input type="number" step="${meta.prod === 'ponte' ? '1' : '0.1'}" min="0" id="el-op-qte-${module}"
+             placeholder="${meta.prod === 'ponte' ? 'œufs' : 'kg'}" style="width:90px">
+      <input type="text" id="el-op-desc-${module}" placeholder="ce qu'il faut retenir…" style="flex:1;min-width:150px">
+      <button class="btn btn-primary btn-sm" onclick="elevageNoterOperateur('${module}')">Noter</button>
+    </div>`;
+}
+
+async function elevageNoterOperateur(module) {
+  const v = (c) => (document.getElementById('el-op-' + c + '-' + module) || {}).value || '';
+  const date = v('date'), type = v('type'), qte = String(v('qte')).trim(), desc = v('desc').trim();
+  if (!date) { toast('Date requise', 'error'); return; }
+  const { error } = await sb.from('elevage_historique').insert({
+    module, date_evenement: date, type_evenement: type,
+    quantite: qte === '' ? null : Number(qte),
+    description: desc || null, created_by: currentProfile.id
+  });
+  // Le refus le plus probable : la migration 027 n'est pas passee, ou le
+  // droit a ete retire entre le chargement de la page et l'envoi.
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Noté ✓', 'success');
+  loadElevagesLocataire();
 }
 
 function elevageFiches(module) {
@@ -11750,6 +11879,8 @@ function renderElevage(module) {
         <div class="v">${coutUnitaire === null ? '—' : coutUnitaire.toFixed(2) + ' $'}</div>
         <div class="s">${coutUnitaire === null ? 'aucune production en ' + year : 'coûts ' + year + ' ÷ production'}</div></div>
     </div>
+
+    ${elevageOperateurs(module)}
 
     <div class="el-cap">
       <span>Nombre de ${meta.animal}s permis</span>
