@@ -1069,6 +1069,14 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .el-lot-c input{font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;
                 background:var(--surface);color:var(--text);font-family:inherit;width:120px}
 .el-lot-c .el-fiche-l{align-self:center;margin-top:0}
+.el-histo-btn{display:block;width:100%;text-align:left;background:none;border:none;padding:2px 0;margin-top:2px;
+  font-family:inherit;font-size:11px;color:var(--text2);cursor:pointer}
+.el-histo-btn:hover{color:var(--text)}
+.el-histo{margin-top:6px;border-top:1px solid var(--border);padding-top:6px}
+.el-histo-l{margin-bottom:6px}
+.el-histo-d{font-size:10px;color:var(--text3);font-family:'Space Mono',monospace}
+.el-histo-t{font-size:11px;color:var(--text2);margin-left:5px}
+.el-histo-x{font-size:11px;color:var(--text);margin-top:1px}
 .el-fiche-edit{border-color:var(--accent2)}
 .el-ed{display:block;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
 .el-ed input,.el-ed textarea{display:block;width:100%;margin-top:3px;font-size:12px;padding:5px 7px;
@@ -11197,6 +11205,7 @@ function elevageVueLocataire(module, animaux, hist, lots, lecture) {
             ${ELEVAGE_PONTE[a.statut] && meta.prod === 'ponte'
               ? `<div class="el-fiche-l">${ELEVAGE_PONTE[a.statut]}</div>` : ''}
             ${a.notes ? `<div class="el-fiche-n">${escHtml(a.notes)}</div>` : ''}
+            ${elevageHistoire(a.id, hist, meta)}
           </div>
         </div>`).join('')}
     </div>` : '';
@@ -11302,7 +11311,12 @@ function elevageFiches(module) {
         ${!ELEVAGE_PRESENTS.includes(a.statut) && a.date_arrivee ? `<div class="el-fiche-l">arrivé${meta.genre === 'f' ? 'e' : ''} le ${a.date_arrivee}</div>` : ''}
         ${ELEVAGE_PONTE[a.statut] && meta.prod === 'ponte' ? `<div class="el-fiche-l">${ELEVAGE_PONTE[a.statut]}</div>` : ''}
         ${a.notes ? `<div class="el-fiche-n">${escHtml(a.notes)}</div>` : ''}
-        <div class="el-fiche-l">${evParAnimal[a.id] || 0} événement${(evParAnimal[a.id] || 0) > 1 ? 's' : ''} à son nom</div>
+        ${(evParAnimal[a.id] || 0) === 0
+          ? '<div class="el-fiche-l">aucun événement à son nom</div>'
+          : `<button class="el-histo-btn" onclick="elevageHistoireAnimal('${module}','${a.id}')">
+               ${st.histoire === a.id ? '▾' : '▸'} ${evParAnimal[a.id]} événement${evParAnimal[a.id] > 1 ? 's' : ''} à son nom
+             </button>`}
+        ${st.histoire === a.id ? elevageHistoire(a.id, st.hist, meta) : ''}
       </div>
       <div class="el-fiche-act">
         <select onchange="elevageStatutAnimal('${module}','${a.id}',this.value)" title="Statut">
@@ -11521,6 +11535,31 @@ async function elevageDelLot(module, id, espece) {
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
   toast('Lot supprimé', 'success');
   loadElevage(module);
+}
+
+// L'histoire d'une bete : ses propres evenements, du plus recent au plus
+// ancien. Le compteur seul ne disait pas ce qui etait arrive — « 1
+// evenement a son nom » obligeait a fouiller le tableau de l'elevage
+// entier pour retrouver une boiterie.
+function elevageHistoire(id, hist, meta) {
+  const siens = (hist || []).filter(e => e.animal_id === id);
+  if (!siens.length) return '';
+  return `<div class="el-histo">
+    ${siens.map(e => `
+      <div class="el-histo-l">
+        <span class="el-histo-d">${e.date_evenement || ''}</span>
+        <span class="el-histo-t">${ELEVAGE_TYPE_LABELS[e.type_evenement] || e.type_evenement}${
+          e.quantite != null ? ' · ' + e.quantite : ''}</span>
+        ${e.description ? `<div class="el-histo-x">${escHtml(e.description)}</div>` : ''}
+      </div>`).join('')}
+  </div>`;
+}
+
+function elevageHistoireAnimal(module, id) {
+  if (!_elevage[module]) return;
+  // Un second clic referme : c'est un depliant, pas une selection.
+  _elevage[module].histoire = _elevage[module].histoire === id ? null : id;
+  renderElevage(module);
 }
 
 async function elevageAddAnimal(module) {
