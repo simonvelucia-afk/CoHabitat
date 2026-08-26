@@ -1058,6 +1058,17 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .el-fiche-n{font-size:11px;color:var(--text2);margin-top:5px;font-style:italic}
 .el-fiches-lect{grid-template-columns:repeat(auto-fill,minmax(165px,1fr))}
 .el-fiches-lect .el-fiche-corps{padding-bottom:11px}
+.el-lot{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--border);
+        border-radius:8px;margin-bottom:8px}
+.el-lot-off{opacity:.55}
+.el-lot-h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:9px 11px 0}
+.el-lot-h select{font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;
+                 background:var(--surface);color:var(--text);font-family:inherit;max-width:100%}
+.el-lot-c{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:flex-end;padding:9px 11px 10px}
+.el-lot-c label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text3)}
+.el-lot-c input{font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;
+                background:var(--surface);color:var(--text);font-family:inherit;width:120px}
+.el-lot-c .el-fiche-l{align-self:center;margin-top:0}
 .el-fiche-act{display:flex;gap:6px;padding:0 11px 10px;align-items:center}
 .el-fiche-act select{flex:1;min-width:0;font-size:11px;padding:4px 6px;border:1px solid var(--border);
                      border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit}
@@ -1680,6 +1691,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
            partagent les réservoirs, le poulailler ferme la marche.
            Remplies par loadElevagesLocataire(), masquées si le module
            Serre est coupé ou si l'élevage est vide. -->
+      <div id="sablonponie-section" style="display:none;margin-top:36px;padding-top:28px;border-top:1px solid var(--border);"></div>
       <div id="poulailler-section" style="display:none;margin-top:36px;padding-top:28px;border-top:1px solid var(--border);"></div>
     </div>
 
@@ -7575,8 +7587,10 @@ function renderSerre() {
       : (mine ? `<div style="font-size:12px;color:var(--text2);margin-bottom:14px;">${pt('Vous louez actuellement')} <strong>${mine}</strong> ${mine > 1 ? pt('zones') : pt('zone')}.</div>` : '')}
 
     <div class="serre-sec" style="margin-top:0;">${pt('Conditions de la serre')}</div>
-    ${ConditionsSerre(L, true)}
-    <div id="sablonponie-section"></div>
+    <div class="el-eau" style="margin-bottom:18px">
+      <span>🌡 Température de l'air : <strong>${L.temp_air == null ? '—' : L.temp_air + ' °C'}</strong></span>
+      <span style="color:var(--text3)">💧 Les réservoirs se lisent avec la sablonponie — c'est la même eau.</span>
+    </div>
     ${_serre.isAdmin && !isDemo ? `<div style="font-size:11px;color:var(--text3);margin:-10px 0 18px;">${pt('Saisie manuelle : onglet Admin → 🌱 Serre')}</div>` : ''}
 
     <div id="serre-plan-wrap">
@@ -10967,6 +10981,20 @@ const ELEVAGE_PANIERS = [
   { cle: 'ponte_defaut_rejet',      label: 'Défaut — rejeté',     court: 'Dr',
     aide: 'cassé, souillé, douteux — jeté' },
 ];
+// Calibres d'une recolte de poissons. A la difference des oeufs, ils se
+// comptent en PIECES alors que la quantite se pese en KILOS : les deux ne
+// s'additionnent pas, et l'ecran ne deduit jamais l'un de l'autre. Il en
+// tire en revanche le poids moyen reel — kilos divises par pieces — qui
+// se compare au poids estime du lot.
+const ELEVAGE_CALIBRES = [
+  { cle: 'recolte_petit', label: 'Petits',  court: 'P' },
+  { cle: 'recolte_moyen', label: 'Moyens',  court: 'M' },
+  { cle: 'recolte_gros',  label: 'Gros',    court: 'G' },
+  { cle: 'recolte_rejet', label: 'Rejetés', court: 'R', aide: 'impropres — non consommés' },
+];
+// Le detail suit le type de production de l'elevage.
+const paniersDu = (module) => ELEVAGE_META[module].prod === 'ponte' ? ELEVAGE_PANIERS : ELEVAGE_CALIBRES;
+
 const ELEVAGE_COUT_CATS = ['Nourriture', 'Équipement', 'Vétérinaire', 'Litière', 'Énergie', 'Autre'];
 const ELEVAGE_TYPE_LABELS = { ajout: 'Ajout', perte: 'Perte / Mortalité', ponte: 'Ponte (œufs)', recolte: 'Récolte', sante: 'Santé', note: 'Note' };
 let _elevage = {};
@@ -10976,11 +11004,12 @@ async function loadElevage(module) {
   const root = document.getElementById(meta.container);
   if (!root) return;
   root.innerHTML = `<div class="loading"><div class="spinner"></div> Chargement…</div>`;
-  const [hRes, cRes, aRes, capRes] = await Promise.all([
+  const [hRes, cRes, aRes, capRes, lRes] = await Promise.all([
     sb.from('elevage_historique').select('*').eq('module', module).order('date_evenement', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('elevage_couts').select('*').eq('module', module).order('date_cout', { ascending: false }),
     sb.from('elevage_animaux').select('*').eq('module', module).order('statut').order('nom'),
-    sb.from('system_settings').select('key, value').eq('key', 'elevage_capacite_' + module).maybeSingle()
+    sb.from('system_settings').select('key, value').eq('key', 'elevage_capacite_' + module).maybeSingle(),
+    sb.from('elevage_lots').select('*').eq('module', module).order('date_mise_en_bassin', { ascending: false })
   ]);
   if (hRes.error || cRes.error) {
     root.innerHTML = `<div class="empty-state"><p>Erreur de chargement — vérifiez la migration <code>sql/011_elevages.sql</code>.<br>${escHtml((hRes.error || cRes.error).message)}</p></div>`;
@@ -10993,6 +11022,10 @@ async function loadElevage(module) {
     hist: hRes.data || [], couts: cRes.data || [],
     animaux: aRes.error ? [] : (aRes.data || []),
     fichesIndisponibles: !!aRes.error,
+    // Comme les fiches : une base sans la migration 026 doit continuer
+    // d'afficher l'elevage, pas une erreur.
+    lots: lRes.error ? [] : (lRes.data || []),
+    lotsIndisponibles: !!lRes.error,
     // Vide ou absente = aucun plafond. Un elevage sans regle ne doit pas
     // se voir imposer un ratio invente par l'interface.
     capacite: (function () {
@@ -11040,10 +11073,53 @@ function elevagePortrait(a, meta) {
 // Le detail sous la quantite : « 24 » seul ne dit pas que sept etaient
 // gros et deux feles. Absent quand la cueillette n'a pas ete calibree.
 function elevageDetailPaniers(e) {
-  const parts = ELEVAGE_PANIERS
+  const parts = ELEVAGE_PANIERS.concat(ELEVAGE_CALIBRES)
     .filter(p => e[p.cle] !== null && e[p.cle] !== undefined && Number(e[p.cle]) > 0)
     .map(p => `${p.court} ${e[p.cle]}`);
   return parts.length ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">${parts.join(' · ')}</div>` : '';
+}
+
+// ── Lots de poissons ────────────────────────────────────────────────────
+// On ne nomme pas quarante truites. Un lot entre en bassin, il grossit, on
+// le recolte en plusieurs fois — le cycle des cultures de la serre,
+// applique a l'eau.
+const ELEVAGE_STADES = ['alevin', 'juvenile', 'croissance', 'marchand', 'reproduction', 'epuise'];
+const ELEVAGE_STADE_LABELS = {
+  alevin: 'Alevins', juvenile: 'Juvéniles', croissance: 'En croissance',
+  marchand: 'Taille marchande', reproduction: 'Reproduction', epuise: 'Lot épuisé'
+};
+const ELEVAGE_STADE_AIDE = {
+  alevin: 'tout juste mis en bassin', juvenile: 'grossit, pas encore récoltable',
+  croissance: 'prend son poids de marché', marchand: 'récoltable',
+  reproduction: 'géniteurs — ne se récolte pas', epuise: 'plus rien à récolter'
+};
+const ELEVAGE_STADE_COULEUR = {
+  alevin: 'rgba(126,184,160,.45)', juvenile: 'rgba(126,184,160,.85)',
+  croissance: 'rgba(200,169,110,.9)', marchand: 'rgba(208,138,90,.85)',
+  reproduction: 'rgba(111,179,232,.85)', epuise: 'var(--border)'
+};
+// « reproduction » sort du circuit de production : un lot de geniteurs ne
+// se recolte pas, il fournit les alevins suivants.
+const ELEVAGE_STADE_RECOLTABLE = (st) => st !== 'reproduction' && st !== 'epuise';
+// Le sexe ne se note qu'a la reproduction : un lot d'engraissement est
+// mixte et personne ne le trie ; des geniteurs se separent par sexe, en
+// bassins distincts.
+const ELEVAGE_SEXES = ['mixte', 'male', 'femelle'];
+const ELEVAGE_SEXE_LABELS = { mixte: 'Mixte', male: '♂ Mâles', femelle: '♀ Femelles' };
+
+// Ce qu'un lot a deja donne : la somme des recoltes qui lui sont
+// rattachees. Une recolte dont le lot a ete supprime reste dans
+// l'historique mais ne compte plus ici — elle est redevenue collective.
+function lotRecolte(lot, hist) {
+  return (hist || []).filter(e => e.lot_id === lot.id && e.type_evenement === 'recolte')
+                     .reduce((n, e) => n + Number(e.quantite || 0), 0);
+}
+
+function lotBiomasse(lot) {
+  // Estimation, pas une mesure : quantite initiale x poids moyen. Sans
+  // pesee on ne l'affiche pas plutot que d'inventer un chiffre.
+  if (lot.poids_moyen_g == null) return null;
+  return (Number(lot.quantite_initiale || 0) * Number(lot.poids_moyen_g)) / 1000;
 }
 
 // ── Vue locataire ───────────────────────────────────────────────────────
@@ -11062,23 +11138,32 @@ async function loadElevagesLocataire() {
   for (const c of cibles) {
     const root = document.getElementById(c.el);
     if (!root) continue;
-    const [aRes, hRes] = await Promise.all([
+    const [aRes, hRes, lRes, condRes] = await Promise.all([
       sb.from('elevage_animaux').select('*').eq('module', c.module).order('statut').order('nom'),
       sb.from('elevage_historique').select('*').eq('module', c.module)
-        .order('date_evenement', { ascending: false }).limit(60)
+        .order('date_evenement', { ascending: false }).limit(60),
+      sb.from('elevage_lots').select('*').eq('module', c.module).order('date_mise_en_bassin', { ascending: false }),
+      // Les reservoirs sont les bassins de la sablonponie : sa zone les
+      // porte desormais, la serre n'en garde qu'un renvoi.
+      c.module === 'sablonponie'
+        ? sb.from('serre_lectures').select('*').order('horodatage', { ascending: false }).limit(1)
+        : Promise.resolve({ data: [] })
     ]);
     // Sans la migration 025, la base renvoie zero ligne sans erreur. Une
     // section vide vaut mieux qu'une section qui affiche des zeros comme
     // s'ils etaient mesures : on se retire.
     const animaux = aRes.error ? [] : (aRes.data || []);
     const hist    = hRes.error ? [] : (hRes.data || []);
-    if (!animaux.length && !hist.length) { root.style.display = 'none'; root.innerHTML = ''; continue; }
+    const lots    = lRes.error ? [] : (lRes.data || []);
+    const lecture = (!condRes.error && condRes.data && condRes.data[0]) || null;
+    if (!animaux.length && !hist.length && !lots.length) { root.style.display = 'none'; root.innerHTML = ''; continue; }
     root.style.display = '';
-    root.innerHTML = elevageVueLocataire(c.module, animaux, hist);
+    root.innerHTML = elevageVueLocataire(c.module, animaux, hist, lots, lecture);
   }
 }
 
-function elevageVueLocataire(module, animaux, hist) {
+function elevageVueLocataire(module, animaux, hist, lots, lecture) {
+  lots = lots || [];
   const meta = ELEVAGE_META[module];
   const presents = animaux.filter(a => ELEVAGE_PRESENTS.includes(a.statut));
   const mois = new Date().toISOString().slice(0, 7);
@@ -11090,7 +11175,9 @@ function elevageVueLocataire(module, animaux, hist) {
   const derniere = hist.find(e => e.type_evenement === meta.prod);
   // Le cheptel se lit sur les fiches quand il y en a, sinon sur les
   // quantites — un elevage peut etre suivi en masse sans etre nomme.
-  const cheptel = presents.length || hist.reduce((n, e) =>
+  const enLots = lots.filter(l => l.stade !== 'epuise')
+                     .reduce((n, l) => n + Number(l.quantite_initiale || 0), 0);
+  const cheptel = enLots || presents.length || hist.reduce((n, e) =>
     n + (e.type_evenement === 'ajout' ? Number(e.quantite || 0)
        : e.type_evenement === 'perte' ? -Number(e.quantite || 0) : 0), 0);
 
@@ -11109,9 +11196,35 @@ function elevageVueLocataire(module, animaux, hist) {
         </div>`).join('')}
     </div>` : '';
 
+  // Les bassins : c'est la zone de la sablonponie qui les porte.
+  const bassins = (meta.eau && lecture) ? `
+    <div class="el-eau" style="margin-bottom:14px">
+      <span>💧 <strong>Bassins</strong> — la même eau irrigue la serre.</span>
+      ${[1, 2, 3].map(n => `<span>Bassin ${n} : <strong>${
+        lecture['reservoir' + n + '_temp'] == null ? '—' : lecture['reservoir' + n + '_temp'] + ' °C'}</strong> · ${
+        lecture['reservoir' + n + '_pct'] == null ? '—' : lecture['reservoir' + n + '_pct'] + ' %'}</span>`).join('')}
+    </div>` : '';
+
+  const lotsVue = lots.filter(l => l.stade !== 'epuise').length ? `
+    <div class="el-fiches el-fiches-lect" style="margin-bottom:0">
+      ${lots.filter(l => l.stade !== 'epuise').map(l => `
+        <div class="el-lot" style="border-left-color:${ELEVAGE_STADE_COULEUR[l.stade] || 'var(--border)'};margin-bottom:0">
+          <div class="el-lot-h" style="padding-bottom:9px">
+            <div><strong>${escHtml(l.espece)}</strong>
+              <div class="el-fiche-l">${l.quantite_initiale} ${meta.animal}${l.quantite_initiale > 1 ? 's' : ''}${
+                (l.sexe && l.sexe !== 'mixte') ? ' · ' + ELEVAGE_SEXE_LABELS[l.sexe] : ''}</div>
+              <div class="el-fiche-l">${ELEVAGE_STADE_LABELS[l.stade]} — ${ELEVAGE_STADE_AIDE[l.stade]}</div>
+              ${l.poids_moyen_g != null ? `<div class="el-fiche-l">≈ ${l.poids_moyen_g} g pièce</div>` : ''}
+              ${ELEVAGE_STADE_RECOLTABLE(l.stade) && l.date_recolte_prevue
+                ? `<div class="el-fiche-l">récolte prévue ${l.date_recolte_prevue}</div>` : ''}
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>` : '';
+
   return `
-    <div class="serre-sec" style="margin-top:0">${meta.icon} ${meta.titre}${
-      meta.eau ? ' <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">— dans les réservoirs ci-dessus</span>' : ''}</div>
+    <div class="serre-sec" style="margin-top:0">${meta.icon} ${meta.titre}</div>
+    ${bassins}
     <div class="el-stats" style="margin-bottom:14px">
       <div class="el-stat"><div class="l">${cheptel > 1 ? meta.animal + 's' : meta.animal}</div>
         <div class="v" style="color:var(--accent2)">${cheptel}</div></div>
@@ -11121,6 +11234,7 @@ function elevageVueLocataire(module, animaux, hist) {
         <div class="v">${q(Number(derniere.quantite || 0))} ${unite(Number(derniere.quantite || 0))}</div>
         <div class="s">${derniere.date_evenement || ''}</div></div>` : ''}
     </div>
+    ${lotsVue}
     ${portraits}`;
 }
 
@@ -11197,8 +11311,9 @@ function elevageMajPaniers(module) {
   const bloc = document.getElementById('el-paniers-' + module);
   if (!bloc) return;
   const type = (document.getElementById('el-h-type-' + module) || {}).value;
-  bloc.style.display = type === 'ponte' ? 'flex' : 'none';
-  if (type === 'ponte') elevageTotalPaniers(module);
+  const prod = ELEVAGE_META[module].prod;
+  bloc.style.display = type === prod ? 'flex' : 'none';
+  if (type === prod) elevageTotalPaniers(module);
 }
 
 // La quantite se deduit des paniers des qu'un seul est rempli : saisir un
@@ -11206,7 +11321,8 @@ function elevageMajPaniers(module) {
 // rien n'est calibre, le champ Quantite reste libre — une cueillette
 // entree en bloc doit rester possible.
 function elevageTotalPaniers(module) {
-  const lu = ELEVAGE_PANIERS.map(p => {
+  const prod = ELEVAGE_META[module].prod;
+  const lu = paniersDu(module).map(p => {
     const el = document.getElementById('el-h-' + p.cle + '-' + module);
     const v = el && String(el.value).trim();
     return v === '' || v == null ? null : Number(v);
@@ -11214,10 +11330,23 @@ function elevageTotalPaniers(module) {
   const remplis = lu.filter(v => v !== null && isFinite(v));
   const aff = document.getElementById('el-paniers-total-' + module);
   const qty = document.getElementById('el-h-qty-' + module);
-  if (!remplis.length) { if (aff) aff.textContent = '—'; if (qty) qty.readOnly = false; return; }
+  if (!remplis.length) { if (aff) aff.textContent = '—'; if (qty && prod === 'ponte') qty.readOnly = false; return; }
   const total = remplis.reduce((s, v) => s + v, 0);
-  if (aff) aff.textContent = String(total);
-  if (qty) { qty.value = String(total); qty.readOnly = true; }
+
+  if (prod === 'ponte') {
+    // Des oeufs : les paniers FONT le total. Saisir une quantite qui
+    // contredit son propre detail n'aurait pas de sens.
+    if (aff) aff.textContent = String(total);
+    if (qty) { qty.value = String(total); qty.readOnly = true; }
+    return;
+  }
+  // Des poissons : les calibres comptent des pieces, la quantite pese des
+  // kilos. On ne deduit donc RIEN — on affiche seulement le poids moyen
+  // reel, qui se compare au poids estime du lot.
+  const kg = Number(String((qty || {}).value || '').trim());
+  const sains = total - (lu[3] === null ? 0 : lu[3]);   // les rejetes ne se pesent pas
+  const moyen = (isFinite(kg) && kg > 0 && sains > 0) ? Math.round((kg * 1000) / sains) : null;
+  if (aff) aff.textContent = `${total} pièce${total > 1 ? 's' : ''}${moyen ? ' · ' + moyen + ' g' : ''}`;
 }
 
 async function elevageSetCapacite(module) {
@@ -11240,6 +11369,128 @@ async function elevageSetCapacite(module) {
   }
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
   toast(n === null ? 'Plafond retiré' : 'Nombre permis enregistré', 'success');
+  loadElevage(module);
+}
+
+// ── Lots : rendu et actions (administration) ────────────────────────────
+function elevageLots(module) {
+  const meta = ELEVAGE_META[module];
+  const st = _elevage[module] || {};
+  if (meta.prod !== 'recolte') return '';   // les lots n'ont de sens que pour l'eau
+  if (st.lotsIndisponibles) {
+    return `<div class="el-sec">Lots en bassin</div>
+      <div class="el-eau" style="border-left-color:var(--text3)">
+        <span>Les lots demandent la migration <code>sql/026_sablonponie_lots.sql</code>, pas encore passée.</span></div>`;
+  }
+  const lots = st.lots || [];
+  const actifs = lots.filter(l => l.stade !== 'epuise');
+  const enBassin = actifs.reduce((n, l) => n + Number(l.quantite_initiale || 0), 0);
+  const geniteurs = actifs.filter(l => l.stade === 'reproduction')
+                          .reduce((n, l) => n + Number(l.quantite_initiale || 0), 0);
+  const today = new Date().toISOString().split('T')[0];
+
+  const carte = (l) => {
+    const recolte = lotRecolte(l, st.hist);
+    const bio = lotBiomasse(l);
+    return `
+    <div class="el-lot${l.stade === 'epuise' ? ' el-lot-off' : ''}" style="border-left-color:${ELEVAGE_STADE_COULEUR[l.stade] || 'var(--border)'}">
+      <div class="el-lot-h">
+        <div><strong>${escHtml(l.espece)}</strong>
+          <span class="el-fiche-l" style="display:inline">· ${l.quantite_initiale} mis en bassin le ${l.date_mise_en_bassin || '—'}</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <select onchange="elevageStadeLot('${module}','${l.id}',this.value)" title="Stade de croissance">
+            ${ELEVAGE_STADES.map(v => `<option value="${v}"${l.stade === v ? ' selected' : ''}>${ELEVAGE_STADE_LABELS[v]} — ${ELEVAGE_STADE_AIDE[v]}</option>`).join('')}
+          </select>
+          <select onchange="elevageSexeLot('${module}','${l.id}',this.value)" title="Sexe du lot">
+            ${ELEVAGE_SEXES.map(v => `<option value="${v}"${(l.sexe || 'mixte') === v ? ' selected' : ''}>${ELEVAGE_SEXE_LABELS[v]}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="el-lot-c">
+        <label>Poids moyen (g)
+          <input type="number" step="1" min="0" id="el-lot-poids-${l.id}" value="${l.poids_moyen_g ?? ''}" placeholder="non pesé">
+        </label>
+        ${ELEVAGE_STADE_RECOLTABLE(l.stade) ? `<label>Récolte prévue
+          <input type="date" id="el-lot-prevue-${l.id}" value="${l.date_recolte_prevue || ''}">
+        </label>` : '<span class="el-fiche-l">géniteurs — pas de récolte prévue</span>'}
+        <button class="btn btn-secondary btn-sm" onclick="elevageMajLot('${module}','${l.id}')">Enregistrer</button>
+        <span class="el-fiche-l">${bio === null ? 'biomasse non estimée — pesez le lot'
+          : 'biomasse estimée ' + bio.toFixed(1) + ' kg'}</span>
+        <span class="el-fiche-l">${recolte > 0 ? 'récolté : ' + (Math.round(recolte * 10) / 10).toFixed(1) + ' kg'
+          : ELEVAGE_STADE_RECOLTABLE(l.stade) ? 'aucune récolte' : ''}</span>
+        <button class="btn btn-secondary btn-sm" onclick="elevageDelLot('${module}','${l.id}','${escHtml(l.espece).replace(/'/g, "\\'")}')">✕</button>
+      </div>
+      ${l.notes ? `<div class="el-fiche-n" style="padding:0 11px 9px">${escHtml(l.notes)}</div>` : ''}
+    </div>`;
+  };
+
+  return `
+    <div class="el-sec">Lots en bassin${actifs.length ? ` · ${enBassin} ${meta.animal}${enBassin > 1 ? 's' : ''} sur ${actifs.length} lot${actifs.length > 1 ? 's' : ''}` : ''}${
+      geniteurs ? ` <span style="font-weight:400;text-transform:none;color:var(--text3)">dont ${geniteurs} géniteur${geniteurs > 1 ? 's' : ''}</span>` : ''}${
+      lots.length > actifs.length ? ` <span style="font-weight:400;text-transform:none;color:var(--text3)">(+ ${lots.length - actifs.length} épuisé${lots.length - actifs.length > 1 ? 's' : ''})</span>` : ''}</div>
+    <div class="el-form">
+      <div class="el-field" style="min-width:150px"><label>Espèce</label><input type="text" id="el-lot-espece-${module}" placeholder="Truite arc-en-ciel"></div>
+      <div class="el-field" style="width:110px"><label>Quantité</label><input type="number" step="1" min="0" id="el-lot-qte-${module}"></div>
+      <div class="el-field" style="min-width:130px"><label>Mise en bassin</label><input type="date" id="el-lot-date-${module}" value="${today}"></div>
+      <div class="el-field" style="min-width:120px"><label>Sexe</label>
+        <select id="el-lot-sexe-${module}">${ELEVAGE_SEXES.map(v => `<option value="${v}">${ELEVAGE_SEXE_LABELS[v]}</option>`).join('')}</select></div>
+      <div class="el-field" style="flex:1;min-width:140px"><label>Notes</label><input type="text" id="el-lot-notes-${module}" placeholder="provenance, taille à l'arrivée…"></div>
+      <button class="btn btn-primary btn-sm" onclick="elevageAddLot('${module}')">+ Lot</button>
+    </div>
+    ${lots.length ? lots.map(carte).join('')
+      : `<div class="empty-state" style="padding:18px"><p style="font-size:13px;color:var(--text3)">Aucun lot.
+          Mettre un lot en bassin permet de suivre sa croissance et ses récoltes.</p></div>`}
+  `;
+}
+
+async function elevageAddLot(module) {
+  const v = (id) => (document.getElementById('el-lot-' + id + '-' + module) || {}).value || '';
+  const espece = v('espece').trim();
+  const qte = v('qte').trim();
+  if (!espece) { toast('Une espèce est requise', 'error'); return; }
+  if (qte === '' || Number(qte) < 0) { toast('Une quantité est requise', 'error'); return; }
+  const { error } = await sb.from('elevage_lots').insert({
+    module, espece, quantite_initiale: Math.round(Number(qte)),
+    date_mise_en_bassin: v('date') || new Date().toISOString().slice(0, 10),
+    sexe: v('sexe') || 'mixte',
+    notes: v('notes').trim() || null, created_by: currentProfile.id
+  });
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Lot mis en bassin', 'success');
+  loadElevage(module);
+}
+
+async function elevageStadeLot(module, id, stade) {
+  const { error } = await sb.from('elevage_lots').update({ stade }).eq('id', id);
+  if (error) { toast('Erreur: ' + error.message, 'error'); }
+  loadElevage(module);
+}
+
+async function elevageSexeLot(module, id, sexe) {
+  const { error } = await sb.from('elevage_lots').update({ sexe }).eq('id', id);
+  if (error) { toast('Erreur: ' + error.message, 'error'); }
+  loadElevage(module);
+}
+
+async function elevageMajLot(module, id) {
+  const poids = String((document.getElementById('el-lot-poids-' + id) || {}).value || '').trim();
+  const prevue = (document.getElementById('el-lot-prevue-' + id) || {}).value || '';
+  // Vide reste NULL : un lot non pese n'est pas un lot de poids nul, et
+  // confondre les deux ferait afficher une biomasse inventee.
+  const n = poids === '' ? null : Number(poids);
+  if (n !== null && (!isFinite(n) || n < 0)) { toast('Poids invalide', 'error'); return; }
+  const { error } = await sb.from('elevage_lots')
+    .update({ poids_moyen_g: n, date_recolte_prevue: prevue || null }).eq('id', id);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Lot mis à jour', 'success');
+  loadElevage(module);
+}
+
+async function elevageDelLot(module, id, espece) {
+  if (!confirm(`Supprimer le lot « ${espece} » ?\n\nSes récoltes restent dans l'historique — elles redeviennent simplement collectives.`)) return;
+  const { error } = await sb.from('elevage_lots').delete().eq('id', id);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Lot supprimé', 'success');
   loadElevage(module);
 }
 
@@ -11385,6 +11636,8 @@ function renderElevage(module) {
         généralement limité par règlement municipal${peutFixerCapacite ? '' : ' — modifiable par l’administrateur principal'}.</span>
     </div>
 
+    ${elevageLots(module)}
+
     ${elevageFiches(module)}
 
     <div class="el-sec">Historique des ${meta.animal}s</div>
@@ -11392,25 +11645,34 @@ function renderElevage(module) {
       <div class="el-field" style="min-width:130px"><label>Date</label><input type="date" id="el-h-date-${module}" value="${today}"></div>
       <div class="el-field" style="min-width:150px"><label>Type d'événement</label>
         <select id="el-h-type-${module}" onchange="elevageMajPaniers('${module}')">${typeOptions}</select></div>
-      <div class="el-field" style="width:90px"><label>Quantité</label><input type="number" step="1" min="0" id="el-h-qty-${module}"></div>
+      <div class="el-field" style="width:90px"><label>Quantité${meta.prod === 'ponte' ? '' : ' (kg)'}</label>
+        <input type="number" step="${meta.prod === 'ponte' ? '1' : '0.1'}" min="0" id="el-h-qty-${module}"
+               oninput="elevageTotalPaniers('${module}')"></div>
       <div class="el-field" style="min-width:140px"><label>${meta.animal.charAt(0).toUpperCase() + meta.animal.slice(1)}</label>
         <select id="el-h-animal-${module}">
           <option value="">— tout l'élevage —</option>
           ${(st.animaux || []).filter(a => ELEVAGE_PRESENTS.includes(a.statut)).map(a => `<option value="${a.id}">${escHtml(a.nom)}</option>`).join('')}
         </select></div>
+      ${meta.prod !== 'recolte' || !(st.lots || []).length ? '' : `
+      <div class="el-field" style="min-width:150px"><label>Lot récolté</label>
+        <select id="el-h-lot-${module}">
+          <option value="">— non précisé —</option>
+          ${(st.lots || []).filter(l => l.stade !== 'epuise').map(l =>
+            `<option value="${l.id}">${escHtml(l.espece)} · ${l.date_mise_en_bassin || ''}</option>`).join('')}
+        </select></div>`}
       <div class="el-field" style="flex:1;min-width:150px"><label>Description</label><input type="text" id="el-h-desc-${module}" placeholder="race, cause…"></div>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);white-space:nowrap"><input type="checkbox" id="el-h-bb-${module}" checked style="width:auto"> 📌 Babillard</label>
       <button class="btn btn-primary btn-sm" onclick="elevageAddHist('${module}')">+ Ajouter</button>
     </div>
-    ${meta.prod !== 'ponte' ? '' : `
     <div class="el-form el-paniers" id="el-paniers-${module}" style="display:none">
-      <span class="el-paniers-t">Calibrer la cueillette <span style="color:var(--text3);font-weight:400">— facultatif</span></span>
-      ${ELEVAGE_PANIERS.map(p => `
+      <span class="el-paniers-t">${meta.prod === 'ponte' ? 'Calibrer la cueillette' : 'Calibrer la récolte'}
+        <span style="color:var(--text3);font-weight:400">— facultatif${meta.prod === 'ponte' ? '' : ', en pièces'}</span></span>
+      ${paniersDu(module).map(p => `
       <div class="el-field" style="width:96px"><label${p.aide ? ` title="${p.aide}"` : ''}>${p.label}</label>
         <input type="number" step="1" min="0" id="el-h-${p.cle}-${module}" oninput="elevageTotalPaniers('${module}')"></div>`).join('')}
-      <div class="el-field" style="width:100px"><label>Total</label>
+      <div class="el-field" style="min-width:130px"><label>${meta.prod === 'ponte' ? 'Total' : 'Pièces · poids moyen'}</label>
         <div class="serre-ro" id="el-paniers-total-${module}" style="font-weight:700">—</div></div>
-    </div>`}
+    </div>
     <div class="table-container" style="margin-bottom:26px">
       <table><thead><tr><th>Date</th><th>Type</th><th>Qté</th><th>${meta.animal.charAt(0).toUpperCase() + meta.animal.slice(1)}</th><th>Description</th><th></th></tr></thead>
       <tbody>${st.hist.length ? st.hist.map(e => `
@@ -11462,13 +11724,16 @@ async function elevageAddHist(module) {
   // Vide = evenement collectif, ce qui reste le cas courant : la ponte
   // d'une semaine appartient au troupeau, pas a une poule.
   const animal = (g('el-h-animal') || {}).value || null;
+  // Le lot d'ou sortent les poissons — vide si on ne sait plus, la
+  // recolte reste alors collective.
+  const lot = (g('el-h-lot') || {}).value || null;
   if (!date) { toast('Date requise', 'error'); return; }
   // Paniers : seulement pour une ponte, et seulement ceux qui ont ete
   // saisis. Un panier laisse vide reste NULL — « pas detaille » n'est pas
   // « aucun », et confondre les deux inventerait une mesure.
   const paniers = {};
-  if (type === 'ponte') {
-    ELEVAGE_PANIERS.forEach(p => {
+  if (type === ELEVAGE_META[module].prod) {
+    paniersDu(module).forEach(p => {
       const el = g('el-h-' + p.cle);
       const v = el && String(el.value).trim();
       paniers[p.cle] = (v === '' || v == null) ? null : Math.max(0, Math.round(Number(v)));
@@ -11476,7 +11741,7 @@ async function elevageAddHist(module) {
   }
   const { error } = await sb.from('elevage_historique').insert({
     module, date_evenement: date, type_evenement: type, quantite: qty, description: desc,
-    animal_id: animal, created_by: currentProfile.id, ...paniers
+    animal_id: animal, lot_id: lot, created_by: currentProfile.id, ...paniers
   });
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }
   let posted = false;
@@ -11606,7 +11871,8 @@ function renderSerreAdmin() {
       </div>
     </div>
 
-    <div class="sa-sec">Conditions de la serre — saisie manuelle</div>
+    <div class="sa-sec">Sablonponie — bassins et poissons</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Les réservoirs sont les bassins de la sablonponie : la même eau irrigue les planches et fait vivre les poissons.</div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Les conditions sont normalement remplies par les capteurs (Raspberry Pi + MQTT). Cette saisie est un dépannage si un capteur est absent ou hors service ; les locataires voient le résultat en lecture seule sur la page Espaces.</div>
     ${ConditionsSerre(_serreAdmin.lecture, false, SERRE_COND_ADMIN_PREFIX)}
 
