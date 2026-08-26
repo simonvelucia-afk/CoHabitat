@@ -1814,8 +1814,6 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         <button class="admin-tab" onclick="adminTab('spaces-admin')" data-pt="Espaces">Espaces</button>
         <button class="admin-tab" onclick="adminTab('vehicles-admin')" data-pt="Véhicules">Véhicules</button>
         <button class="admin-tab" onclick="adminTab('serre')">🌱 Serre</button>
-        <button class="admin-tab" onclick="adminTab('poulailler')">🐔 Poulailler</button>
-        <button class="admin-tab" onclick="adminTab('poissons')">🐟 Poissons</button>
         <button class="admin-tab" onclick="adminTab('payments')" data-pt="Paiements">Paiements</button>
         <button class="admin-tab" onclick="adminTab('settings')" id="settings-tab" style="display:none" data-pt="Paramètres">Paramètres</button>
         <button class="admin-tab" onclick="adminTab('logs')" data-pt="Logs">Logs</button>
@@ -1908,11 +1906,15 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
       </div>
 
       <!-- Serre admin : attribution des zones + frais d'exploitation -->
-      <div id="admin-serre" class="admin-section" style="display:none"></div>
-
-      <!-- Élevages : poulailler & sablonponie (rempli par renderElevage) -->
-      <div id="admin-poulailler" class="admin-section" style="display:none"></div>
-      <div id="admin-poissons" class="admin-section" style="display:none"></div>
+      <!-- Serre, sablonponie et poulailler sous un seul onglet.
+           L'ordre suit l'eau : les reservoirs alimentent la serre ET la
+           sablonponie, ou vivent les poissons — les deux se lisent
+           ensemble. Le poulailler, systeme distinct, ferme la marche. -->
+      <div id="admin-serre" class="admin-section" style="display:none">
+        <div id="serre-corps"></div>
+        <div id="admin-poissons"></div>
+        <div id="admin-poulailler"></div>
+      </div>
 
       <!-- Demandes de suppression -->
       <div id="admin-deletions" class="admin-section" style="display:none">
@@ -10833,6 +10835,9 @@ async function adminTab(tab) {
     toast('Réservé à l\'administrateur principal', 'info');
     tab = 'tenants';
   }
+  // Poulailler et Poissons ne sont plus des onglets : ce sont deux
+  // sections du volet Serre. Les anciens noms y menent toujours.
+  if (tab === 'poulailler' || tab === 'poissons') tab = 'serre';
   currentAdminTab = tab;
   document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none');
   document.querySelectorAll('#page-admin .admin-tab').forEach(t => t.classList.remove('active'));
@@ -10853,9 +10858,14 @@ async function adminTab(tab) {
     case 'demandes': await loadBuildingDemandes(); break;
     case 'spaces-admin': await loadAdminSpaces(); break;
     case 'vehicles-admin': await loadAdminVehicles(); break;
-    case 'serre': await loadSerreAdmin(); break;
-    case 'poulailler': await loadElevage('poulailler'); break;
-    case 'poissons': await loadElevage('sablonponie'); break;
+    case 'serre':
+      // Les trois sections d'un meme volet. La serre d'abord : elle
+      // charge la derniere lecture des reservoirs, que la sablonponie
+      // reaffiche ensuite — c'est la meme eau.
+      await loadSerreAdmin();
+      await loadElevage('sablonponie');
+      await loadElevage('poulailler');
+      break;
     case 'payments': await loadAdminPayments(); break;
     case 'settings': await loadSettings(); break;
     case 'logs': await loadLogs(); break;
@@ -10870,8 +10880,15 @@ async function adminTab(tab) {
 //  au babillard (bulletin_board).
 // ═══════════════════════════════════════════════════════════════════════
 const ELEVAGE_META = {
-  poulailler:  { container: 'admin-poulailler', icon: '🐔', titre: 'Poulailler', animal: 'poule', lieu: 'poulailler', prod: 'ponte', adj1: 'nouvelle', adjN: 'nouvelles' },
-  sablonponie: { container: 'admin-poissons', icon: '🐟', titre: 'Poissons (sablonponie)', animal: 'poisson', lieu: 'bassin de sablonponie', prod: 'recolte', adj1: 'nouveau', adjN: 'nouveaux' }
+  // prodUnite1/prodUniteN : ce que compte `quantite` sur un evenement de
+  // production. Des oeufs se comptent a l'unite, une recolte de poissons
+  // au kilo — le meme champ, deux unites.
+  // eau : la sablonponie partage les reservoirs de la serre. Sa section
+  // les reaffiche plutot que de laisser croire a deux circuits distincts.
+  poulailler:  { container: 'admin-poulailler', icon: '🐔', titre: 'Poulailler', animal: 'poule', lieu: 'poulailler', prod: 'ponte', adj1: 'nouvelle', adjN: 'nouvelles',
+                 prodLabel: 'Ponte', prodUnite1: 'œuf', prodUniteN: 'œufs', eau: false },
+  sablonponie: { container: 'admin-poissons', icon: '🐟', titre: 'Poissons (sablonponie)', animal: 'poisson', lieu: 'bassin de sablonponie', prod: 'recolte', adj1: 'nouveau', adjN: 'nouveaux',
+                 prodLabel: 'Récolte', prodUnite1: 'kg', prodUniteN: 'kg', eau: true }
 };
 const ELEVAGE_COUT_CATS = ['Nourriture', 'Équipement', 'Vétérinaire', 'Litière', 'Énergie', 'Autre'];
 const ELEVAGE_TYPE_LABELS = { ajout: 'Ajout', perte: 'Perte / Mortalité', ponte: 'Ponte (œufs)', recolte: 'Récolte', sante: 'Santé', note: 'Note' };
@@ -10894,6 +10911,28 @@ async function loadElevage(module) {
   renderElevage(module);
 }
 
+// Les reservoirs ne sont pas ceux de la serre « aussi » : ce sont les
+// memes. L'eau qui irrigue les planches est celle ou vivent les poissons,
+// et la temperature qui compte pour eux se lit dans la meme colonne. La
+// section les reaffiche ici plutot que de laisser un administrateur
+// croire a deux circuits, ou remonter d'une section pour les consulter.
+function elevageBandeauEau() {
+  const L = (typeof _serreAdmin !== 'undefined' && _serreAdmin.lecture) || null;
+  if (!L) {
+    return `<div class="el-eau"><span>💧 <strong>Réservoirs partagés avec la serre.</strong></span>
+      <span style="color:var(--text3)">Aucune lecture enregistrée — voir la section Serre ci-dessus.</span></div>`;
+  }
+  const v = (x, u) => (x === null || x === undefined || x === '') ? '—' : x + ' ' + u;
+  const resv = [1, 2, 3].map(n =>
+    `<span>Réservoir ${n} : <strong>${v(L['reservoir' + n + '_temp'], '°C')}</strong> · ${v(L['reservoir' + n + '_pct'], '%')}</span>`
+  ).join('');
+  return `<div class="el-eau">
+    <span>💧 <strong>Réservoirs partagés avec la serre</strong> — même eau, même lecture.</span>
+    ${resv}
+    ${L.horodatage ? `<span style="color:var(--text3)">Relevé du ${new Date(L.horodatage).toLocaleString(appLocale())}</span>` : ''}
+  </div>`;
+}
+
 function renderElevage(module) {
   const meta = ELEVAGE_META[module];
   const root = document.getElementById(meta.container);
@@ -10903,6 +10942,24 @@ function renderElevage(module) {
   const year = new Date().getFullYear();
   const totalCoutYear = st.couts.filter(c => (c.date_cout || '').slice(0, 4) === String(year)).reduce((s, c) => s + Number(c.montant || 0), 0);
   const today = new Date().toISOString().split('T')[0];
+
+  // Production. Les quantites de ponte et de recolte etaient enregistrees
+  // et listees, jamais additionnees : le seul total affiche etait le
+  // cheptel (ajouts moins pertes). Un immeuble veut pourtant savoir
+  // combien d'oeufs le poulailler a donnes, et ce qu'ils lui coutent.
+  const mois = today.slice(0, 7);
+  const prodDe = (filtre) => st.hist
+    .filter(e => e.type_evenement === meta.prod && filtre(e.date_evenement || ''))
+    .reduce((n, e) => n + Number(e.quantite || 0), 0);
+  const prodMois  = prodDe(d => d.slice(0, 7) === mois);
+  const prodAnnee = prodDe(d => d.slice(0, 4) === String(year));
+  const prodTotal = prodDe(() => true);
+  // Arrondi a l'unite pour des oeufs, au dixieme pour des kilos.
+  const q = (n) => meta.prodUnite1 === 'kg' ? (Math.round(n * 10) / 10).toFixed(1) : String(Math.round(n));
+  // Le cout unitaire n'a de sens que si l'annee a produit quelque chose.
+  // Sans cela on afficherait une division par zero comme un resultat.
+  const coutUnitaire = prodAnnee > 0 ? totalCoutYear / prodAnnee : null;
+  const uniteProd = (n) => Math.abs(n) === 1 ? meta.prodUnite1 : meta.prodUniteN;
   const typeOptions = ['ajout', 'perte', meta.prod, 'sante', 'note'].map(t => `<option value="${t}">${ELEVAGE_TYPE_LABELS[t]}</option>`).join('');
   const catOptions = ELEVAGE_COUT_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
 
@@ -10913,14 +10970,35 @@ function renderElevage(module) {
       .el-field label{font-size:11px;color:var(--text3)}
       .el-field input,.el-field select{font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit;width:100%}
       .el-sec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin:8px 0 8px}
-      .el-stat{text-align:right}.el-stat .l{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}.el-stat .v{font-size:1.3rem;font-weight:700}
+      /* Grille qui se replie plutot qu'une rangee qui deborde : cinq
+         chiffres ne tiennent pas cote a cote sur un telephone. */
+      .el-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:0 0 18px}
+      .el-stat{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;min-width:0}
+      .el-stat .l{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .el-stat .v{font-size:1.15rem;font-weight:700;margin-top:2px}
+      .el-stat .s{font-size:11px;color:var(--text3);margin-top:1px}
+      .el-eau{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--surface2);border:1px solid var(--border);
+              border-left:3px solid var(--accent2);border-radius:8px;padding:9px 12px;margin-bottom:16px;font-size:12px;color:var(--text2)}
     </style>
     <div class="section-header">
       <div class="section-title"><h3 style="font-size:1.15rem">${meta.icon} ${meta.titre}</h3></div>
-      <div style="display:flex;gap:20px;align-items:center;">
-        <div class="el-stat"><div class="l">Cheptel actuel</div><div class="v" style="color:var(--accent2)">${cheptel} ${meta.animal}${cheptel > 1 ? 's' : ''}</div></div>
-        <div class="el-stat"><div class="l">Coûts ${year}</div><div class="v">${totalCoutYear.toFixed(2)} $</div></div>
-      </div>
+    </div>
+
+    ${meta.eau ? elevageBandeauEau() : ''}
+
+    <div class="el-stats">
+      <div class="el-stat"><div class="l">Cheptel actuel</div>
+        <div class="v" style="color:var(--accent2)">${cheptel} ${meta.animal}${Math.abs(cheptel) > 1 ? 's' : ''}</div></div>
+      <div class="el-stat"><div class="l">${meta.prodLabel} ce mois</div>
+        <div class="v">${q(prodMois)} ${uniteProd(prodMois)}</div></div>
+      <div class="el-stat"><div class="l">${meta.prodLabel} ${year}</div>
+        <div class="v">${q(prodAnnee)} ${uniteProd(prodAnnee)}</div>
+        <div class="s">${q(prodTotal)} ${uniteProd(prodTotal)} depuis le début</div></div>
+      <div class="el-stat"><div class="l">Coûts ${year}</div>
+        <div class="v">${totalCoutYear.toFixed(2)} $</div></div>
+      <div class="el-stat"><div class="l">Coût par ${meta.prodUnite1}</div>
+        <div class="v">${coutUnitaire === null ? '—' : coutUnitaire.toFixed(2) + ' $'}</div>
+        <div class="s">${coutUnitaire === null ? 'aucune production en ' + year : 'coûts ' + year + ' ÷ production'}</div></div>
     </div>
 
     <div class="el-sec">Historique des ${meta.animal}s</div>
@@ -11039,7 +11117,7 @@ const SERRE_COND_ADMIN_PREFIX = 'sa-';
 let _serreAdmin = { zones: [], locByZone: {}, tenants: [], couts: [], basePrice: 0.5, lecture: null };
 
 async function loadSerreAdmin() {
-  const root = document.getElementById('admin-serre');
+  const root = document.getElementById('serre-corps');
   if (!root) return;
   root.innerHTML = `<div class="loading"><div class="spinner"></div> Chargement…</div>`;
   const [zRes, lRes, tRes, cRes, sRes, condRes] = await Promise.all([
@@ -11065,7 +11143,7 @@ async function loadSerreAdmin() {
 }
 
 function renderSerreAdmin() {
-  const root = document.getElementById('admin-serre');
+  const root = document.getElementById('serre-corps');
   const zones = _serreAdmin.zones;
   const occ = Object.keys(_serreAdmin.locByZone).length;
   const revenu = Object.values(_serreAdmin.locByZone).reduce((s, l) => s + Number(l.frais_mensuel || 0), 0);

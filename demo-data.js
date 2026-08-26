@@ -32,6 +32,9 @@
 
   var MOI = '00000000-0000-0000-0000-0000000000d1';  // Alex Tremblay
   var jours = function (n) { return new Date(Date.now() + n * 86400000).toISOString(); };
+  // Les colonnes date_evenement et date_cout sont de type `date` : elles
+  // attendent AAAA-MM-JJ, pas un horodatage complet.
+  var jourCourt = function (n) { return jours(n).slice(0, 10); };
   var minutes = function (n) { return new Date(Date.now() + n * 60000).toISOString(); };
   var heures = function (n) { return new Date(Date.now() + n * 3600000).toISOString(); };
 
@@ -290,10 +293,51 @@
       { culture_id: 'sc-2', espece: 'Basilic', total: 0.45, unite: 'kg' },
     ],
 
+    // Noms de colonnes repris de sql/009_serre.sql : horodatage,
+    // reservoirN_temp, reservoirN_pct. Le jeu precedent employait
+    // mesure_at / temp_reservoir1 / niveau1_pct, qui n'existent pas —
+    // les conditions s'affichaient donc vides en demonstration.
     serre_lectures: [
-      { id: 'sle-1', mesure_at: heures(-1), temp_air: 22.4, temp_reservoir1: 18.9, niveau1_pct: 76 },
-      { id: 'sle-2', mesure_at: heures(-4), temp_air: 21.1, temp_reservoir1: 18.7, niveau1_pct: 78 },
-      { id: 'sle-3', mesure_at: heures(-8), temp_air: 19.8, temp_reservoir1: 18.5, niveau1_pct: 80 },
+      { id: 'sle-1', horodatage: heures(-1), temp_air: 22.4,
+        reservoir1_temp: 18.9, reservoir2_temp: 19.4, reservoir3_temp: 18.2,
+        reservoir1_pct: 76, reservoir2_pct: 63, reservoir3_pct: 88 },
+      { id: 'sle-2', horodatage: heures(-4), temp_air: 21.1,
+        reservoir1_temp: 18.7, reservoir2_temp: 19.1, reservoir3_temp: 18.0,
+        reservoir1_pct: 78, reservoir2_pct: 65, reservoir3_pct: 89 },
+      { id: 'sle-3', horodatage: heures(-8), temp_air: 19.8,
+        reservoir1_temp: 18.5, reservoir2_temp: 18.9, reservoir3_temp: 17.9,
+        reservoir1_pct: 80, reservoir2_pct: 67, reservoir3_pct: 90 },
+    ],
+
+    // ── Elevages : poulailler et sablonponie ─────────────────
+    // Les deux ecrans etaient vides en demonstration, ce qui donnait a
+    // croire que la fonction n'existait pas. Un mois de ponte et deux
+    // recoltes suffisent a montrer les totaux et le cout unitaire.
+    elevage_historique: [
+      // Poulailler : six poules, une perte, la ponte des dernieres semaines.
+      { id: 'eh-1', module: 'poulailler', date_evenement: jourCourt(-300), type_evenement: 'ajout', quantite: 6, description: 'Six poules Chantecler' },
+      { id: 'eh-2', module: 'poulailler', date_evenement: jourCourt(-96),  type_evenement: 'perte', quantite: 1, description: 'Prédation — renard, clôture renforcée depuis' },
+      { id: 'eh-3', module: 'poulailler', date_evenement: jourCourt(-40),  type_evenement: 'ponte', quantite: 88, description: 'Cumul de la semaine' },
+      { id: 'eh-4', module: 'poulailler', date_evenement: jourCourt(-26),  type_evenement: 'ponte', quantite: 92, description: 'Cumul de la semaine' },
+      { id: 'eh-5', module: 'poulailler', date_evenement: jourCourt(-12),  type_evenement: 'ponte', quantite: 79, description: 'Cumul de la semaine — chaleur' },
+      { id: 'eh-6', module: 'poulailler', date_evenement: jourCourt(-4),   type_evenement: 'ponte', quantite: 90, description: 'Cumul de la semaine' },
+      { id: 'eh-7', module: 'poulailler', date_evenement: jourCourt(-18),  type_evenement: 'sante', quantite: null, description: 'Traitement antiparasitaire, tout le troupeau' },
+      // Sablonponie : truites arc-en-ciel, deux recoltes.
+      { id: 'ep-1', module: 'sablonponie', date_evenement: jourCourt(-260), type_evenement: 'ajout', quantite: 40, description: 'Alevins de truite arc-en-ciel' },
+      { id: 'ep-2', module: 'sablonponie', date_evenement: jourCourt(-190), type_evenement: 'perte', quantite: 3,  description: 'Mortalité à l’acclimatation' },
+      { id: 'ep-3', module: 'sablonponie', date_evenement: jourCourt(-70),  type_evenement: 'recolte', quantite: 4.2, description: 'Première récolte — 8 pièces' },
+      { id: 'ep-4', module: 'sablonponie', date_evenement: jourCourt(-9),   type_evenement: 'recolte', quantite: 5.6, description: 'Deuxième récolte — 10 pièces' },
+      { id: 'ep-5', module: 'sablonponie', date_evenement: jourCourt(-30),  type_evenement: 'note', quantite: null, description: 'Backwash dirigé vers les planches 1 à 3' },
+    ],
+
+    elevage_couts: [
+      { id: 'ec-1', module: 'poulailler', date_cout: jourCourt(-120), categorie: 'Nourriture', montant: 78.40, description: 'Moulée, 3 sacs' },
+      { id: 'ec-2', module: 'poulailler', date_cout: jourCourt(-60),  categorie: 'Nourriture', montant: 52.30, description: 'Moulée, 2 sacs' },
+      { id: 'ec-3', module: 'poulailler', date_cout: jourCourt(-45),  categorie: 'Litière',    montant: 24.00, description: 'Copeaux' },
+      { id: 'ec-4', module: 'poulailler', date_cout: jourCourt(-18),  categorie: 'Vétérinaire', montant: 40.00, description: 'Antiparasitaire' },
+      { id: 'ec-5', module: 'sablonponie', date_cout: jourCourt(-200), categorie: 'Équipement', montant: 210.00, description: 'Pompe de secours' },
+      { id: 'ec-6', module: 'sablonponie', date_cout: jourCourt(-85),  categorie: 'Nourriture', montant: 96.75, description: 'Granulés, 25 kg' },
+      { id: 'ec-7', module: 'sablonponie', date_cout: jourCourt(-20),  categorie: 'Énergie',    montant: 61.20, description: 'Part de l’aération, relevé trimestriel' },
     ],
 
     // ── Reglages ─────────────────────────────────────────────
