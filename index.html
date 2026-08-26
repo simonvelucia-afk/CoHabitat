@@ -11244,7 +11244,7 @@ async function loadElevagesLocataire() {
   for (const c of cibles) {
     const root = document.getElementById(c.el);
     if (!root) continue;
-    const [aRes, hRes, lRes, condRes] = await Promise.all([
+    const [aRes, hRes, lRes, condRes, offRes, retRes] = await Promise.all([
       sb.from('elevage_animaux').select('*').eq('module', c.module).order('statut').order('nom'),
       sb.from('elevage_historique').select('*').eq('module', c.module)
         .order('date_evenement', { ascending: false }).limit(60),
@@ -11253,7 +11253,9 @@ async function loadElevagesLocataire() {
       // porte desormais, la serre n'en garde qu'un renvoi.
       c.module === 'sablonponie'
         ? sb.from('serre_lectures').select('*').order('horodatage', { ascending: false }).limit(1)
-        : Promise.resolve({ data: [] })
+        : Promise.resolve({ data: [] }),
+      sb.from('elevage_offres').select('*').eq('module', c.module).order('date_offre', { ascending: false }).limit(12),
+      sb.from('elevage_retraits').select('id, offre_id, user_id, contenants, retire_at, profiles:user_id(full_name, unit)')
     ]);
     // Sans la migration 025, la base renvoie zero ligne sans erreur. Une
     // section vide vaut mieux qu'une section qui affiche des zeros comme
@@ -11262,13 +11264,17 @@ async function loadElevagesLocataire() {
     const hist    = hRes.error ? [] : (hRes.data || []);
     const lots    = lRes.error ? [] : (lRes.data || []);
     const lecture = (!condRes.error && condRes.data && condRes.data[0]) || null;
-    if (!animaux.length && !hist.length && !lots.length) { root.style.display = 'none'; root.innerHTML = ''; continue; }
+    // Sans la migration 028 ces deux requetes echouent : la zone doit
+    // continuer de s'afficher, le bloc de distribution s'efface seul.
+    const offres   = offRes.error ? [] : (offRes.data || []);
+    const retraits = retRes.error ? [] : (retRes.data || []);
+    if (!animaux.length && !hist.length && !lots.length && !offres.length) { root.style.display = 'none'; root.innerHTML = ''; continue; }
     root.style.display = '';
-    root.innerHTML = elevageVueLocataire(c.module, animaux, hist, lots, lecture);
+    root.innerHTML = elevageVueLocataire(c.module, animaux, hist, lots, lecture, offres, retraits);
   }
 }
 
-function elevageVueLocataire(module, animaux, hist, lots, lecture) {
+function elevageVueLocataire(module, animaux, hist, lots, lecture, offres, retraits) {
   lots = lots || [];
   const meta = ELEVAGE_META[module];
   const presents = animaux.filter(a => ELEVAGE_PRESENTS.includes(a.statut));
@@ -11343,7 +11349,111 @@ function elevageVueLocataire(module, animaux, hist, lots, lecture) {
     </div>
     ${lotsVue}
     ${portraits}
+    ${elevageDistribution(module, meta, offres || [], retraits || [])}
     ${elevageSaisieOperateur(module, meta)}`;
+}
+
+// ── Distribution ────────────────────────────────────────────────────────
+// Repartir la production, SANS ARGENT. Vendre des oeufs ou du poisson au
+// Quebec touche a des regimes distincts — classement des oeufs, permis
+// d'aquaculture, statut du lieu de vente — et la question se pose au
+// MAPAQ avant de se poser au logiciel. Distribuer n'est pas vendre.
+//
+// L'unite est le CONTENANT : « 6 gros oeufs », « Truite ~540 g ». Un oeuf
+// seul ne se distribue pas, et le calibre distingue les offres.
+function elevageDistribution(module, meta, offres, retraits) {
+  if (!offres.length && !_elevageOperateurDe.includes(module)) return '';
+  const peutOffrir = _elevageOperateurDe.includes(module)
+    || ['admin', 'principal_admin'].includes(currentProfile?.role);
+  const prisDe = (o) => retraits.filter(r => r.offre_id === o.id)
+                                .reduce((n, r) => n + Number(r.contenants || 0), 0);
+  const miens = (o) => retraits.filter(r => r.offre_id === o.id && r.user_id === currentProfile?.id);
+
+  const carte = (o) => {
+    const pris = prisDe(o), reste = Number(o.contenants || 0) - pris;
+    const aMoi = miens(o);
+    // « vous » plutot que son propre nom : on se reconnait mieux ainsi
+    // dans une liste, et le nom manque de toute facon tant que la ligne
+    // n'a pas ete relue avec sa jointure.
+    const preneurs = retraits.filter(r => r.offre_id === o.id)
+      .map(r => (r.user_id === currentProfile?.id ? 'vous' : (r.profiles?.full_name || 'un résident'))
+              + (r.contenants > 1 ? ' ×' + r.contenants : ''));
+    return `
+      <div class="el-lot" style="border-left-color:${reste > 0 ? 'var(--accent2)' : 'var(--border)'};margin-bottom:8px">
+        <div class="el-lot-h">
+          <div><strong>${escHtml(o.libelle)}</strong>
+            <div class="el-fiche-l">${o.date_offre || ''} · ${reste > 0
+              ? reste + ' contenant' + (reste > 1 ? 's' : '') + ' disponible' + (reste > 1 ? 's' : '')
+              : 'tout est parti'}${pris ? ' · ' + pris + ' pris' : ''}</div>
+            ${preneurs.length ? `<div class="el-fiche-l">${escHtml(preneurs.join(', '))}</div>` : ''}
+            ${o.notes ? `<div class="el-fiche-n">${escHtml(o.notes)}</div>` : ''}
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            ${aMoi.length
+              ? `<span class="el-fiche-l">vous en avez ${aMoi.reduce((n, r) => n + Number(r.contenants || 0), 0)}</span>
+                 <button class="btn btn-secondary btn-sm" onclick="elevageReposer('${module}','${aMoi[0].id}')">Reposer</button>`
+              : reste > 0
+                ? `<button class="btn btn-primary btn-sm" onclick="elevagePrendre('${module}','${o.id}')">J'en prends un</button>`
+                : ''}
+            ${peutOffrir ? `<button class="btn btn-secondary btn-sm" onclick="elevageRetirerOffre('${module}','${o.id}','${escHtml(o.libelle).replace(/'/g, "\\'")}')" title="Retirer l'offre">✕</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+  };
+
+  return `
+    <div class="serre-sec" style="margin-top:22px">🧺 À partager
+      <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">— la production de l'immeuble, sans frais</span></div>
+    ${offres.length ? offres.map(carte).join('')
+      : '<div class="el-fiche-l" style="margin-bottom:8px">Rien à partager pour le moment.</div>'}
+    ${peutOffrir ? `
+    <div class="el-cap" style="border-left:3px solid var(--accent2);margin-bottom:0">
+      <span>🧺 <strong>Mettre à partager</strong></span>
+      <input type="text" id="el-of-lib-${module}" placeholder="${meta.prod === 'ponte' ? '6 gros œufs' : 'Truite ~540 g'}" style="flex:1;min-width:160px">
+      <input type="number" min="1" step="1" id="el-of-nb-${module}" placeholder="contenants" style="width:120px">
+      <input type="text" id="el-of-notes-${module}" placeholder="note…" style="flex:1;min-width:120px">
+      <button class="btn btn-primary btn-sm" onclick="elevageOffrir('${module}')">Proposer</button>
+    </div>` : ''}`;
+}
+
+async function elevageOffrir(module) {
+  const v = (c) => (document.getElementById('el-of-' + c + '-' + module) || {}).value || '';
+  const libelle = v('lib').trim(), nb = String(v('nb')).trim();
+  if (!libelle) { toast('Décrivez le contenant', 'error'); return; }
+  if (nb === '' || Number(nb) < 1) { toast('Combien de contenants ?', 'error'); return; }
+  const { error } = await sb.from('elevage_offres').insert({
+    module, libelle, contenants: Math.round(Number(nb)),
+    notes: v('notes').trim() || null, created_by: currentProfile.id
+  });
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Mis à partager', 'success');
+  loadElevagesLocataire();
+}
+
+async function elevagePrendre(module, offreId) {
+  // Le stock est verifie par la base (declencheur de la 028) : deux
+  // residents qui cliquent en meme temps ne peuvent pas prendre le meme
+  // dernier contenant, quoi qu'affiche l'ecran.
+  const { error } = await sb.from('elevage_retraits')
+    .insert({ offre_id: offreId, user_id: currentProfile.id, contenants: 1 });
+  if (error) { toast(error.message, 'error'); loadElevagesLocataire(); return; }
+  toast('C\'est à vous — à récupérer en salle commune', 'success');
+  loadElevagesLocataire();
+}
+
+async function elevageReposer(module, retraitId) {
+  const { error } = await sb.from('elevage_retraits').delete().eq('id', retraitId);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Reposé — il redevient disponible', 'success');
+  loadElevagesLocataire();
+}
+
+async function elevageRetirerOffre(module, id, libelle) {
+  if (!confirm(`Retirer « ${libelle} » du partage ?\n\nLes retraits déjà faits disparaissent avec l'offre.`)) return;
+  const { error } = await sb.from('elevage_offres').delete().eq('id', id);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Offre retirée', 'success');
+  loadElevagesLocataire();
 }
 
 // L'operateur note sa production la ou il regarde son elevage — sur la

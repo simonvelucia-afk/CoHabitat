@@ -330,6 +330,24 @@
         photo_url: 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2060%22%3E%3Crect%20width%3D%2280%22%20height%3D%2260%22%20fill%3D%22%23242220%22/%3E%3Cellipse%20cx%3D%2240%22%20cy%3D%2240%22%20rx%3D%2221%22%20ry%3D%2215%22%20fill%3D%22%239c5730%22/%3E%3Ccircle%20cx%3D%2255%22%20cy%3D%2225%22%20r%3D%229%22%20fill%3D%22%239c5730%22/%3E%3Cpath%20d%3D%22M52%2016c1-4%204-4%204%200%201-4%204-4%204%201%201-3%203-2%203%201z%22%20fill%3D%22%23c0392b%22/%3E%3Cpath%20d%3D%22M56%2032q3%203%200%205-3-2%200-5z%22%20fill%3D%22%23c0392b%22/%3E%3Ccircle%20cx%3D%2258%22%20cy%3D%2224%22%20r%3D%221.6%22%20fill%3D%22%231a1a1a%22/%3E%3Cpath%20d%3D%22M64%2027l6%202-6%202z%22%20fill%3D%22%23e8a33d%22/%3E%3Cpath%20d%3D%22M20%2038q10-8%2018%202-9%206-18-2z%22%20fill%3D%22%237a4022%22/%3E%3Cpath%20d%3D%22M19%2034q-6-3-8%202%205%201%209%202z%22%20fill%3D%22%237a4022%22/%3E%3Cpath%20d%3D%22M24%2052l-2%205M32%2053l-1%205%22%20stroke%3D%22%23e8a33d%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E' },
     ],
 
+    // Ce qui est a partager cette semaine. Aucun prix : distribuer n'est
+    // pas vendre, et la vente demande une reponse du MAPAQ.
+    elevage_offres: [
+      { id: 'of-1', module: 'poulailler', libelle: '6 gros œufs', contenants: 4,
+        date_offre: jourCourt(-2), notes: 'Ramassage de la fin de semaine' },
+      { id: 'of-2', module: 'poulailler', libelle: '12 œufs moyens', contenants: 2,
+        date_offre: jourCourt(-2), notes: null },
+      { id: 'of-3', module: 'sablonponie', libelle: 'Truite ~540 g, vidée', contenants: 3,
+        date_offre: jourCourt(-9), notes: 'Deuxième récolte' },
+    ],
+
+    elevage_retraits: [
+      { id: 'rt-1', offre_id: 'of-1', user_id: 'p2', contenants: 1, retire_at: jours(-1),
+        profiles: { full_name: 'Camille Bernard', unit: 'A-101' } },
+      { id: 'rt-2', offre_id: 'of-3', user_id: 'p3', contenants: 1, retire_at: jours(-8),
+        profiles: { full_name: 'Julien Moreau', unit: 'C-310' } },
+    ],
+
     // Un resident s'occupe du poulailler — c'est le compte de la
     // demonstration lui-meme, pour que le formulaire de saisie apparaisse.
     elevage_operateurs: [
