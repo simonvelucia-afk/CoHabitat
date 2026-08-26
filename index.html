@@ -10890,6 +10890,20 @@ const ELEVAGE_META = {
   sablonponie: { container: 'admin-poissons', icon: '🐟', titre: 'Poissons (sablonponie)', animal: 'poisson', lieu: 'bassin de sablonponie', prod: 'recolte', adj1: 'nouveau', adjN: 'nouveaux',
                  prodLabel: 'Récolte', prodUnite1: 'kg', prodUniteN: 'kg', eau: true, genre: 'm' }
 };
+// Cinq paniers exclusifs dont la somme fait la cueillette. Le calibre
+// suit l'age de la poule — une jeune pond souvent et petit, une vieille
+// moins souvent mais gros — et c'est une information que le total seul
+// efface. Le detail reste facultatif : une cueillette entree en bloc est
+// parfaitement valide.
+const ELEVAGE_PANIERS = [
+  { cle: 'ponte_petit',             label: 'Petits',   court: 'P' },
+  { cle: 'ponte_moyen',             label: 'Moyens',   court: 'M' },
+  { cle: 'ponte_gros',              label: 'Gros',     court: 'G' },
+  { cle: 'ponte_defaut_comestible', label: 'Défaut — comestible', court: 'Dc',
+    aide: 'fêlé, sale, difforme — consommé sur place' },
+  { cle: 'ponte_defaut_rejet',      label: 'Défaut — rejeté',     court: 'Dr',
+    aide: 'cassé, souillé, douteux — jeté' },
+];
 const ELEVAGE_COUT_CATS = ['Nourriture', 'Équipement', 'Vétérinaire', 'Litière', 'Énergie', 'Autre'];
 const ELEVAGE_TYPE_LABELS = { ajout: 'Ajout', perte: 'Perte / Mortalité', ponte: 'Ponte (œufs)', recolte: 'Récolte', sante: 'Santé', note: 'Note' };
 let _elevage = {};
@@ -10931,16 +10945,25 @@ async function loadElevage(module) {
 // Un elevage n'existait qu'en masse : un cheptel calcule a partir des
 // quantites d'ajout et de perte. On savait qu'il y avait cinq poules,
 // jamais lesquelles. La fiche donne un nom, une photo et une histoire.
-// « reforme » veut dire toujours la, mais ne produit plus : une poule
-// agee pond a peine et sera remplacee, sans cesser d'occuper une place au
-// regard du reglement ni d'etre nourrie. C'est pourquoi le cheptel
-// additionne present ET reforme — seule la production les distingue.
-const ELEVAGE_STATUTS = ['present', 'reforme', 'parti', 'mort'];
-const ELEVAGE_PRESENTS = ['present', 'reforme'];
+// Trois bandes d'age, un gradient et non une hierarchie : le calibre de
+// l'oeuf augmente avec l'age pendant que le rythme diminue. Une jeune
+// poule et une vieille produisent toutes les deux, differemment — d'ou un
+// cheptel qui les additionne sans distinction. L'etat explique un
+// rendement, il n'exclut jamais une bete du compte.
+const ELEVAGE_STATUTS = ['jeune', 'adulte', 'age', 'reforme', 'parti', 'mort'];
+const ELEVAGE_PRESENTS = ['jeune', 'adulte', 'age'];
+const ELEVAGE_PONTE = { jeune: 'pond souvent, petits œufs', adulte: 'pleine ponte', age: 'pond moins souvent, gros œufs' };
 function elevageStatutLabel(statut, genre) {
   const e = genre === 'f' ? 'e' : '';
-  return { present: 'Présent' + e, reforme: 'Réformé' + e, parti: 'Parti' + e, mort: 'Mort' + e }[statut] || statut;
+  return { jeune: 'Jeune', adulte: 'Adulte', age: 'Âgé' + e,
+           reforme: 'Réformé' + e, parti: 'Parti' + e, mort: 'Mort' + e }[statut] || statut;
 }
+// Ce que le selecteur affiche a cote de chaque etat : le rythme de ponte
+// pour les trois bandes, le motif de depart pour les trois sorties.
+const ELEVAGE_STATUT_AIDE = {
+  jeune: 'petits œufs', adulte: 'pleine ponte', age: 'gros œufs',
+  reforme: 'fin de carrière', parti: 'donnée ou vendue', mort: ''
+};
 
 // Photo : une URL, jamais un fichier. Sans elle — ou si le lien est mort —
 // l'emblene de l'elevage tient lieu de portrait, plutot qu'un cadre casse.
@@ -10949,6 +10972,15 @@ function elevagePortrait(a, meta) {
   return `<div class="el-photo${a.photo_url ? '' : ' el-sansphoto'}" data-icone="${meta.icon}">
     ${a.photo_url ? `<img src="${escHtml(a.photo_url)}" alt="${escHtml(a.nom)}" loading="lazy" onerror="${secours}">` : ''}
   </div>`;
+}
+
+// Le detail sous la quantite : « 24 » seul ne dit pas que sept etaient
+// gros et deux feles. Absent quand la cueillette n'a pas ete calibree.
+function elevageDetailPaniers(e) {
+  const parts = ELEVAGE_PANIERS
+    .filter(p => e[p.cle] !== null && e[p.cle] !== undefined && Number(e[p.cle]) > 0)
+    .map(p => `${p.court} ${e[p.cle]}`);
+  return parts.length ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">${parts.join(' · ')}</div>` : '';
 }
 
 function elevageFiches(module) {
@@ -10963,7 +10995,10 @@ function elevageFiches(module) {
   const evParAnimal = {};
   (st.hist || []).forEach(e => { if (e.animal_id) evParAnimal[e.animal_id] = (evParAnimal[e.animal_id] || 0) + 1; });
   const presents = animaux.filter(a => ELEVAGE_PRESENTS.includes(a.statut)).length;
-  const reformes = animaux.filter(a => a.statut === 'reforme').length;
+  const jeunes = animaux.filter(a => a.statut === 'jeune').length;
+  const ages   = animaux.filter(a => a.statut === 'age').length;
+  const bandes = [jeunes ? jeunes + ' jeune' + (jeunes > 1 ? 's' : '') : '',
+                  ages ? ages + ' âgée' + (ages > 1 ? 's' : '') : ''].filter(Boolean).join(', ');
 
   // Le cheptel vient des quantites, les fiches d'un decompte nominal :
   // les deux peuvent diverger, et le taire serait pire que le dire.
@@ -10973,7 +11008,7 @@ function elevageFiches(module) {
         — les fiches ne couvrent pas tout l'élevage, ou un mouvement n'a pas été reporté.</div>` : '';
 
   const cartes = animaux.map(a => `
-    <div class="el-fiche${ELEVAGE_PRESENTS.includes(a.statut) ? '' : ' el-fiche-off'}${a.statut === 'reforme' ? ' el-fiche-ref' : ''}">
+    <div class="el-fiche${ELEVAGE_PRESENTS.includes(a.statut) ? '' : ' el-fiche-off'}${ELEVAGE_PONTE[a.statut] && a.statut !== 'adulte' ? ' el-fiche-age' : ''}">
       ${elevagePortrait(a, meta)}
       <div class="el-fiche-corps">
         <div class="el-fiche-nom">${escHtml(a.nom)}</div>
@@ -10982,12 +11017,14 @@ function elevageFiches(module) {
           !ELEVAGE_PRESENTS.includes(a.statut) && a.date_sortie ? ' le ' + a.date_sortie
           : a.date_arrivee ? ' · arrivé' + (meta.genre === 'f' ? 'e' : '') + ' le ' + a.date_arrivee : ''}</div>
         ${!ELEVAGE_PRESENTS.includes(a.statut) && a.date_arrivee ? `<div class="el-fiche-l">arrivé${meta.genre === 'f' ? 'e' : ''} le ${a.date_arrivee}</div>` : ''}
+        ${ELEVAGE_PONTE[a.statut] && meta.prod === 'ponte' ? `<div class="el-fiche-l">${ELEVAGE_PONTE[a.statut]}</div>` : ''}
         ${a.notes ? `<div class="el-fiche-n">${escHtml(a.notes)}</div>` : ''}
         <div class="el-fiche-l">${evParAnimal[a.id] || 0} événement${(evParAnimal[a.id] || 0) > 1 ? 's' : ''} à son nom</div>
       </div>
       <div class="el-fiche-act">
         <select onchange="elevageStatutAnimal('${module}','${a.id}',this.value)" title="Statut">
-          ${ELEVAGE_STATUTS.map(v => `<option value="${v}"${a.statut === v ? ' selected' : ''}>${elevageStatutLabel(v, meta.genre)}</option>`).join('')}
+          ${ELEVAGE_STATUTS.map(v => `<option value="${v}"${a.statut === v ? ' selected' : ''}>${
+            elevageStatutLabel(v, meta.genre)}${ELEVAGE_STATUT_AIDE[v] ? ' — ' + ELEVAGE_STATUT_AIDE[v] : ''}</option>`).join('')}
         </select>
         <button class="btn btn-secondary btn-sm" onclick="elevageDelAnimal('${module}','${a.id}','${escHtml(a.nom).replace(/'/g, "\\'")}')">✕</button>
       </div>
@@ -10995,7 +11032,7 @@ function elevageFiches(module) {
 
   return `
     <div class="el-sec">Fiches individuelles · ${presents} ${presents > 1 ? meta.animal + 's' : meta.animal}${
-      reformes ? ` <span style="font-weight:400;text-transform:none;color:var(--accent3, #e07060)">dont ${reformes} réformée${reformes > 1 ? 's' : ''}</span>` : ''}${
+      bandes ? ` <span style="font-weight:400;text-transform:none;color:var(--text3)">dont ${bandes}</span>` : ''}${
       animaux.length > presents ? ` <span style="font-weight:400;text-transform:none;color:var(--text3)">(+ ${animaux.length - presents} archivée${animaux.length - presents > 1 ? 's' : ''})</span>` : ''}</div>
     ${ecart}
     <div class="el-form">
@@ -11011,6 +11048,35 @@ function elevageFiches(module) {
       : `<div class="empty-state" style="padding:18px"><p style="font-size:13px;color:var(--text3)">Aucune fiche.
           Nommer ${meta.genre === 'f' ? 'une' : 'un'} ${meta.animal} permet de lui rattacher ses propres événements.</p></div>`}
   `;
+}
+
+// Le calibrage ne concerne qu'une cueillette d'oeufs : l'afficher pour un
+// ajout ou une note encombrerait la saisie sans rien apporter.
+function elevageMajPaniers(module) {
+  const bloc = document.getElementById('el-paniers-' + module);
+  if (!bloc) return;
+  const type = (document.getElementById('el-h-type-' + module) || {}).value;
+  bloc.style.display = type === 'ponte' ? 'flex' : 'none';
+  if (type === 'ponte') elevageTotalPaniers(module);
+}
+
+// La quantite se deduit des paniers des qu'un seul est rempli : saisir un
+// total qui contredit son propre detail n'aurait pas de sens. Tant que
+// rien n'est calibre, le champ Quantite reste libre — une cueillette
+// entree en bloc doit rester possible.
+function elevageTotalPaniers(module) {
+  const lu = ELEVAGE_PANIERS.map(p => {
+    const el = document.getElementById('el-h-' + p.cle + '-' + module);
+    const v = el && String(el.value).trim();
+    return v === '' || v == null ? null : Number(v);
+  });
+  const remplis = lu.filter(v => v !== null && isFinite(v));
+  const aff = document.getElementById('el-paniers-total-' + module);
+  const qty = document.getElementById('el-h-qty-' + module);
+  if (!remplis.length) { if (aff) aff.textContent = '—'; if (qty) qty.readOnly = false; return; }
+  const total = remplis.reduce((s, v) => s + v, 0);
+  if (aff) aff.textContent = String(total);
+  if (qty) { qty.value = String(total); qty.readOnly = true; }
 }
 
 async function elevageSetCapacite(module) {
@@ -11057,8 +11123,8 @@ async function elevageStatutAnimal(module, id, statut) {
   // date_sortie accompagne le depart : une fiche archivee sans date ne dit
   // pas quand. La remettre a « present » l'efface, sinon la date d'un
   // retour en arriere resterait a trainer.
-  // Une reforme n'est pas un depart : l'animal reste, la date de sortie
-  // n'a donc pas lieu d'etre posee.
+  // Vieillir n'est pas partir : l'animal reste, la date de sortie n'a
+  // donc pas lieu d'etre posee.
   const patch = { statut, date_sortie: ELEVAGE_PRESENTS.includes(statut) ? null : new Date().toISOString().slice(0, 10) };
   const { error } = await sb.from('elevage_animaux').update(patch).eq('id', id);
   if (error) { toast('Erreur: ' + error.message, 'error'); loadElevage(module); return; }
@@ -11154,6 +11220,9 @@ function renderElevage(module) {
       .el-stat .s{font-size:11px;color:var(--text3);margin-top:1px}
       .el-eau{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--surface2);border:1px solid var(--border);
               border-left:3px solid var(--accent2);border-radius:8px;padding:9px 12px;margin-bottom:16px;font-size:12px;color:var(--text2)}
+      .el-paniers{background:var(--surface);border-style:dashed}
+      .el-paniers-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);
+                    align-self:center;margin-right:4px}
       .el-cap{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:12px;color:var(--text2);
               background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:18px}
       .el-cap input{font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;
@@ -11163,7 +11232,9 @@ function renderElevage(module) {
       .el-fiches{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px;margin-bottom:26px}
       .el-fiche{display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:0}
       .el-fiche-off{opacity:.55}
-      .el-fiche-ref{opacity:1;border-color:rgba(224,112,96,.45)}
+      /* Une bete agee produit toujours : sa fiche reste pleinement
+         lisible, seul le liserre la signale. */
+      .el-fiche-age{opacity:1;border-color:rgba(200,169,110,.5)}
       .el-photo{position:relative;aspect-ratio:4/3;background:var(--surface);display:flex;align-items:center;justify-content:center;overflow:hidden}
       .el-photo img{width:100%;height:100%;object-fit:cover;display:block}
       /* Sans photo — ou lien mort — l'embleme de l'elevage tient lieu de
@@ -11220,7 +11291,8 @@ function renderElevage(module) {
     <div class="el-sec">Historique des ${meta.animal}s</div>
     <div class="el-form">
       <div class="el-field" style="min-width:130px"><label>Date</label><input type="date" id="el-h-date-${module}" value="${today}"></div>
-      <div class="el-field" style="min-width:150px"><label>Type d'événement</label><select id="el-h-type-${module}">${typeOptions}</select></div>
+      <div class="el-field" style="min-width:150px"><label>Type d'événement</label>
+        <select id="el-h-type-${module}" onchange="elevageMajPaniers('${module}')">${typeOptions}</select></div>
       <div class="el-field" style="width:90px"><label>Quantité</label><input type="number" step="1" min="0" id="el-h-qty-${module}"></div>
       <div class="el-field" style="min-width:140px"><label>${meta.animal.charAt(0).toUpperCase() + meta.animal.slice(1)}</label>
         <select id="el-h-animal-${module}">
@@ -11231,10 +11303,19 @@ function renderElevage(module) {
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);white-space:nowrap"><input type="checkbox" id="el-h-bb-${module}" checked style="width:auto"> 📌 Babillard</label>
       <button class="btn btn-primary btn-sm" onclick="elevageAddHist('${module}')">+ Ajouter</button>
     </div>
+    ${meta.prod !== 'ponte' ? '' : `
+    <div class="el-form el-paniers" id="el-paniers-${module}" style="display:none">
+      <span class="el-paniers-t">Calibrer la cueillette <span style="color:var(--text3);font-weight:400">— facultatif</span></span>
+      ${ELEVAGE_PANIERS.map(p => `
+      <div class="el-field" style="width:96px"><label${p.aide ? ` title="${p.aide}"` : ''}>${p.label}</label>
+        <input type="number" step="1" min="0" id="el-h-${p.cle}-${module}" oninput="elevageTotalPaniers('${module}')"></div>`).join('')}
+      <div class="el-field" style="width:100px"><label>Total</label>
+        <div class="serre-ro" id="el-paniers-total-${module}" style="font-weight:700">—</div></div>
+    </div>`}
     <div class="table-container" style="margin-bottom:26px">
       <table><thead><tr><th>Date</th><th>Type</th><th>Qté</th><th>${meta.animal.charAt(0).toUpperCase() + meta.animal.slice(1)}</th><th>Description</th><th></th></tr></thead>
       <tbody>${st.hist.length ? st.hist.map(e => `
-        <tr><td>${e.date_evenement || ''}</td><td>${ELEVAGE_TYPE_LABELS[e.type_evenement] || e.type_evenement}</td><td>${e.quantite ?? ''}</td>
+        <tr><td>${e.date_evenement || ''}</td><td>${ELEVAGE_TYPE_LABELS[e.type_evenement] || e.type_evenement}</td><td>${e.quantite ?? ''}${elevageDetailPaniers(e)}</td>
         <td style="color:${e.animal_id ? 'var(--text)' : 'var(--text3)'}">${e.animal_id ? escHtml(nomAnimal(e.animal_id)) : 'tout l\'élevage'}</td><td>${escHtml(e.description || '')}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="elevageDelHist('${module}','${e.id}')">✕</button></td></tr>`).join('')
         : '<tr><td colspan="6" style="text-align:center;color:var(--text3)">Aucun événement</td></tr>'}</tbody></table>
@@ -11283,9 +11364,20 @@ async function elevageAddHist(module) {
   // d'une semaine appartient au troupeau, pas a une poule.
   const animal = (g('el-h-animal') || {}).value || null;
   if (!date) { toast('Date requise', 'error'); return; }
+  // Paniers : seulement pour une ponte, et seulement ceux qui ont ete
+  // saisis. Un panier laisse vide reste NULL — « pas detaille » n'est pas
+  // « aucun », et confondre les deux inventerait une mesure.
+  const paniers = {};
+  if (type === 'ponte') {
+    ELEVAGE_PANIERS.forEach(p => {
+      const el = g('el-h-' + p.cle);
+      const v = el && String(el.value).trim();
+      paniers[p.cle] = (v === '' || v == null) ? null : Math.max(0, Math.round(Number(v)));
+    });
+  }
   const { error } = await sb.from('elevage_historique').insert({
     module, date_evenement: date, type_evenement: type, quantite: qty, description: desc,
-    animal_id: animal, created_by: currentProfile.id
+    animal_id: animal, created_by: currentProfile.id, ...paniers
   });
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }
   let posted = false;

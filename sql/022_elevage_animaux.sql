@@ -27,32 +27,48 @@ create table if not exists elevage_animaux (
   photo_url     text,
   date_arrivee  date,
   date_sortie   date,
-  statut        text not null default 'present',
+  statut        text not null default 'adulte',
   notes         text,
   created_by    uuid references profiles(id) on delete set null,
   created_at    timestamptz default now()
 );
 
--- Quatre etats, dont deux signifient « toujours la » :
+-- Six etats : trois bandes d'age dans l'elevage, trois facons d'en
+-- sortir.
 --
---   present   dans l'elevage, productif
---   reforme   toujours la, ne produit plus — une poule agee pond a peine
---             mais elle est encore au poulailler, occupe une place au
---             regard du reglement, et coute a nourrir
---   parti     donne, vendu, transfere
---   mort
+--   DANS L'ELEVAGE — toutes pondent
+--     jeune    pond souvent, petits oeufs
+--     adulte   pleine ponte
+--     age      pond moins souvent, gros oeufs
 --
--- La distinction compte : « 4 poules » laisserait croire a quatre
--- pondeuses alors que deux sont en fin de ponte. Le cheptel additionne
--- present et reforme ; la production ne s'attend qu'aux premieres.
+--   SORTIES
+--     reforme  fin de carriere : ne pond plus, quitte l'elevage
+--     parti    donne, vendu, transfere
+--     mort
 --
--- Contrainte posee en DROP/ADD plutot qu'en `check` inline : une base qui
--- a deja passe une version anterieure de cette migration doit pouvoir
--- accueillir le nouvel etat.
+-- Les trois bandes sont un gradient, pas une hierarchie : le calibre de
+-- l'oeuf augmente avec l'age pendant que le rythme diminue. Une jeune
+-- poule et une vieille produisent toutes les deux, differemment. C'est
+-- pourquoi le cheptel les additionne sans distinction — elles occupent
+-- une place au regard du reglement, coutent a nourrir, et pondent.
+--
+-- « age » et « reforme » ne se confondent pas, et la difference n'est pas
+-- de degre : l'une est encore la et produit, l'autre est sortie. Une bete
+-- agee comptee comme reformee disparaitrait du cheptel alors qu'elle
+-- donne encore des oeufs — et des gros.
+--
+-- Contrainte posee en DROP/ADD plutot qu'en `check` inline, et conversion
+-- des valeurs d'une version anterieure de cette migration : une base deja
+-- migree doit pouvoir accueillir les nouveaux etats.
+-- L'ordre compte : convertir avant d'avoir retire l'ancienne contrainte
+-- echouerait, celle-ci n'admettant pas les nouvelles valeurs. On leve la
+-- contrainte, on convertit, puis on repose la contrainte elargie.
 alter table elevage_animaux drop constraint if exists elevage_animaux_statut_check;
+update elevage_animaux set statut = 'adulte' where statut = 'present';
+alter table elevage_animaux alter column statut set default 'adulte';
 alter table elevage_animaux
   add constraint elevage_animaux_statut_check
-  check (statut in ('present', 'reforme', 'parti', 'mort'));
+  check (statut in ('jeune', 'adulte', 'age', 'reforme', 'parti', 'mort'));
 
 create index if not exists idx_elevage_animaux_module
   on elevage_animaux(module, statut, nom);
