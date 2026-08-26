@@ -10886,9 +10886,9 @@ const ELEVAGE_META = {
   // eau : la sablonponie partage les reservoirs de la serre. Sa section
   // les reaffiche plutot que de laisser croire a deux circuits distincts.
   poulailler:  { container: 'admin-poulailler', icon: '🐔', titre: 'Poulailler', animal: 'poule', lieu: 'poulailler', prod: 'ponte', adj1: 'nouvelle', adjN: 'nouvelles',
-                 prodLabel: 'Ponte', prodUnite1: 'œuf', prodUniteN: 'œufs', eau: false },
+                 prodLabel: 'Ponte', prodUnite1: 'œuf', prodUniteN: 'œufs', eau: false, genre: 'f' },
   sablonponie: { container: 'admin-poissons', icon: '🐟', titre: 'Poissons (sablonponie)', animal: 'poisson', lieu: 'bassin de sablonponie', prod: 'recolte', adj1: 'nouveau', adjN: 'nouveaux',
-                 prodLabel: 'Récolte', prodUnite1: 'kg', prodUniteN: 'kg', eau: true }
+                 prodLabel: 'Récolte', prodUnite1: 'kg', prodUniteN: 'kg', eau: true, genre: 'm' }
 };
 const ELEVAGE_COUT_CATS = ['Nourriture', 'Équipement', 'Vétérinaire', 'Litière', 'Énergie', 'Autre'];
 const ELEVAGE_TYPE_LABELS = { ajout: 'Ajout', perte: 'Perte / Mortalité', ponte: 'Ponte (œufs)', recolte: 'Récolte', sante: 'Santé', note: 'Note' };
@@ -10899,16 +10899,138 @@ async function loadElevage(module) {
   const root = document.getElementById(meta.container);
   if (!root) return;
   root.innerHTML = `<div class="loading"><div class="spinner"></div> Chargement…</div>`;
-  const [hRes, cRes] = await Promise.all([
+  const [hRes, cRes, aRes] = await Promise.all([
     sb.from('elevage_historique').select('*').eq('module', module).order('date_evenement', { ascending: false }).order('created_at', { ascending: false }),
-    sb.from('elevage_couts').select('*').eq('module', module).order('date_cout', { ascending: false })
+    sb.from('elevage_couts').select('*').eq('module', module).order('date_cout', { ascending: false }),
+    sb.from('elevage_animaux').select('*').eq('module', module).order('statut').order('nom')
   ]);
   if (hRes.error || cRes.error) {
     root.innerHTML = `<div class="empty-state"><p>Erreur de chargement — vérifiez la migration <code>sql/011_elevages.sql</code>.<br>${escHtml((hRes.error || cRes.error).message)}</p></div>`;
     return;
   }
-  _elevage[module] = { hist: hRes.data || [], couts: cRes.data || [] };
+  // Les fiches sont facultatives : une base qui n'a pas encore passe la
+  // migration 022 doit continuer d'afficher l'elevage, pas une erreur.
+  // On note l'absence pour le dire une fois a l'ecran.
+  _elevage[module] = {
+    hist: hRes.data || [], couts: cRes.data || [],
+    animaux: aRes.error ? [] : (aRes.data || []),
+    fichesIndisponibles: !!aRes.error
+  };
   renderElevage(module);
+}
+
+// ── Fiches individuelles ────────────────────────────────────────────────
+// Un elevage n'existait qu'en masse : un cheptel calcule a partir des
+// quantites d'ajout et de perte. On savait qu'il y avait cinq poules,
+// jamais lesquelles. La fiche donne un nom, une photo et une histoire.
+const ELEVAGE_STATUTS = ['present', 'parti', 'mort'];
+function elevageStatutLabel(statut, genre) {
+  const e = genre === 'f' ? 'e' : '';
+  return { present: 'Présent' + e, parti: 'Parti' + e, mort: 'Mort' + e }[statut] || statut;
+}
+
+// Photo : une URL, jamais un fichier. Sans elle — ou si le lien est mort —
+// l'emblene de l'elevage tient lieu de portrait, plutot qu'un cadre casse.
+function elevagePortrait(a, meta) {
+  const secours = `this.style.display='none';this.parentElement.classList.add('el-sansphoto')`;
+  return `<div class="el-photo${a.photo_url ? '' : ' el-sansphoto'}" data-icone="${meta.icon}">
+    ${a.photo_url ? `<img src="${escHtml(a.photo_url)}" alt="${escHtml(a.nom)}" loading="lazy" onerror="${secours}">` : ''}
+  </div>`;
+}
+
+function elevageFiches(module) {
+  const meta = ELEVAGE_META[module];
+  const st = _elevage[module] || {};
+  if (st.fichesIndisponibles) {
+    return `<div class="el-sec">Fiches individuelles</div>
+      <div class="el-eau" style="border-left-color:var(--text3)">
+        <span>Les fiches demandent la migration <code>sql/022_elevage_animaux.sql</code>, pas encore passée.</span></div>`;
+  }
+  const animaux = st.animaux || [];
+  const evParAnimal = {};
+  (st.hist || []).forEach(e => { if (e.animal_id) evParAnimal[e.animal_id] = (evParAnimal[e.animal_id] || 0) + 1; });
+  const presents = animaux.filter(a => a.statut === 'present').length;
+
+  // Le cheptel vient des quantites, les fiches d'un decompte nominal :
+  // les deux peuvent diverger, et le taire serait pire que le dire.
+  const cheptel = (st.hist || []).reduce((n, e) => n + (e.type_evenement === 'ajout' ? Number(e.quantite || 0) : e.type_evenement === 'perte' ? -Number(e.quantite || 0) : 0), 0);
+  const ecart = animaux.length && presents !== cheptel
+    ? `<div class="el-ecart">⚠ ${presents} fiche${presents > 1 ? 's' : ''} active${presents > 1 ? 's' : ''} pour un cheptel de ${cheptel}
+        — les fiches ne couvrent pas tout l'élevage, ou un mouvement n'a pas été reporté.</div>` : '';
+
+  const cartes = animaux.map(a => `
+    <div class="el-fiche${a.statut !== 'present' ? ' el-fiche-off' : ''}">
+      ${elevagePortrait(a, meta)}
+      <div class="el-fiche-corps">
+        <div class="el-fiche-nom">${escHtml(a.nom)}</div>
+        ${a.race ? `<div class="el-fiche-l">${escHtml(a.race)}</div>` : ''}
+        <div class="el-fiche-l">${elevageStatutLabel(a.statut, meta.genre)}${
+          a.statut !== 'present' && a.date_sortie ? ' le ' + a.date_sortie
+          : a.date_arrivee ? ' · arrivé' + (meta.genre === 'f' ? 'e' : '') + ' le ' + a.date_arrivee : ''}</div>
+        ${a.statut !== 'present' && a.date_arrivee ? `<div class="el-fiche-l">arrivé${meta.genre === 'f' ? 'e' : ''} le ${a.date_arrivee}</div>` : ''}
+        ${a.notes ? `<div class="el-fiche-n">${escHtml(a.notes)}</div>` : ''}
+        <div class="el-fiche-l">${evParAnimal[a.id] || 0} événement${(evParAnimal[a.id] || 0) > 1 ? 's' : ''} à son nom</div>
+      </div>
+      <div class="el-fiche-act">
+        <select onchange="elevageStatutAnimal('${module}','${a.id}',this.value)" title="Statut">
+          ${ELEVAGE_STATUTS.map(v => `<option value="${v}"${a.statut === v ? ' selected' : ''}>${elevageStatutLabel(v, meta.genre)}</option>`).join('')}
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="elevageDelAnimal('${module}','${a.id}','${escHtml(a.nom).replace(/'/g, "\\'")}')">✕</button>
+      </div>
+    </div>`).join('');
+
+  return `
+    <div class="el-sec">Fiches individuelles · ${presents} ${presents > 1 ? meta.animal + 's' : meta.animal}${
+      animaux.length > presents ? ` <span style="font-weight:400;text-transform:none;color:var(--text3)">(+ ${animaux.length - presents} archivée${animaux.length - presents > 1 ? 's' : ''})</span>` : ''}</div>
+    ${ecart}
+    <div class="el-form">
+      <div class="el-field" style="min-width:120px"><label>Nom</label><input type="text" id="el-a-nom-${module}" placeholder="Gertrude"></div>
+      <div class="el-field" style="min-width:110px"><label>Race</label><input type="text" id="el-a-race-${module}" placeholder="Chantecler"></div>
+      <div class="el-field" style="min-width:130px"><label>Arrivée</label><input type="date" id="el-a-date-${module}"></div>
+      <div class="el-field" style="flex:1;min-width:170px"><label>Photo (adresse web)</label><input type="url" id="el-a-photo-${module}" placeholder="https://…"></div>
+      <div class="el-field" style="flex:1;min-width:140px"><label>Notes</label><input type="text" id="el-a-notes-${module}" placeholder="caractère, signe distinctif…"></div>
+      <button class="btn btn-primary btn-sm" onclick="elevageAddAnimal('${module}')">+ Fiche</button>
+    </div>
+    ${animaux.length
+      ? `<div class="el-fiches">${cartes}</div>`
+      : `<div class="empty-state" style="padding:18px"><p style="font-size:13px;color:var(--text3)">Aucune fiche.
+          Nommer ${meta.genre === 'f' ? 'une' : 'un'} ${meta.animal} permet de lui rattacher ses propres événements.</p></div>`}
+  `;
+}
+
+async function elevageAddAnimal(module) {
+  const v = (id) => (document.getElementById('el-a-' + id + '-' + module) || {}).value || '';
+  const nom = v('nom').trim();
+  if (!nom) { toast('Un nom est requis', 'error'); return; }
+  const { error } = await sb.from('elevage_animaux').insert({
+    module, nom,
+    race: v('race').trim() || null,
+    photo_url: v('photo').trim() || null,
+    date_arrivee: v('date') || null,
+    notes: v('notes').trim() || null,
+    created_by: currentProfile.id
+  });
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Fiche créée', 'success');
+  loadElevage(module);
+}
+
+async function elevageStatutAnimal(module, id, statut) {
+  // date_sortie accompagne le depart : une fiche archivee sans date ne dit
+  // pas quand. La remettre a « present » l'efface, sinon la date d'un
+  // retour en arriere resterait a trainer.
+  const patch = { statut, date_sortie: statut === 'present' ? null : new Date().toISOString().slice(0, 10) };
+  const { error } = await sb.from('elevage_animaux').update(patch).eq('id', id);
+  if (error) { toast('Erreur: ' + error.message, 'error'); loadElevage(module); return; }
+  loadElevage(module);
+}
+
+async function elevageDelAnimal(module, id, nom) {
+  if (!confirm(`Supprimer la fiche de ${nom} ?\n\nSes événements restent dans l'historique de l'élevage — ils redeviennent simplement collectifs.`)) return;
+  const { error } = await sb.from('elevage_animaux').delete().eq('id', id);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast('Fiche supprimée', 'success');
+  loadElevage(module);
 }
 
 // Les reservoirs ne sont pas ceux de la serre « aussi » : ce sont les
@@ -10960,6 +11082,9 @@ function renderElevage(module) {
   // Sans cela on afficherait une division par zero comme un resultat.
   const coutUnitaire = prodAnnee > 0 ? totalCoutYear / prodAnnee : null;
   const uniteProd = (n) => Math.abs(n) === 1 ? meta.prodUnite1 : meta.prodUniteN;
+  // Une fiche supprimee laisse ses evenements en place, animal_id a NULL.
+  // Un identifiant qui ne resout pas est donc un cas normal, pas un bug.
+  const nomAnimal = (id) => ((st.animaux || []).find(a => a.id === id) || {}).nom || 'fiche supprimée';
   const typeOptions = ['ajout', 'perte', meta.prod, 'sante', 'note'].map(t => `<option value="${t}">${ELEVAGE_TYPE_LABELS[t]}</option>`).join('');
   const catOptions = ELEVAGE_COUT_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
 
@@ -10979,6 +11104,23 @@ function renderElevage(module) {
       .el-stat .s{font-size:11px;color:var(--text3);margin-top:1px}
       .el-eau{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--surface2);border:1px solid var(--border);
               border-left:3px solid var(--accent2);border-radius:8px;padding:9px 12px;margin-bottom:16px;font-size:12px;color:var(--text2)}
+      .el-ecart{font-size:12px;color:var(--accent3,#e07060);background:rgba(224,112,96,.08);border:1px solid rgba(224,112,96,.3);
+                border-radius:8px;padding:8px 11px;margin-bottom:10px}
+      .el-fiches{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px;margin-bottom:26px}
+      .el-fiche{display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:0}
+      .el-fiche-off{opacity:.55}
+      .el-photo{position:relative;aspect-ratio:4/3;background:var(--surface);display:flex;align-items:center;justify-content:center;overflow:hidden}
+      .el-photo img{width:100%;height:100%;object-fit:cover;display:block}
+      /* Sans photo — ou lien mort — l'embleme de l'elevage tient lieu de
+         portrait : mieux qu'un cadre casse. */
+      .el-photo.el-sansphoto::after{content:attr(data-icone);font-size:2.4rem;opacity:.35}
+      .el-fiche-corps{padding:9px 11px;flex:1;min-width:0}
+      .el-fiche-nom{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .el-fiche-l{font-size:11px;color:var(--text3);margin-top:2px}
+      .el-fiche-n{font-size:11px;color:var(--text2);margin-top:5px;font-style:italic}
+      .el-fiche-act{display:flex;gap:6px;padding:0 11px 10px;align-items:center}
+      .el-fiche-act select{flex:1;min-width:0;font-size:11px;padding:4px 6px;border:1px solid var(--border);
+                           border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit}
     </style>
     <div class="section-header">
       <div class="section-title"><h3 style="font-size:1.15rem">${meta.icon} ${meta.titre}</h3></div>
@@ -11001,21 +11143,29 @@ function renderElevage(module) {
         <div class="s">${coutUnitaire === null ? 'aucune production en ' + year : 'coûts ' + year + ' ÷ production'}</div></div>
     </div>
 
+    ${elevageFiches(module)}
+
     <div class="el-sec">Historique des ${meta.animal}s</div>
     <div class="el-form">
       <div class="el-field" style="min-width:130px"><label>Date</label><input type="date" id="el-h-date-${module}" value="${today}"></div>
       <div class="el-field" style="min-width:150px"><label>Type d'événement</label><select id="el-h-type-${module}">${typeOptions}</select></div>
       <div class="el-field" style="width:90px"><label>Quantité</label><input type="number" step="1" min="0" id="el-h-qty-${module}"></div>
+      <div class="el-field" style="min-width:140px"><label>${meta.animal.charAt(0).toUpperCase() + meta.animal.slice(1)}</label>
+        <select id="el-h-animal-${module}">
+          <option value="">— tout l'élevage —</option>
+          ${(st.animaux || []).filter(a => a.statut === 'present').map(a => `<option value="${a.id}">${escHtml(a.nom)}</option>`).join('')}
+        </select></div>
       <div class="el-field" style="flex:1;min-width:150px"><label>Description</label><input type="text" id="el-h-desc-${module}" placeholder="race, cause…"></div>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);white-space:nowrap"><input type="checkbox" id="el-h-bb-${module}" checked style="width:auto"> 📌 Babillard</label>
       <button class="btn btn-primary btn-sm" onclick="elevageAddHist('${module}')">+ Ajouter</button>
     </div>
     <div class="table-container" style="margin-bottom:26px">
-      <table><thead><tr><th>Date</th><th>Type</th><th>Qté</th><th>Description</th><th></th></tr></thead>
+      <table><thead><tr><th>Date</th><th>Type</th><th>Qté</th><th>${meta.animal.charAt(0).toUpperCase() + meta.animal.slice(1)}</th><th>Description</th><th></th></tr></thead>
       <tbody>${st.hist.length ? st.hist.map(e => `
-        <tr><td>${e.date_evenement || ''}</td><td>${ELEVAGE_TYPE_LABELS[e.type_evenement] || e.type_evenement}</td><td>${e.quantite ?? ''}</td><td>${escHtml(e.description || '')}</td>
+        <tr><td>${e.date_evenement || ''}</td><td>${ELEVAGE_TYPE_LABELS[e.type_evenement] || e.type_evenement}</td><td>${e.quantite ?? ''}</td>
+        <td style="color:${e.animal_id ? 'var(--text)' : 'var(--text3)'}">${e.animal_id ? escHtml(nomAnimal(e.animal_id)) : 'tout l\'élevage'}</td><td>${escHtml(e.description || '')}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="elevageDelHist('${module}','${e.id}')">✕</button></td></tr>`).join('')
-        : '<tr><td colspan="5" style="text-align:center;color:var(--text3)">Aucun événement</td></tr>'}</tbody></table>
+        : '<tr><td colspan="6" style="text-align:center;color:var(--text3)">Aucun événement</td></tr>'}</tbody></table>
     </div>
 
     <div class="el-sec">Coûts d'exploitation</div>
@@ -11057,9 +11207,13 @@ async function elevageAddHist(module) {
   const type = g('el-h-type').value;
   const qty = g('el-h-qty').value ? Number(g('el-h-qty').value) : null;
   const desc = g('el-h-desc').value.trim() || null;
+  // Vide = evenement collectif, ce qui reste le cas courant : la ponte
+  // d'une semaine appartient au troupeau, pas a une poule.
+  const animal = (g('el-h-animal') || {}).value || null;
   if (!date) { toast('Date requise', 'error'); return; }
   const { error } = await sb.from('elevage_historique').insert({
-    module, date_evenement: date, type_evenement: type, quantite: qty, description: desc, created_by: currentProfile.id
+    module, date_evenement: date, type_evenement: type, quantite: qty, description: desc,
+    animal_id: animal, created_by: currentProfile.id
   });
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }
   let posted = false;

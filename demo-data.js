@@ -309,6 +309,31 @@
         reservoir1_pct: 80, reservoir2_pct: 67, reservoir3_pct: 90 },
     ],
 
+    // Fiches individuelles. Les portraits sont des SVG embarques :
+    // la demonstration doit fonctionner sans reseau, sur la tablette
+    // comme ailleurs. Un vrai deploiement y met des adresses web.
+    elevage_animaux: [
+      { id: 'ea-1', module: 'poulailler', nom: 'Gertrude', race: 'Chantecler',
+        date_arrivee: jourCourt(-300), statut: 'present', notes: 'la plus vieille, mène le troupeau',
+        photo_url: 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2060%22%3E%3Crect%20width%3D%2280%22%20height%3D%2260%22%20fill%3D%22%232a2622%22/%3E%3Cellipse%20cx%3D%2240%22%20cy%3D%2240%22%20rx%3D%2221%22%20ry%3D%2215%22%20fill%3D%22%23c88a4a%22/%3E%3Ccircle%20cx%3D%2255%22%20cy%3D%2225%22%20r%3D%229%22%20fill%3D%22%23c88a4a%22/%3E%3Cpath%20d%3D%22M52%2016c1-4%204-4%204%200%201-4%204-4%204%201%201-3%203-2%203%201z%22%20fill%3D%22%23c0392b%22/%3E%3Ccircle%20cx%3D%2258%22%20cy%3D%2224%22%20r%3D%221.6%22%20fill%3D%22%231a1a1a%22/%3E%3Cpath%20d%3D%22M64%2027l6%202-6%202z%22%20fill%3D%22%23e8a33d%22/%3E%3Cpath%20d%3D%22M20%2038q10-8%2018%202-9%206-18-2z%22%20fill%3D%22%2300000022%22/%3E%3Cpath%20d%3D%22M24%2052l-2%205M32%2053l-1%205%22%20stroke%3D%22%23e8a33d%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E' },
+      { id: 'ea-2', module: 'poulailler', nom: 'Blanchette', race: 'Chantecler',
+        date_arrivee: jourCourt(-300), statut: 'present', notes: 'pond presque tous les jours',
+        photo_url: 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2060%22%3E%3Crect%20width%3D%2280%22%20height%3D%2260%22%20fill%3D%22%23242a2a%22/%3E%3Cellipse%20cx%3D%2240%22%20cy%3D%2240%22%20rx%3D%2221%22%20ry%3D%2215%22%20fill%3D%22%23e8e4dc%22/%3E%3Ccircle%20cx%3D%2255%22%20cy%3D%2225%22%20r%3D%229%22%20fill%3D%22%23e8e4dc%22/%3E%3Cpath%20d%3D%22M52%2016c1-4%204-4%204%200%201-4%204-4%204%201%201-3%203-2%203%201z%22%20fill%3D%22%23c0392b%22/%3E%3Ccircle%20cx%3D%2258%22%20cy%3D%2224%22%20r%3D%221.6%22%20fill%3D%22%231a1a1a%22/%3E%3Cpath%20d%3D%22M64%2027l6%202-6%202z%22%20fill%3D%22%23e8a33d%22/%3E%3Cpath%20d%3D%22M20%2038q10-8%2018%202-9%206-18-2z%22%20fill%3D%22%2300000022%22/%3E%3Cpath%20d%3D%22M24%2052l-2%205M32%2053l-1%205%22%20stroke%3D%22%23e8a33d%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E' },
+      { id: 'ea-3', module: 'poulailler', nom: 'Rousse', race: 'Rhode Island Red',
+        date_arrivee: jourCourt(-300), statut: 'present', notes: 'aime se percher sur la clôture',
+        photo_url: 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2060%22%3E%3Crect%20width%3D%2280%22%20height%3D%2260%22%20fill%3D%22%232a2422%22/%3E%3Cellipse%20cx%3D%2240%22%20cy%3D%2240%22%20rx%3D%2221%22%20ry%3D%2215%22%20fill%3D%22%23a8482a%22/%3E%3Ccircle%20cx%3D%2255%22%20cy%3D%2225%22%20r%3D%229%22%20fill%3D%22%23a8482a%22/%3E%3Cpath%20d%3D%22M52%2016c1-4%204-4%204%200%201-4%204-4%204%201%201-3%203-2%203%201z%22%20fill%3D%22%238e2b1c%22/%3E%3Ccircle%20cx%3D%2258%22%20cy%3D%2224%22%20r%3D%221.6%22%20fill%3D%22%231a1a1a%22/%3E%3Cpath%20d%3D%22M64%2027l6%202-6%202z%22%20fill%3D%22%23e8a33d%22/%3E%3Cpath%20d%3D%22M20%2038q10-8%2018%202-9%206-18-2z%22%20fill%3D%22%2300000022%22/%3E%3Cpath%20d%3D%22M24%2052l-2%205M32%2053l-1%205%22%20stroke%3D%22%23e8a33d%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E' },
+      { id: 'ea-4', module: 'poulailler', nom: 'Poivre', race: 'Plymouth Rock',
+        date_arrivee: jourCourt(-150), statut: 'present', notes: 'plumage barré noir et blanc',
+        photo_url: 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2060%22%3E%3Crect%20width%3D%2280%22%20height%3D%2260%22%20fill%3D%22%2322262a%22/%3E%3Cellipse%20cx%3D%2240%22%20cy%3D%2240%22%20rx%3D%2221%22%20ry%3D%2215%22%20fill%3D%22%236b6b6b%22/%3E%3Ccircle%20cx%3D%2255%22%20cy%3D%2225%22%20r%3D%229%22%20fill%3D%22%236b6b6b%22/%3E%3Cpath%20d%3D%22M52%2016c1-4%204-4%204%200%201-4%204-4%204%201%201-3%203-2%203%201z%22%20fill%3D%22%23c0392b%22/%3E%3Ccircle%20cx%3D%2258%22%20cy%3D%2224%22%20r%3D%221.6%22%20fill%3D%22%231a1a1a%22/%3E%3Cpath%20d%3D%22M64%2027l6%202-6%202z%22%20fill%3D%22%23e8a33d%22/%3E%3Cpath%20d%3D%22M20%2038q10-8%2018%202-9%206-18-2z%22%20fill%3D%22%2300000022%22/%3E%3Cpath%20d%3D%22M24%2052l-2%205M32%2053l-1%205%22%20stroke%3D%22%23e8a33d%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E' },
+      { id: 'ea-5', module: 'poulailler', nom: 'Mimi', race: 'Chantecler',
+        date_arrivee: jourCourt(-40), statut: 'present', notes: 'la dernière arrivée, encore farouche',
+        photo_url: 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2060%22%3E%3Crect%20width%3D%2280%22%20height%3D%2260%22%20fill%3D%22%232a2820%22/%3E%3Cellipse%20cx%3D%2240%22%20cy%3D%2240%22%20rx%3D%2221%22%20ry%3D%2215%22%20fill%3D%22%23d8b06a%22/%3E%3Ccircle%20cx%3D%2255%22%20cy%3D%2225%22%20r%3D%229%22%20fill%3D%22%23d8b06a%22/%3E%3Cpath%20d%3D%22M52%2016c1-4%204-4%204%200%201-4%204-4%204%201%201-3%203-2%203%201z%22%20fill%3D%22%23c0392b%22/%3E%3Ccircle%20cx%3D%2258%22%20cy%3D%2224%22%20r%3D%221.6%22%20fill%3D%22%231a1a1a%22/%3E%3Cpath%20d%3D%22M64%2027l6%202-6%202z%22%20fill%3D%22%23e8a33d%22/%3E%3Cpath%20d%3D%22M20%2038q10-8%2018%202-9%206-18-2z%22%20fill%3D%22%2300000022%22/%3E%3Cpath%20d%3D%22M24%2052l-2%205M32%2053l-1%205%22%20stroke%3D%22%23e8a33d%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E' },
+      { id: 'ea-6', module: 'poulailler', nom: 'Coquette', race: 'Chantecler',
+        date_arrivee: jourCourt(-300), date_sortie: jourCourt(-96), statut: 'mort',
+        notes: 'Prédation — la clôture a été renforcée depuis',
+        photo_url: 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2060%22%3E%3Crect%20width%3D%2280%22%20height%3D%2260%22%20fill%3D%22%23262220%22/%3E%3Cellipse%20cx%3D%2240%22%20cy%3D%2240%22%20rx%3D%2221%22%20ry%3D%2215%22%20fill%3D%22%23b8905c%22/%3E%3Ccircle%20cx%3D%2255%22%20cy%3D%2225%22%20r%3D%229%22%20fill%3D%22%23b8905c%22/%3E%3Cpath%20d%3D%22M52%2016c1-4%204-4%204%200%201-4%204-4%204%201%201-3%203-2%203%201z%22%20fill%3D%22%23c0392b%22/%3E%3Ccircle%20cx%3D%2258%22%20cy%3D%2224%22%20r%3D%221.6%22%20fill%3D%22%231a1a1a%22/%3E%3Cpath%20d%3D%22M64%2027l6%202-6%202z%22%20fill%3D%22%23e8a33d%22/%3E%3Cpath%20d%3D%22M20%2038q10-8%2018%202-9%206-18-2z%22%20fill%3D%22%2300000022%22/%3E%3Cpath%20d%3D%22M24%2052l-2%205M32%2053l-1%205%22%20stroke%3D%22%23e8a33d%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E' },
+    ],
+
     // ── Elevages : poulailler et sablonponie ─────────────────
     // Les deux ecrans etaient vides en demonstration, ce qui donnait a
     // croire que la fonction n'existait pas. Un mois de ponte et deux
@@ -316,12 +341,14 @@
     elevage_historique: [
       // Poulailler : six poules, une perte, la ponte des dernieres semaines.
       { id: 'eh-1', module: 'poulailler', date_evenement: jourCourt(-300), type_evenement: 'ajout', quantite: 6, description: 'Six poules Chantecler' },
-      { id: 'eh-2', module: 'poulailler', date_evenement: jourCourt(-96),  type_evenement: 'perte', quantite: 1, description: 'Prédation — renard, clôture renforcée depuis' },
       { id: 'eh-3', module: 'poulailler', date_evenement: jourCourt(-40),  type_evenement: 'ponte', quantite: 88, description: 'Cumul de la semaine' },
       { id: 'eh-4', module: 'poulailler', date_evenement: jourCourt(-26),  type_evenement: 'ponte', quantite: 92, description: 'Cumul de la semaine' },
       { id: 'eh-5', module: 'poulailler', date_evenement: jourCourt(-12),  type_evenement: 'ponte', quantite: 79, description: 'Cumul de la semaine — chaleur' },
       { id: 'eh-6', module: 'poulailler', date_evenement: jourCourt(-4),   type_evenement: 'ponte', quantite: 90, description: 'Cumul de la semaine' },
       { id: 'eh-7', module: 'poulailler', date_evenement: jourCourt(-18),  type_evenement: 'sante', quantite: null, description: 'Traitement antiparasitaire, tout le troupeau' },
+      // Deux evenements nominatifs : le reste appartient au troupeau.
+      { id: 'eh-8', module: 'poulailler', date_evenement: jourCourt(-96),  type_evenement: 'perte', quantite: 1, description: 'Prédation — renard, clôture renforcée depuis', animal_id: 'ea-6' },
+      { id: 'eh-9', module: 'poulailler', date_evenement: jourCourt(-33),  type_evenement: 'sante', quantite: null, description: 'Boiterie légère, rétablie en trois jours', animal_id: 'ea-1' },
       // Sablonponie : truites arc-en-ciel, deux recoltes.
       { id: 'ep-1', module: 'sablonponie', date_evenement: jourCourt(-260), type_evenement: 'ajout', quantite: 40, description: 'Alevins de truite arc-en-ciel' },
       { id: 'ep-2', module: 'sablonponie', date_evenement: jourCourt(-190), type_evenement: 'perte', quantite: 3,  description: 'Mortalité à l’acclimatation' },
