@@ -1011,6 +1011,57 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   font-weight: 500;
 }
 
+/* ── Elevages ──────────────────────────────────────────────────
+   Ces regles servent DEUX ecrans : le panneau d'administration et
+   la page Espaces. Elles vivaient dans un <style> injecte par le
+   rendu admin, donc la vue locataire s'affichait sans aucune mise
+   en forme — tuiles empilees et portraits pleine largeur. Une
+   feuille de style n'a pas a dependre de l'ecran qui s'affiche en
+   premier. */
+.el-form{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px}
+.el-field{display:flex;flex-direction:column;gap:3px}
+.el-field label{font-size:11px;color:var(--text3)}
+.el-field input,.el-field select{font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit;width:100%}
+.el-sec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin:8px 0 8px}
+/* Grille qui se replie plutot qu'une rangee qui deborde : cinq
+   chiffres ne tiennent pas cote a cote sur un telephone. */
+.el-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:0 0 18px}
+.el-stat{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;min-width:0}
+.el-stat .l{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.el-stat .v{font-size:1.15rem;font-weight:700;margin-top:2px}
+.el-stat .s{font-size:11px;color:var(--text3);margin-top:1px}
+.el-eau{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--surface2);border:1px solid var(--border);
+        border-left:3px solid var(--accent2);border-radius:8px;padding:9px 12px;margin-bottom:16px;font-size:12px;color:var(--text2)}
+.el-paniers{background:var(--surface);border-style:dashed}
+.el-paniers-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);
+              align-self:center;margin-right:4px}
+.el-cap{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:12px;color:var(--text2);
+        background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:18px}
+.el-cap input{font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;
+              background:var(--surface);color:var(--text);font-family:inherit}
+.el-ecart{font-size:12px;color:var(--accent3,#e07060);background:rgba(224,112,96,.08);border:1px solid rgba(224,112,96,.3);
+          border-radius:8px;padding:8px 11px;margin-bottom:10px}
+.el-fiches{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px;margin-bottom:26px}
+.el-fiche{display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:0}
+.el-fiche-off{opacity:.55}
+/* Une bete agee produit toujours : sa fiche reste pleinement
+   lisible, seul le liserre la signale. */
+.el-fiche-age{opacity:1;border-color:rgba(200,169,110,.5)}
+.el-photo{position:relative;aspect-ratio:4/3;background:var(--surface);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.el-photo img{width:100%;height:100%;object-fit:cover;display:block}
+/* Sans photo — ou lien mort — l'embleme de l'elevage tient lieu de
+   portrait : mieux qu'un cadre casse. */
+.el-photo.el-sansphoto::after{content:attr(data-icone);font-size:2.4rem;opacity:.35}
+.el-fiche-corps{padding:9px 11px;flex:1;min-width:0}
+.el-fiche-nom{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.el-fiche-l{font-size:11px;color:var(--text3);margin-top:2px}
+.el-fiche-n{font-size:11px;color:var(--text2);margin-top:5px;font-style:italic}
+.el-fiches-lect{grid-template-columns:repeat(auto-fill,minmax(165px,1fr))}
+.el-fiches-lect .el-fiche-corps{padding-bottom:11px}
+.el-fiche-act{display:flex;gap:6px;padding:0 11px 10px;align-items:center}
+.el-fiche-act select{flex:1;min-width:0;font-size:11px;padding:4px 6px;border:1px solid var(--border);
+                     border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit}
+
 @media (max-width: 768px) {
   .nav-tabs { display: none; }
   #burger-btn { display: flex; }
@@ -1623,6 +1674,13 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
       <div id="serre-section" style="margin-top:36px;padding-top:28px;border-top:1px solid var(--border);">
         <div class="loading"><div class="spinner"></div> Chargement…</div>
       </div>
+
+      <!-- Élevages, en lecture seule. Même ordre que l'écran
+           d'administration — la sablonponie suit la serre parce qu'elles
+           partagent les réservoirs, le poulailler ferme la marche.
+           Remplies par loadElevagesLocataire(), masquées si le module
+           Serre est coupé ou si l'élevage est vide. -->
+      <div id="poulailler-section" style="display:none;margin-top:36px;padding-top:28px;border-top:1px solid var(--border);"></div>
     </div>
 
     <!-- ==================== TENANT: VÉHICULES / TRAJETS ==================== -->
@@ -1912,7 +1970,6 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
            ensemble. Le poulailler, systeme distinct, ferme la marche. -->
       <div id="admin-serre" class="admin-section" style="display:none">
         <div id="serre-corps"></div>
-        <div id="admin-poissons"></div>
         <div id="admin-poulailler"></div>
       </div>
 
@@ -6864,9 +6921,14 @@ async function loadSpaces() {
   // Charger la section dédiée « Serre communautaire » en bas de page
   if (window.appModules.serre !== false) {
     loadSerre();
+    loadElevagesLocataire();
   } else {
     const ss = document.getElementById('serre-section');
     if (ss) ss.style.display = 'none';
+    ['sablonponie-section', 'poulailler-section'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
   }
   // Déléguer les clics sur les boutons réseau. loadSpaces() est rejoué à
   // chaque visite de la page : sans ce garde, les écouteurs s'empilaient et
@@ -7514,6 +7576,7 @@ function renderSerre() {
 
     <div class="serre-sec" style="margin-top:0;">${pt('Conditions de la serre')}</div>
     ${ConditionsSerre(L, true)}
+    <div id="sablonponie-section"></div>
     ${_serre.isAdmin && !isDemo ? `<div style="font-size:11px;color:var(--text3);margin:-10px 0 18px;">${pt('Saisie manuelle : onglet Admin → 🌱 Serre')}</div>` : ''}
 
     <div id="serre-plan-wrap">
@@ -10983,6 +11046,84 @@ function elevageDetailPaniers(e) {
   return parts.length ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">${parts.join(' · ')}</div>` : '';
 }
 
+// ── Vue locataire ───────────────────────────────────────────────────────
+// Ce qu'un resident a le droit de voir : qui vit ici et ce qu'ils ont
+// produit. Aucun formulaire, aucun cout — la saisie et les depenses
+// restent a l'administration (migration 025).
+//
+// La sablonponie s'affiche sous les reservoirs de la serre, le poulailler
+// en bas de la page Espaces : le meme ordre que l'ecran d'administration,
+// et le meme motif — les poissons vivent dans ces bassins.
+async function loadElevagesLocataire() {
+  const cibles = [
+    { module: 'sablonponie', el: 'sablonponie-section', filet: false },
+    { module: 'poulailler',  el: 'poulailler-section',  filet: true },
+  ];
+  for (const c of cibles) {
+    const root = document.getElementById(c.el);
+    if (!root) continue;
+    const [aRes, hRes] = await Promise.all([
+      sb.from('elevage_animaux').select('*').eq('module', c.module).order('statut').order('nom'),
+      sb.from('elevage_historique').select('*').eq('module', c.module)
+        .order('date_evenement', { ascending: false }).limit(60)
+    ]);
+    // Sans la migration 025, la base renvoie zero ligne sans erreur. Une
+    // section vide vaut mieux qu'une section qui affiche des zeros comme
+    // s'ils etaient mesures : on se retire.
+    const animaux = aRes.error ? [] : (aRes.data || []);
+    const hist    = hRes.error ? [] : (hRes.data || []);
+    if (!animaux.length && !hist.length) { root.style.display = 'none'; root.innerHTML = ''; continue; }
+    root.style.display = '';
+    root.innerHTML = elevageVueLocataire(c.module, animaux, hist);
+  }
+}
+
+function elevageVueLocataire(module, animaux, hist) {
+  const meta = ELEVAGE_META[module];
+  const presents = animaux.filter(a => ELEVAGE_PRESENTS.includes(a.statut));
+  const mois = new Date().toISOString().slice(0, 7);
+  const somme = (f) => hist.filter(e => e.type_evenement === meta.prod && f(e.date_evenement || ''))
+                           .reduce((n, e) => n + Number(e.quantite || 0), 0);
+  const prodMois = somme(d => d.slice(0, 7) === mois);
+  const q = (n) => meta.prodUnite1 === 'kg' ? (Math.round(n * 10) / 10).toFixed(1) : String(Math.round(n));
+  const unite = (n) => Math.abs(n) === 1 ? meta.prodUnite1 : meta.prodUniteN;
+  const derniere = hist.find(e => e.type_evenement === meta.prod);
+  // Le cheptel se lit sur les fiches quand il y en a, sinon sur les
+  // quantites — un elevage peut etre suivi en masse sans etre nomme.
+  const cheptel = presents.length || hist.reduce((n, e) =>
+    n + (e.type_evenement === 'ajout' ? Number(e.quantite || 0)
+       : e.type_evenement === 'perte' ? -Number(e.quantite || 0) : 0), 0);
+
+  const portraits = presents.length ? `
+    <div class="el-fiches el-fiches-lect">
+      ${presents.map(a => `
+        <div class="el-fiche">
+          ${elevagePortrait(a, meta)}
+          <div class="el-fiche-corps">
+            <div class="el-fiche-nom">${escHtml(a.nom)}</div>
+            ${a.race ? `<div class="el-fiche-l">${escHtml(a.race)}</div>` : ''}
+            ${ELEVAGE_PONTE[a.statut] && meta.prod === 'ponte'
+              ? `<div class="el-fiche-l">${ELEVAGE_PONTE[a.statut]}</div>` : ''}
+            ${a.notes ? `<div class="el-fiche-n">${escHtml(a.notes)}</div>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>` : '';
+
+  return `
+    <div class="serre-sec" style="margin-top:0">${meta.icon} ${meta.titre}${
+      meta.eau ? ' <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">— dans les réservoirs ci-dessus</span>' : ''}</div>
+    <div class="el-stats" style="margin-bottom:14px">
+      <div class="el-stat"><div class="l">${cheptel > 1 ? meta.animal + 's' : meta.animal}</div>
+        <div class="v" style="color:var(--accent2)">${cheptel}</div></div>
+      <div class="el-stat"><div class="l">${meta.prodLabel} ce mois</div>
+        <div class="v">${q(prodMois)} ${unite(prodMois)}</div></div>
+      ${derniere ? `<div class="el-stat"><div class="l">Dernière ${meta.prodLabel.toLowerCase()}</div>
+        <div class="v">${q(Number(derniere.quantite || 0))} ${unite(Number(derniere.quantite || 0))}</div>
+        <div class="s">${derniere.date_evenement || ''}</div></div>` : ''}
+    </div>
+    ${portraits}`;
+}
+
 function elevageFiches(module) {
   const meta = ELEVAGE_META[module];
   const st = _elevage[module] || {};
@@ -11205,54 +11346,12 @@ function renderElevage(module) {
   const catOptions = ELEVAGE_COUT_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
 
   root.innerHTML = `
-    <style>
-      .el-form{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px}
-      .el-field{display:flex;flex-direction:column;gap:3px}
-      .el-field label{font-size:11px;color:var(--text3)}
-      .el-field input,.el-field select{font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit;width:100%}
-      .el-sec{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin:8px 0 8px}
-      /* Grille qui se replie plutot qu'une rangee qui deborde : cinq
-         chiffres ne tiennent pas cote a cote sur un telephone. */
-      .el-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:0 0 18px}
-      .el-stat{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;min-width:0}
-      .el-stat .l{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      .el-stat .v{font-size:1.15rem;font-weight:700;margin-top:2px}
-      .el-stat .s{font-size:11px;color:var(--text3);margin-top:1px}
-      .el-eau{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--surface2);border:1px solid var(--border);
-              border-left:3px solid var(--accent2);border-radius:8px;padding:9px 12px;margin-bottom:16px;font-size:12px;color:var(--text2)}
-      .el-paniers{background:var(--surface);border-style:dashed}
-      .el-paniers-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);
-                    align-self:center;margin-right:4px}
-      .el-cap{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:12px;color:var(--text2);
-              background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:18px}
-      .el-cap input{font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;
-                    background:var(--surface);color:var(--text);font-family:inherit}
-      .el-ecart{font-size:12px;color:var(--accent3,#e07060);background:rgba(224,112,96,.08);border:1px solid rgba(224,112,96,.3);
-                border-radius:8px;padding:8px 11px;margin-bottom:10px}
-      .el-fiches{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px;margin-bottom:26px}
-      .el-fiche{display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:0}
-      .el-fiche-off{opacity:.55}
-      /* Une bete agee produit toujours : sa fiche reste pleinement
-         lisible, seul le liserre la signale. */
-      .el-fiche-age{opacity:1;border-color:rgba(200,169,110,.5)}
-      .el-photo{position:relative;aspect-ratio:4/3;background:var(--surface);display:flex;align-items:center;justify-content:center;overflow:hidden}
-      .el-photo img{width:100%;height:100%;object-fit:cover;display:block}
-      /* Sans photo — ou lien mort — l'embleme de l'elevage tient lieu de
-         portrait : mieux qu'un cadre casse. */
-      .el-photo.el-sansphoto::after{content:attr(data-icone);font-size:2.4rem;opacity:.35}
-      .el-fiche-corps{padding:9px 11px;flex:1;min-width:0}
-      .el-fiche-nom{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .el-fiche-l{font-size:11px;color:var(--text3);margin-top:2px}
-      .el-fiche-n{font-size:11px;color:var(--text2);margin-top:5px;font-style:italic}
-      .el-fiche-act{display:flex;gap:6px;padding:0 11px 10px;align-items:center}
-      .el-fiche-act select{flex:1;min-width:0;font-size:11px;padding:4px 6px;border:1px solid var(--border);
-                           border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit}
-    </style>
+
     <div class="section-header">
       <div class="section-title"><h3 style="font-size:1.15rem">${meta.icon} ${meta.titre}</h3></div>
     </div>
 
-    ${meta.eau ? elevageBandeauEau() : ''}
+    ${meta.eau ? `<div class="el-eau"><span>💧 <strong>Ces bassins sont les réservoirs ci-dessus</strong> — même eau, même relevé.</span></div>` : ''}
 
     <div class="el-stats">
       <div class="el-stat"><div class="l">Cheptel actuel</div>
@@ -11510,6 +11609,10 @@ function renderSerreAdmin() {
     <div class="sa-sec">Conditions de la serre — saisie manuelle</div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Les conditions sont normalement remplies par les capteurs (Raspberry Pi + MQTT). Cette saisie est un dépannage si un capteur est absent ou hors service ; les locataires voient le résultat en lecture seule sur la page Espaces.</div>
     ${ConditionsSerre(_serreAdmin.lecture, false, SERRE_COND_ADMIN_PREFIX)}
+
+    <!-- La sablonponie vit dans ces reservoirs : elle se lit avec eux,
+         non dans une section separee qui les reafficherait. -->
+    <div id="admin-poissons"></div>
 
     <div class="sa-sec">Tarif</div>
     <div class="sa-form" style="align-items:flex-end">
