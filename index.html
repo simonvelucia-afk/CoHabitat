@@ -1896,7 +1896,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         <button class="admin-tab" id="demandes-tab" onclick="adminTab('demandes')" data-pt="Demandes">📋 Demandes <span id="demandes-pending-count" class="badge badge-yellow" style="display:none;font-size:10px;margin-left:4px;padding:1px 6px;"></span></button>
         <button class="admin-tab" onclick="adminTab('spaces-admin')" data-pt="Espaces">Espaces</button>
         <button class="admin-tab" onclick="adminTab('vehicles-admin')" data-pt="Véhicules">Véhicules</button>
-        <button class="admin-tab" onclick="adminTab('serre')">🌱 Serre</button>
+        <button class="admin-tab" onclick="adminTab('production')">🌱 Production</button>
         <button class="admin-tab" onclick="adminTab('payments')" data-pt="Paiements">Paiements</button>
         <button class="admin-tab" onclick="adminTab('settings')" id="settings-tab" style="display:none" data-pt="Paramètres">Paramètres</button>
         <button class="admin-tab" onclick="adminTab('logs')" data-pt="Logs">Logs</button>
@@ -10925,9 +10925,12 @@ async function adminTab(tab) {
     toast('Réservé à l\'administrateur principal', 'info');
     tab = 'tenants';
   }
-  // Poulailler et Poissons ne sont plus des onglets : ce sont deux
-  // sections du volet Serre. Les anciens noms y menent toujours.
-  if (tab === 'poulailler' || tab === 'poissons') tab = 'serre';
+  // Le volet s'appelle Production : il tient la serre, la sablonponie et
+  // le poulailler, dont la serre n'est qu'un. La cle interne reste
+  // 'serre' — le conteneur, loadSerreAdmin et l'etat la portent, et la
+  // renommer partout pour un libelle serait du remuement sans gain.
+  // Les quatre noms menent au meme endroit : aucun ancien lien ne casse.
+  if (tab === 'production' || tab === 'poulailler' || tab === 'poissons') tab = 'serre';
   currentAdminTab = tab;
   document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none');
   document.querySelectorAll('#page-admin .admin-tab').forEach(t => t.classList.remove('active'));
