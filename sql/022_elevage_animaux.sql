@@ -27,12 +27,32 @@ create table if not exists elevage_animaux (
   photo_url     text,
   date_arrivee  date,
   date_sortie   date,
-  statut        text not null default 'present'
-                check (statut in ('present', 'parti', 'mort')),
+  statut        text not null default 'present',
   notes         text,
   created_by    uuid references profiles(id) on delete set null,
   created_at    timestamptz default now()
 );
+
+-- Quatre etats, dont deux signifient « toujours la » :
+--
+--   present   dans l'elevage, productif
+--   reforme   toujours la, ne produit plus — une poule agee pond a peine
+--             mais elle est encore au poulailler, occupe une place au
+--             regard du reglement, et coute a nourrir
+--   parti     donne, vendu, transfere
+--   mort
+--
+-- La distinction compte : « 4 poules » laisserait croire a quatre
+-- pondeuses alors que deux sont en fin de ponte. Le cheptel additionne
+-- present et reforme ; la production ne s'attend qu'aux premieres.
+--
+-- Contrainte posee en DROP/ADD plutot qu'en `check` inline : une base qui
+-- a deja passe une version anterieure de cette migration doit pouvoir
+-- accueillir le nouvel etat.
+alter table elevage_animaux drop constraint if exists elevage_animaux_statut_check;
+alter table elevage_animaux
+  add constraint elevage_animaux_statut_check
+  check (statut in ('present', 'reforme', 'parti', 'mort'));
 
 create index if not exists idx_elevage_animaux_module
   on elevage_animaux(module, statut, nom);

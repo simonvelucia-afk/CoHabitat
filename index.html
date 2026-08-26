@@ -10899,10 +10899,11 @@ async function loadElevage(module) {
   const root = document.getElementById(meta.container);
   if (!root) return;
   root.innerHTML = `<div class="loading"><div class="spinner"></div> Chargement…</div>`;
-  const [hRes, cRes, aRes] = await Promise.all([
+  const [hRes, cRes, aRes, capRes] = await Promise.all([
     sb.from('elevage_historique').select('*').eq('module', module).order('date_evenement', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('elevage_couts').select('*').eq('module', module).order('date_cout', { ascending: false }),
-    sb.from('elevage_animaux').select('*').eq('module', module).order('statut').order('nom')
+    sb.from('elevage_animaux').select('*').eq('module', module).order('statut').order('nom'),
+    sb.from('system_settings').select('key, value').eq('key', 'elevage_capacite_' + module).maybeSingle()
   ]);
   if (hRes.error || cRes.error) {
     root.innerHTML = `<div class="empty-state"><p>Erreur de chargement — vérifiez la migration <code>sql/011_elevages.sql</code>.<br>${escHtml((hRes.error || cRes.error).message)}</p></div>`;
@@ -10914,7 +10915,14 @@ async function loadElevage(module) {
   _elevage[module] = {
     hist: hRes.data || [], couts: cRes.data || [],
     animaux: aRes.error ? [] : (aRes.data || []),
-    fichesIndisponibles: !!aRes.error
+    fichesIndisponibles: !!aRes.error,
+    // Vide ou absente = aucun plafond. Un elevage sans regle ne doit pas
+    // se voir imposer un ratio invente par l'interface.
+    capacite: (function () {
+      const v = capRes && !capRes.error && capRes.data ? String(capRes.data.value || '').trim() : '';
+      const n = v === '' ? null : Number(v);
+      return (n === null || !isFinite(n) || n < 0) ? null : n;
+    })()
   };
   renderElevage(module);
 }
@@ -10923,10 +10931,15 @@ async function loadElevage(module) {
 // Un elevage n'existait qu'en masse : un cheptel calcule a partir des
 // quantites d'ajout et de perte. On savait qu'il y avait cinq poules,
 // jamais lesquelles. La fiche donne un nom, une photo et une histoire.
-const ELEVAGE_STATUTS = ['present', 'parti', 'mort'];
+// « reforme » veut dire toujours la, mais ne produit plus : une poule
+// agee pond a peine et sera remplacee, sans cesser d'occuper une place au
+// regard du reglement ni d'etre nourrie. C'est pourquoi le cheptel
+// additionne present ET reforme — seule la production les distingue.
+const ELEVAGE_STATUTS = ['present', 'reforme', 'parti', 'mort'];
+const ELEVAGE_PRESENTS = ['present', 'reforme'];
 function elevageStatutLabel(statut, genre) {
   const e = genre === 'f' ? 'e' : '';
-  return { present: 'Présent' + e, parti: 'Parti' + e, mort: 'Mort' + e }[statut] || statut;
+  return { present: 'Présent' + e, reforme: 'Réformé' + e, parti: 'Parti' + e, mort: 'Mort' + e }[statut] || statut;
 }
 
 // Photo : une URL, jamais un fichier. Sans elle — ou si le lien est mort —
@@ -10949,7 +10962,8 @@ function elevageFiches(module) {
   const animaux = st.animaux || [];
   const evParAnimal = {};
   (st.hist || []).forEach(e => { if (e.animal_id) evParAnimal[e.animal_id] = (evParAnimal[e.animal_id] || 0) + 1; });
-  const presents = animaux.filter(a => a.statut === 'present').length;
+  const presents = animaux.filter(a => ELEVAGE_PRESENTS.includes(a.statut)).length;
+  const reformes = animaux.filter(a => a.statut === 'reforme').length;
 
   // Le cheptel vient des quantites, les fiches d'un decompte nominal :
   // les deux peuvent diverger, et le taire serait pire que le dire.
@@ -10959,15 +10973,15 @@ function elevageFiches(module) {
         — les fiches ne couvrent pas tout l'élevage, ou un mouvement n'a pas été reporté.</div>` : '';
 
   const cartes = animaux.map(a => `
-    <div class="el-fiche${a.statut !== 'present' ? ' el-fiche-off' : ''}">
+    <div class="el-fiche${ELEVAGE_PRESENTS.includes(a.statut) ? '' : ' el-fiche-off'}${a.statut === 'reforme' ? ' el-fiche-ref' : ''}">
       ${elevagePortrait(a, meta)}
       <div class="el-fiche-corps">
         <div class="el-fiche-nom">${escHtml(a.nom)}</div>
         ${a.race ? `<div class="el-fiche-l">${escHtml(a.race)}</div>` : ''}
         <div class="el-fiche-l">${elevageStatutLabel(a.statut, meta.genre)}${
-          a.statut !== 'present' && a.date_sortie ? ' le ' + a.date_sortie
+          !ELEVAGE_PRESENTS.includes(a.statut) && a.date_sortie ? ' le ' + a.date_sortie
           : a.date_arrivee ? ' · arrivé' + (meta.genre === 'f' ? 'e' : '') + ' le ' + a.date_arrivee : ''}</div>
-        ${a.statut !== 'present' && a.date_arrivee ? `<div class="el-fiche-l">arrivé${meta.genre === 'f' ? 'e' : ''} le ${a.date_arrivee}</div>` : ''}
+        ${!ELEVAGE_PRESENTS.includes(a.statut) && a.date_arrivee ? `<div class="el-fiche-l">arrivé${meta.genre === 'f' ? 'e' : ''} le ${a.date_arrivee}</div>` : ''}
         ${a.notes ? `<div class="el-fiche-n">${escHtml(a.notes)}</div>` : ''}
         <div class="el-fiche-l">${evParAnimal[a.id] || 0} événement${(evParAnimal[a.id] || 0) > 1 ? 's' : ''} à son nom</div>
       </div>
@@ -10981,6 +10995,7 @@ function elevageFiches(module) {
 
   return `
     <div class="el-sec">Fiches individuelles · ${presents} ${presents > 1 ? meta.animal + 's' : meta.animal}${
+      reformes ? ` <span style="font-weight:400;text-transform:none;color:var(--accent3, #e07060)">dont ${reformes} réformée${reformes > 1 ? 's' : ''}</span>` : ''}${
       animaux.length > presents ? ` <span style="font-weight:400;text-transform:none;color:var(--text3)">(+ ${animaux.length - presents} archivée${animaux.length - presents > 1 ? 's' : ''})</span>` : ''}</div>
     ${ecart}
     <div class="el-form">
@@ -10996,6 +11011,29 @@ function elevageFiches(module) {
       : `<div class="empty-state" style="padding:18px"><p style="font-size:13px;color:var(--text3)">Aucune fiche.
           Nommer ${meta.genre === 'f' ? 'une' : 'un'} ${meta.animal} permet de lui rattacher ses propres événements.</p></div>`}
   `;
+}
+
+async function elevageSetCapacite(module) {
+  const champ = document.getElementById('el-cap-' + module);
+  if (!champ) return;
+  const brut = String(champ.value || '').trim();
+  const n = brut === '' ? null : Number(brut);
+  if (n !== null && (!isFinite(n) || n < 0)) { toast('Nombre invalide', 'error'); return; }
+  const key = 'elevage_capacite_' + module;
+  const payload = { value: n === null ? '' : String(Math.round(n)), updated_by: currentProfile.id, updated_at: new Date().toISOString() };
+  // Mettre a jour d'abord : un upsert se heurterait a la politique
+  // d'insertion quand la ligne existe deja — le meme piege que les
+  // interrupteurs de modules avant la migration 020.
+  let { data: touchees, error } = await sb.from('system_settings').update(payload).eq('key', key).select('key');
+  if (!error && (!touchees || touchees.length === 0)) {
+    ({ error } = await sb.from('system_settings').insert({
+      key, value: payload.value, updated_by: payload.updated_by, updated_at: payload.updated_at,
+      description: 'Nombre d\'animaux permis — ' + module
+    }));
+  }
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast(n === null ? 'Plafond retiré' : 'Nombre permis enregistré', 'success');
+  loadElevage(module);
 }
 
 async function elevageAddAnimal(module) {
@@ -11019,7 +11057,9 @@ async function elevageStatutAnimal(module, id, statut) {
   // date_sortie accompagne le depart : une fiche archivee sans date ne dit
   // pas quand. La remettre a « present » l'efface, sinon la date d'un
   // retour en arriere resterait a trainer.
-  const patch = { statut, date_sortie: statut === 'present' ? null : new Date().toISOString().slice(0, 10) };
+  // Une reforme n'est pas un depart : l'animal reste, la date de sortie
+  // n'a donc pas lieu d'etre posee.
+  const patch = { statut, date_sortie: ELEVAGE_PRESENTS.includes(statut) ? null : new Date().toISOString().slice(0, 10) };
   const { error } = await sb.from('elevage_animaux').update(patch).eq('id', id);
   if (error) { toast('Erreur: ' + error.message, 'error'); loadElevage(module); return; }
   loadElevage(module);
@@ -11085,6 +11125,16 @@ function renderElevage(module) {
   // Une fiche supprimee laisse ses evenements en place, animal_id a NULL.
   // Un identifiant qui ne resout pas est donc un cas normal, pas un bug.
   const nomAnimal = (id) => ((st.animaux || []).find(a => a.id === id) || {}).nom || 'fiche supprimée';
+  // Un poulailler residentiel est souvent plafonne par reglement
+  // municipal — quatre poules au Quebec, le plus souvent. Le nombre est
+  // donc une donnee de l'immeuble, pas une constante du logiciel.
+  const capacite = st.capacite;
+  const depasse = capacite !== null && cheptel > capacite;
+  // Le reglage vit dans system_settings, ou seul le principal_admin
+  // ecrit (politiques settings_admin* de la migration 020). Un admin
+  // ordinaire le lit sans pouvoir le changer, plutot que de se heurter
+  // a un refus de la base.
+  const peutFixerCapacite = currentProfile?.role === 'principal_admin';
   const typeOptions = ['ajout', 'perte', meta.prod, 'sante', 'note'].map(t => `<option value="${t}">${ELEVAGE_TYPE_LABELS[t]}</option>`).join('');
   const catOptions = ELEVAGE_COUT_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
 
@@ -11104,11 +11154,16 @@ function renderElevage(module) {
       .el-stat .s{font-size:11px;color:var(--text3);margin-top:1px}
       .el-eau{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--surface2);border:1px solid var(--border);
               border-left:3px solid var(--accent2);border-radius:8px;padding:9px 12px;margin-bottom:16px;font-size:12px;color:var(--text2)}
+      .el-cap{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:12px;color:var(--text2);
+              background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:18px}
+      .el-cap input{font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;
+                    background:var(--surface);color:var(--text);font-family:inherit}
       .el-ecart{font-size:12px;color:var(--accent3,#e07060);background:rgba(224,112,96,.08);border:1px solid rgba(224,112,96,.3);
                 border-radius:8px;padding:8px 11px;margin-bottom:10px}
       .el-fiches{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px;margin-bottom:26px}
       .el-fiche{display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:0}
       .el-fiche-off{opacity:.55}
+      .el-fiche-ref{opacity:1;border-color:rgba(224,112,96,.45)}
       .el-photo{position:relative;aspect-ratio:4/3;background:var(--surface);display:flex;align-items:center;justify-content:center;overflow:hidden}
       .el-photo img{width:100%;height:100%;object-fit:cover;display:block}
       /* Sans photo — ou lien mort — l'embleme de l'elevage tient lieu de
@@ -11130,7 +11185,13 @@ function renderElevage(module) {
 
     <div class="el-stats">
       <div class="el-stat"><div class="l">Cheptel actuel</div>
-        <div class="v" style="color:var(--accent2)">${cheptel} ${meta.animal}${Math.abs(cheptel) > 1 ? 's' : ''}</div></div>
+        <div class="v" style="color:${depasse ? 'var(--accent3, #e07060)' : 'var(--accent2)'}">${cheptel}${
+          capacite === null ? '' : ' / ' + capacite} ${meta.animal}${Math.abs(cheptel) > 1 ? 's' : ''}</div>
+        ${capacite === null
+          ? '<div class="s">aucun plafond fixé</div>'
+          : depasse
+            ? `<div class="s" style="color:var(--accent3, #e07060)">${cheptel - capacite} de trop</div>`
+            : `<div class="s">${capacite - cheptel === 0 ? 'au maximum permis' : (capacite - cheptel) + ' de libre'}</div>`}</div>
       <div class="el-stat"><div class="l">${meta.prodLabel} ce mois</div>
         <div class="v">${q(prodMois)} ${uniteProd(prodMois)}</div></div>
       <div class="el-stat"><div class="l">${meta.prodLabel} ${year}</div>
@@ -11143,6 +11204,17 @@ function renderElevage(module) {
         <div class="s">${coutUnitaire === null ? 'aucune production en ' + year : 'coûts ' + year + ' ÷ production'}</div></div>
     </div>
 
+    <div class="el-cap">
+      <span>Nombre de ${meta.animal}s permis</span>
+      ${peutFixerCapacite
+        ? `<input type="number" min="0" step="1" id="el-cap-${module}" value="${capacite === null ? '' : capacite}"
+             placeholder="aucun" style="width:80px">
+           <button class="btn btn-secondary btn-sm" onclick="elevageSetCapacite('${module}')">Enregistrer</button>`
+        : `<strong>${capacite === null ? 'aucun plafond' : capacite}</strong>`}
+      <span style="color:var(--text3)">Laisser vide s'il n'y a pas de plafond. Un poulailler résidentiel est
+        généralement limité par règlement municipal${peutFixerCapacite ? '' : ' — modifiable par l’administrateur principal'}.</span>
+    </div>
+
     ${elevageFiches(module)}
 
     <div class="el-sec">Historique des ${meta.animal}s</div>
@@ -11153,7 +11225,7 @@ function renderElevage(module) {
       <div class="el-field" style="min-width:140px"><label>${meta.animal.charAt(0).toUpperCase() + meta.animal.slice(1)}</label>
         <select id="el-h-animal-${module}">
           <option value="">— tout l'élevage —</option>
-          ${(st.animaux || []).filter(a => a.statut === 'present').map(a => `<option value="${a.id}">${escHtml(a.nom)}</option>`).join('')}
+          ${(st.animaux || []).filter(a => ELEVAGE_PRESENTS.includes(a.statut)).map(a => `<option value="${a.id}">${escHtml(a.nom)}</option>`).join('')}
         </select></div>
       <div class="el-field" style="flex:1;min-width:150px"><label>Description</label><input type="text" id="el-h-desc-${module}" placeholder="race, cause…"></div>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);white-space:nowrap"><input type="checkbox" id="el-h-bb-${module}" checked style="width:auto"> 📌 Babillard</label>
