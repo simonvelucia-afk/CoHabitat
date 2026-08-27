@@ -335,10 +335,21 @@
     elevage_offres: [
       { id: 'of-1', module: 'poulailler', libelle: '6 gros œufs', contenants: 4,
         date_offre: jourCourt(-2), notes: 'Ramassage de la fin de semaine' },
+      // Celle-ci est dans la machine : case 3. Elle se prend a la machine,
+      // pas depuis l'ecran — et c'est la machine qui consigne le retrait.
       { id: 'of-2', module: 'poulailler', libelle: '12 œufs moyens', contenants: 2,
-        date_offre: jourCourt(-2), notes: null },
+        date_offre: jourCourt(-2), notes: 'Au froid', slot_num: 3,
+        machine_id: 'M1', created_at: jours(-2) },
       { id: 'of-3', module: 'sablonponie', libelle: 'Truite ~540 g, vidée', contenants: 3,
         date_offre: jourCourt(-9), notes: 'Deuxième récolte' },
+    ],
+
+    // Ce que la machine lunch a consigne. price = 0 : un retrait, pas un
+    // achat. Les achats payants d'un voisin ne sont pas lisibles ici.
+    lunch_transactions: [
+      { id: 'lt-1', slot_id: 'db-3', slot_num: 3, price: 0, buyer_name: 'Julien Moreau',
+        user_id: 'p3', created_at: jours(-1),
+        profiles: { full_name: 'Julien Moreau', unit: 'C-310' } },
     ],
 
     elevage_retraits: [

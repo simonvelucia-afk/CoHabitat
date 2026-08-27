@@ -11244,7 +11244,7 @@ async function loadElevagesLocataire() {
   for (const c of cibles) {
     const root = document.getElementById(c.el);
     if (!root) continue;
-    const [aRes, hRes, lRes, condRes, offRes, retRes] = await Promise.all([
+    const [aRes, hRes, lRes, condRes, offRes, retRes, txRes] = await Promise.all([
       sb.from('elevage_animaux').select('*').eq('module', c.module).order('statut').order('nom'),
       sb.from('elevage_historique').select('*').eq('module', c.module)
         .order('date_evenement', { ascending: false }).limit(60),
@@ -11255,7 +11255,13 @@ async function loadElevagesLocataire() {
         ? sb.from('serre_lectures').select('*').order('horodatage', { ascending: false }).limit(1)
         : Promise.resolve({ data: [] }),
       sb.from('elevage_offres').select('*').eq('module', c.module).order('date_offre', { ascending: false }).limit(12),
-      sb.from('elevage_retraits').select('id, offre_id, user_id, contenants, retire_at, profiles:user_id(full_name, unit)')
+      sb.from('elevage_retraits').select('id, offre_id, user_id, contenants, retire_at, profiles:user_id(full_name, unit)'),
+      // Ce que la machine lunch a consigne. price=0 uniquement : la 029
+      // ouvre la lecture des retraits sans prix a tous, mais les ACHATS
+      // d'un voisin ne regardent personne et restent hors de portee.
+      sb.from('lunch_transactions')
+        .select('id, slot_num, buyer_name, user_id, created_at, profiles:user_id(full_name, unit)')
+        .eq('price', 0).order('created_at', { ascending: false }).limit(200)
     ]);
     // Sans la migration 025, la base renvoie zero ligne sans erreur. Une
     // section vide vaut mieux qu'une section qui affiche des zeros comme
@@ -11268,13 +11274,16 @@ async function loadElevagesLocataire() {
     // continuer de s'afficher, le bloc de distribution s'efface seul.
     const offres   = offRes.error ? [] : (offRes.data || []);
     const retraits = retRes.error ? [] : (retRes.data || []);
+    // Sans la 029 cette requete echoue : les offres en machine s'affichent
+    // alors sans la liste de qui a pris, plutot que de faire tomber la zone.
+    const txLunch  = txRes.error ? [] : (txRes.data || []);
     if (!animaux.length && !hist.length && !lots.length && !offres.length) { root.style.display = 'none'; root.innerHTML = ''; continue; }
     root.style.display = '';
-    root.innerHTML = elevageVueLocataire(c.module, animaux, hist, lots, lecture, offres, retraits);
+    root.innerHTML = elevageVueLocataire(c.module, animaux, hist, lots, lecture, offres, retraits, txLunch);
   }
 }
 
-function elevageVueLocataire(module, animaux, hist, lots, lecture, offres, retraits) {
+function elevageVueLocataire(module, animaux, hist, lots, lecture, offres, retraits, txLunch) {
   lots = lots || [];
   const meta = ELEVAGE_META[module];
   const presents = animaux.filter(a => ELEVAGE_PRESENTS.includes(a.statut));
@@ -11349,7 +11358,7 @@ function elevageVueLocataire(module, animaux, hist, lots, lecture, offres, retra
     </div>
     ${lotsVue}
     ${portraits}
-    ${elevageDistribution(module, meta, offres || [], retraits || [])}
+    ${elevageDistribution(module, meta, offres || [], retraits || [], txLunch || [])}
     ${elevageSaisieOperateur(module, meta)}`;
 }
 
@@ -11361,23 +11370,42 @@ function elevageVueLocataire(module, animaux, hist, lots, lecture, offres, retra
 //
 // L'unite est le CONTENANT : « 6 gros oeufs », « Truite ~540 g ». Un oeuf
 // seul ne se distribue pas, et le calibre distingue les offres.
-function elevageDistribution(module, meta, offres, retraits) {
+function elevageDistribution(module, meta, offres, retraits, txLunch) {
   if (!offres.length && !_elevageOperateurDe.includes(module)) return '';
   const peutOffrir = _elevageOperateurDe.includes(module)
     || ['admin', 'principal_admin'].includes(currentProfile?.role);
-  const prisDe = (o) => retraits.filter(r => r.offre_id === o.id)
-                                .reduce((n, r) => n + Number(r.contenants || 0), 0);
-  const miens = (o) => retraits.filter(r => r.offre_id === o.id && r.user_id === currentProfile?.id);
+
+  // UNE offre, UN chemin de retrait. Une offre posee dans une case de la
+  // machine s'y prend, et nulle part ailleurs : c'est la machine qui
+  // consigne. Melanger les deux comptages ferait diverger le stock.
+  const enMachine = (o) => o.slot_num !== null && o.slot_num !== undefined && o.slot_num !== '';
+  // Les lignes de la machine qui concernent cette offre : meme case, et
+  // posterieures a sa mise a disposition — une case se reutilise.
+  const txDe = (o) => !enMachine(o) ? [] : (txLunch || []).filter(x =>
+    Number(x.slot_num) === Number(o.slot_num)
+    && (!o.created_at || new Date(x.created_at) >= new Date(o.created_at)));
+
+  const prisDe = (o) => enMachine(o)
+    ? txDe(o).length
+    : retraits.filter(r => r.offre_id === o.id)
+              .reduce((n, r) => n + Number(r.contenants || 0), 0);
+  const miens = (o) => enMachine(o)
+    ? []   // reposer un contenant deja sorti de la machine n'a pas de sens
+    : retraits.filter(r => r.offre_id === o.id && r.user_id === currentProfile?.id);
 
   const carte = (o) => {
     const pris = prisDe(o), reste = Number(o.contenants || 0) - pris;
     const aMoi = miens(o);
+    const machine = enMachine(o);
     // « vous » plutot que son propre nom : on se reconnait mieux ainsi
     // dans une liste, et le nom manque de toute facon tant que la ligne
     // n'a pas ete relue avec sa jointure.
-    const preneurs = retraits.filter(r => r.offre_id === o.id)
-      .map(r => (r.user_id === currentProfile?.id ? 'vous' : (r.profiles?.full_name || 'un résident'))
-              + (r.contenants > 1 ? ' ×' + r.contenants : ''));
+    const nomme = (uid, prof, secours) =>
+      uid === currentProfile?.id ? 'vous' : (prof?.full_name || secours || 'un résident');
+    const preneurs = machine
+      ? txDe(o).map(x => nomme(x.user_id, x.profiles, x.buyer_name))
+      : retraits.filter(r => r.offre_id === o.id)
+          .map(r => nomme(r.user_id, r.profiles) + (r.contenants > 1 ? ' ×' + r.contenants : ''));
     return `
       <div class="el-lot" style="border-left-color:${reste > 0 ? 'var(--accent2)' : 'var(--border)'};margin-bottom:8px">
         <div class="el-lot-h">
@@ -11389,12 +11417,16 @@ function elevageDistribution(module, meta, offres, retraits) {
             ${o.notes ? `<div class="el-fiche-n">${escHtml(o.notes)}</div>` : ''}
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            ${aMoi.length
-              ? `<span class="el-fiche-l">vous en avez ${aMoi.reduce((n, r) => n + Number(r.contenants || 0), 0)}</span>
-                 <button class="btn btn-secondary btn-sm" onclick="elevageReposer('${module}','${aMoi[0].id}')">Reposer</button>`
-              : reste > 0
-                ? `<button class="btn btn-primary btn-sm" onclick="elevagePrendre('${module}','${o.id}')">J'en prends un</button>`
-                : ''}
+            ${machine
+              ? (reste > 0
+                  ? `<span class="el-fiche-l">🥡 à la machine — case ${escHtml(String(o.slot_num))}</span>`
+                  : '')
+              : aMoi.length
+                ? `<span class="el-fiche-l">vous en avez ${aMoi.reduce((n, r) => n + Number(r.contenants || 0), 0)}</span>
+                   <button class="btn btn-secondary btn-sm" onclick="elevageReposer('${module}','${aMoi[0].id}')">Reposer</button>`
+                : reste > 0
+                  ? `<button class="btn btn-primary btn-sm" onclick="elevagePrendre('${module}','${o.id}')">J'en prends un</button>`
+                  : ''}
             ${peutOffrir ? `<button class="btn btn-secondary btn-sm" onclick="elevageRetirerOffre('${module}','${o.id}','${escHtml(o.libelle).replace(/'/g, "\\'")}')" title="Retirer l'offre">✕</button>` : ''}
           </div>
         </div>
@@ -11411,6 +11443,8 @@ function elevageDistribution(module, meta, offres, retraits) {
       <span>🧺 <strong>Mettre à partager</strong></span>
       <input type="text" id="el-of-lib-${module}" placeholder="${meta.prod === 'ponte' ? '6 gros œufs' : 'Truite ~540 g'}" style="flex:1;min-width:160px">
       <input type="number" min="1" step="1" id="el-of-nb-${module}" placeholder="contenants" style="width:120px">
+      <input type="text" id="el-of-case-${module}" placeholder="case (facultatif)" style="width:150px"
+             title="Numéro de la case de la machine lunch. Laissez vide si le contenant reste au frigo de la salle commune.">
       <input type="text" id="el-of-notes-${module}" placeholder="note…" style="flex:1;min-width:120px">
       <button class="btn btn-primary btn-sm" onclick="elevageOffrir('${module}')">Proposer</button>
     </div>` : ''}`;
@@ -11421,9 +11455,15 @@ async function elevageOffrir(module) {
   const libelle = v('lib').trim(), nb = String(v('nb')).trim();
   if (!libelle) { toast('Décrivez le contenant', 'error'); return; }
   if (nb === '' || Number(nb) < 1) { toast('Combien de contenants ?', 'error'); return; }
+  // La case est facultative : sans elle, le contenant reste au frigo de la
+  // salle commune et se prend depuis cet ecran. Avec elle, c'est la machine
+  // qui ouvre et qui consigne.
+  const cases = v('case').trim();
+  if (cases !== '' && !(Number(cases) > 0)) { toast('Numéro de case invalide', 'error'); return; }
   const { error } = await sb.from('elevage_offres').insert({
     module, libelle, contenants: Math.round(Number(nb)),
-    notes: v('notes').trim() || null, created_by: currentProfile.id
+    notes: v('notes').trim() || null, created_by: currentProfile.id,
+    slot_num: cases === '' ? null : Math.round(Number(cases))
   });
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
   toast('Mis à partager', 'success');
