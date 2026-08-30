@@ -142,6 +142,15 @@ Dans Supabase → **Authentication → URL Configuration**:
 - Activable/désactivable par l'admin (module optionnel `module_serre`)
 - Migrations : `sql/009_serre.sql`, `sql/010_serre_reservoir_temps.sql`, `sql/012_serre_couts_module.sql`, `sql/013_serre_frais_base.sql`, `sql/014_serre_lectures_admin_insert.sql`, `sql/015_serre_plan_locataire.sql`, `sql/016_serre_recoltes_stades.sql`
 
+### LAB — amélioration continue
+- Sous-menu **🧪 LAB** du Babillard : le babillard sert à la vie de l'immeuble, le LAB à celle de l'application
+- **Qualifier les fonctions** : une note de 1 à 5 par fonction (babillard, tableau de bord, espaces, serre, auto-partage, Machine Lunch, billets, transactions, profil, multilingue, usage mobile, et le LAB lui-même) avec un commentaire libre. Moyenne communautaire, répartition des notes et commentaires reçus s'affichent sur chaque carte ; on peut revenir modifier sa note à tout moment. Les fonctions des modules désactivés n'apparaissent pas
+- **Idées à brainstormer** : proposer une amélioration ou une nouvelle fonction, appuyer les idées des autres (un vote par personne) et en discuter dans un fil. Filtres par statut et par type, tri par appuis ou par date
+- **Suivi par l'admin** : cycle `nouveau → à l'étude → planifié → en cours → livré / écarté`, avec un mot de l'équipe visible par tout le monde sous l'idée
+- **Tout est stocké en base** (tables `lab_*`), pas dans le navigateur : c'est la matière première des prochaines versions
+- Traduit en français, anglais, espagnol et chinois ; consultable en mode démo (contributions réservées aux comptes)
+- Migration : `sql/030_lab.sql`
+
 ### Administration
 - Gestion des locataires et unités
 - Gestion des espaces communs + tarification
@@ -193,3 +202,7 @@ L'interface est disponible en **français, anglais et espagnol** (sélecteur dan
 | `serre_lectures` | Lectures de capteurs (températures, niveaux) |
 | `elevage_historique` | Historique poulailler / sablonponie (événements) |
 | `elevage_couts` | Coûts d'exploitation serre / poulailler / sablonponie |
+| `lab_evaluations` | LAB : note 1-5 + commentaire d'un résident sur une fonction |
+| `lab_idees` | LAB : améliorations et nouvelles fonctions proposées |
+| `lab_idee_votes` | LAB : appuis à une idée (un par personne) |
+| `lab_idee_commentaires` | LAB : fil de discussion sous une idée |
