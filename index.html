@@ -390,6 +390,8 @@ h1, h2, h3 { font-family: var(--font-serif); font-weight: 400; }
 }
 .nav-subtab:hover { background: var(--surface2); color: var(--text); }
 .nav-subtab.active { background: rgba(200,169,110,0.15); color: var(--accent); }
+/* Une entree de langue porte son drapeau : meme sous-menu, contenu en ligne. */
+.nav-subtab.nav-langue { display: flex; align-items: center; gap: 8px; }
 
 /* Dans le tiroir, une sous-entree est decalee plutot que repliee. */
 #mobile-drawer .mob-sub {
@@ -1540,7 +1542,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
     </div>
     <div class="nav-tabs" id="nav-tabs"></div>
     <div class="nav-right">
-      <div id="nav-lang-switcher" style="display:flex;"><button class="nav-lang-btn active" id="nav-lang-toggle" onclick="cyclerLangue()" title="Changer de langue"></button></div>
+      <div id="nav-lang-switcher" class="nav-group" style="display:flex;"><button class="nav-lang-btn active" id="nav-lang-toggle" onclick="basculerMenuLangue(event)" title="Changer de langue"></button><div class="nav-submenu" id="sousmenu-langue"></div></div>
       <div id="nav-clock" style="font-family:'Space Mono',monospace;font-size:12px;color:var(--text2);white-space:nowrap;">--:--</div>
       <button id="burger-btn" onclick="toggleMobileMenu()" aria-label="Menu">
         <span></span><span></span><span></span>
@@ -5806,6 +5808,9 @@ const DRAPEAU_QUEBEC = (function () {
 })();
 
 const LANGUES_ORDRE = ['fr', 'en', 'es'];
+// Le nom de chaque langue dans sa propre langue : un hispanophone
+// reconnait « Espanol » sans savoir que l'application appelle sa langue « ES ».
+const LANGUES_NOMS = { fr: 'Français', en: 'English', es: 'Español' };
 // Les emojis drapeaux ne sont pas rendus partout : Chrome sous Windows
 // n'embarque aucune police qui les dessine et retombe sur les deux lettres
 // de l'indicateur regional, si bien que « 🇺🇸 EN » se lit « US EN ». Les
@@ -5851,21 +5856,43 @@ const DRAPEAUX = {
   es: DRAPEAU_MEXIQUE
 };
 
-// Un seul bouton qui fait defiler les langues, plutot que trois cote a
-// cote : la barre est etroite sur tablette, et deux boutons sur trois n'y
-// servaient qu'a occuper de la place.
-function cyclerLangue() {
-  const i = LANGUES_ORDRE.indexOf(appLang);
-  setLang(LANGUES_ORDRE[(i + 1) % LANGUES_ORDRE.length]);
+// Menu deroulant plutot qu'un cycleur : avec trois langues, cycler
+// demandait deja deux touchers pour revenir en arriere, et chaque langue
+// ajoutee en demande un de plus. Le menu les montre toutes d'un coup, et
+// reutilise le sous-menu de la navigation — meme ouverture, meme fermeture
+// au clic ailleurs.
+//
+// Ajouter une langue, c'est ajouter son code a LANGUES_ORDRE, son nom a
+// LANGUES_NOMS et son drapeau a DRAPEAUX. Rien d'autre.
+function basculerMenuLangue(ev) {
+  if (ev) ev.stopPropagation();
+  const cible = document.getElementById('sousmenu-langue');
+  const etaitOuvert = cible && cible.classList.contains('open');
+  fermerSousMenus();
+  if (cible && !etaitOuvert) cible.classList.add('open');
+}
+
+function choisirLangue(l) {
+  fermerSousMenus();
+  setLang(l);
 }
 
 function rafraichirDrapeau() {
   const b = document.getElementById('nav-lang-toggle');
-  if (!b) return;
-  const code = appLang.toUpperCase();
-  b.innerHTML = (DRAPEAUX[appLang] || '') + '<span>' + code + '</span>';
-  const suivante = LANGUES_ORDRE[(LANGUES_ORDRE.indexOf(appLang) + 1) % LANGUES_ORDRE.length];
-  b.title = 'Langue : ' + code + ' — toucher pour passer en ' + suivante.toUpperCase();
+  if (b) {
+    const code = appLang.toUpperCase();
+    b.innerHTML = (DRAPEAUX[appLang] || '') + '<span>' + code + '</span>'
+      + '<span class="nav-caret">▾</span>';
+    b.title = 'Langue : ' + code + ' — toucher pour en choisir une autre';
+  }
+  const menu = document.getElementById('sousmenu-langue');
+  if (menu) {
+    menu.innerHTML = LANGUES_ORDRE.map(l =>
+      `<button class="nav-subtab nav-langue${l === appLang ? ' active' : ''}"`
+      + ` onclick="choisirLangue('${l}')">`
+      + (DRAPEAUX[l] || '') + `<span>${LANGUES_NOMS[l] || l.toUpperCase()}</span></button>`
+    ).join('');
+  }
 }
 
 // Ouverture des sous-menus. Un groupe ne navigue pas : il se deplie, et
