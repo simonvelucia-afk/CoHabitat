@@ -112,8 +112,20 @@ Dans Supabase → **Authentication → URL Configuration**:
 - Tableau de bord avec solde et réservations
 - **Résumé « Ma serre »** sur le tableau de bord : zones louées et cultures en cours (par section, avec stade et dates), récoltes passées avec rendement cumulé par unité, et locations terminées
 - Réservation d'espaces communs par tranches de 15 min
-- Consultation et demande de covoiturage
+- Réservation d'un véhicule ou d'un vélomobile à l'heure, et demande de covoiturage
 - Historique des transactions
+
+### Mobilité partagée (MaaS)
+
+L'ancien module « Auto-partage » devient **Mobilité partagée** — *MaaS, Mobility as a Service* : les véhicules du bâtiment, les vélomobiles et le covoiturage entre résidents sont réunis dans une seule offre, sous le même onglet.
+
+- **Réservation directe d'un véhicule** (onglet 🚲 *Réserver un véhicule*, affiché en premier) : un véhicule, un créneau, un coût calculé au **temps d'utilisation** (`vehicle_pricing.price_per_minute`) et débité du solde virtuel. C'est ce qui rend les **vélomobiles du bâtiment** réservables : on en prend un pour une heure, seul, sans annoncer où l'on va — ce que le covoiturage, qui suppose un chauffeur approuvé et des passagers, ne permettait pas
+- **Flotte multimodale** : chaque véhicule porte un type (`vehicle_type` : automobile, vélomobile, vélo, autre) et un drapeau `is_reservable`. Décoché, le véhicule reste dans la flotte mais n'est accessible que par un trajet publié. La liste est groupée par mode, avec une pastille de disponibilité (libre / occupé jusqu'à…)
+- **Les deux usages se voient l'un l'autre** : `check_vehicle_availability()` regarde les réservations **et** les trajets publiés, si bien qu'un vélomobile engagé sur un covoiturage n'apparaît pas libre sur ce créneau. Un trajet sans heure d'arrivée estimée réserve le véhicule deux heures
+- **Créneaux déjà pris** affichés dans la fenêtre de réservation (`vehicle_busy_slots()`), bornes seulement — jamais qui a réservé
+- **Annulation** : remboursement intégral si elle a lieu plus de 2 h avant le début du créneau, comme pour les espaces communs ; passé ce délai le créneau reste facturé, et l'écran le dit avant de confirmer
+- Migration : `sql/031_mobilite_partagee.sql`
+- ⚠️ **Sur une installation branchée à la centrale Modulimo**, ajoutez `vehicle_reservation` et `vehicle_reservation_refund` à la liste blanche de types de `finance-bridge` (elle vit dans le projet central, hors de ce dépôt). Sans cela le débit est refusé et la réservation s'annule d'elle-même. Une instance autonome n'est pas concernée : elle passe par `adjust_balance()`, que la migration suffit à débloquer
 
 ### Chauffeurs approuvés
 - Publication de trajets avec arrêts intermédiaires
@@ -144,7 +156,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 
 ### LAB — amélioration continue
 - Sous-menu **🧪 LAB** du Babillard : le babillard sert à la vie de l'immeuble, le LAB à celle de l'application
-- **Qualifier les fonctions** : une note de 1 à 5 par fonction (babillard, tableau de bord, espaces, serre, auto-partage, Machine Lunch, billets, transactions, profil, multilingue, usage mobile, et le LAB lui-même) avec un commentaire libre. Moyenne communautaire, répartition des notes et commentaires reçus s'affichent sur chaque carte ; on peut revenir modifier sa note à tout moment. Les fonctions des modules désactivés n'apparaissent pas
+- **Qualifier les fonctions** : une note de 1 à 5 par fonction (babillard, tableau de bord, espaces, serre, mobilité partagée, Machine Lunch, billets, transactions, profil, multilingue, usage mobile, et le LAB lui-même) avec un commentaire libre. Moyenne communautaire, répartition des notes et commentaires reçus s'affichent sur chaque carte ; on peut revenir modifier sa note à tout moment. Les fonctions des modules désactivés n'apparaissent pas
 - **Idées à brainstormer** : proposer une amélioration ou une nouvelle fonction, appuyer les idées des autres (un vote par personne) et en discuter dans un fil. Filtres par statut et par type, tri par appuis ou par date
 - **Suivi par l'admin** : cycle `nouveau → à l'étude → planifié → en cours → livré / écarté`, avec un mot de l'équipe visible par tout le monde sous l'idée
 - **Tout est stocké en base** (tables `lab_*`), pas dans le navigateur : c'est la matière première des prochaines versions
@@ -162,7 +174,32 @@ Dans Supabase → **Authentication → URL Configuration**:
 
 ### Traductions
 
-L'interface est disponible en **français, anglais et espagnol** (sélecteur dans la barre de navigation). Le module serre est entièrement traduit : libellés, stades, noms de cultures, unités, systèmes d'irrigation et fertilisants. Les **valeurs stockées en base restent en français** (`serre_cultures.culture`, `rendement_unite`…) — seul l'affichage est traduit, pour ne pas casser les données existantes ni les clés d'icônes.
+L'interface est disponible en **français, anglais, espagnol et chinois** (sélecteur dans la barre de navigation). Les **conditions d'utilisation** sont traduites dans les quatre langues. Le module serre est entièrement traduit : libellés, stades, noms de cultures, unités, systèmes d'irrigation et fertilisants. Les **valeurs stockées en base restent en français** (`serre_cultures.culture`, `rendement_unite`…) — seul l'affichage est traduit, pour ne pas casser les données existantes ni les clés d'icônes.
+
+### Mesure d'usage (analytics)
+
+`trackFeature(catégorie, action, détails)` écrit dans deux canaux : **Google Analytics 4** (uniquement après consentement explicite, Loi 25) et la table **`usage_logs`** de Supabase, lisible par les seuls administrateurs. `user_type` (`demo` / `resident`), la langue et l'horodatage sont posés par la fonction elle-même — un appelant n'a à fournir que ce qui est propre à son événement.
+
+Une catégorie = un module, en anglais snake_case ; l'action nomme ce qui vient de se passer. Le catalogue complet vit en commentaire au-dessus de `trackFeature()` dans `index.html`, et fait foi :
+
+| Catégorie | Actions |
+|-----------|---------|
+| `platform` | `resident_login`, `demo_login`, `language_select` |
+| `landing` | `landing_view`, `plan_hover`, `contact_click` |
+| `navigation` | `page_view` |
+| `shared_spaces` | `space_reserved` |
+| `shared_mobility` | `vehicle_reserved`, `vehicle_reservation_cancelled`, `trip_published`, `trip_cancelled`, `trip_seat_requested`, `trip_booking_cancelled`, `driver_offer_sent` |
+| `greenhouse` | `zone_rented`, `zone_released`, `harvest_logged`, `culture_saved` |
+| `lunch` | `kiosk_opened`, `queue_joined`, `queue_left` |
+| `bulletin_board` | `post_published`, `post_deleted` |
+| `tickets` | `ticket_created`, `ticket_message_sent`, `ticket_status_changed` |
+| `lab` | `rate_feature`, `submit_idea`, `vote_idea`, `unvote_idea`, `comment_idea`, `set_idea_status`, `idea_deleted`, `switch_tab` |
+| `network` | `network_space_booked` |
+| `federation` | `federated_space_booked` |
+
+La catégorie `covoiturage` a disparu au profit de `shared_mobility` : depuis que le module s'appelle Mobilité partagée, le covoiturage et la réservation de véhicule sont deux façons d'utiliser la même flotte et n'ont pas à se compter séparément. Les lignes déjà écrites dans `usage_logs` gardent l'ancien nom — c'est le prix d'un renommage, à retenir en lisant l'historique.
+
+Deux choses ne sont volontairement pas mesurées, faute d'écran correspondant : **l'annulation d'une réservation d'espace**, qui n'existe pas côté locataire (le remboursement se fait depuis Modulimo Admin), et **l'achat lunch**, qui se déroule dans le kiosque — une autre application, avec son propre suivi. CoHabitat ne voit du lunch que l'ouverture du kiosque et la file d'attente.
 
 ### Mode démo
 - Accès sans compte via bouton "Démo"
@@ -182,6 +219,7 @@ L'interface est disponible en **français, anglais et espagnol** (sélecteur dan
 | `space_reservations` | Réservations d'espaces |
 | `vehicles` | Véhicules |
 | `vehicle_pricing` | Tarification des véhicules |
+| `vehicle_reservations` | Réservation directe d'un véhicule sur un créneau (libre-service) |
 | `trips` | Trajets publiés par chauffeurs |
 | `trip_stops` | Arrêts intermédiaires |
 | `trip_bookings` | Demandes passagers |

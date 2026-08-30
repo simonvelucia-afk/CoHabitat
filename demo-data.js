@@ -121,15 +121,42 @@
 
     // ── Véhicules et trajets ─────────────────────────────────
     vehicles: [
-      { id: 'vh-1', model: 'Kia Niro EV', license_plate: 'ABC 123', seats: 5, is_available: true,
-        cargo_slots: 3, vehicle_pricing: [{ price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00 }] },
-      { id: 'vh-2', model: 'Vélomobile partagé', license_plate: 'VM-02', seats: 1, is_available: true,
-        cargo_slots: 1, vehicle_pricing: [{ price_per_minute: 0.05, price_per_km: 0.10, price_per_cargo_slot: 0.50 }] },
+      { id: 'vh-1', model: 'Kia Niro EV', license_plate: 'ABC 123', seat_count: 5, seats: 5,
+        vehicle_type: 'auto', is_reservable: true, is_available: true, color: 'Blanc',
+        cargo_capacity_m3: 1.2, cargo_slots: 3, notes: 'Recharge au sous-sol, câble dans le coffre.',
+        vehicle_pricing: [{ price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00 }] },
+      { id: 'vh-2', model: 'Vélomobile 1', license_plate: 'VM-01', seat_count: 1, seats: 1,
+        vehicle_type: 'velomobile', is_reservable: true, is_available: true, color: 'Jaune',
+        cargo_capacity_m3: 0.15, cargo_slots: 1, notes: 'Vélomobile caréné. Casque fourni au local à vélos.',
+        vehicle_pricing: [{ price_per_minute: 0.02, price_per_km: 0, price_per_cargo_slot: 0 }] },
+      { id: 'vh-3', model: 'Vélomobile 2', license_plate: 'VM-02', seat_count: 1, seats: 1,
+        vehicle_type: 'velomobile', is_reservable: true, is_available: true, color: 'Bleu',
+        cargo_capacity_m3: 0.15, cargo_slots: 1, notes: 'Vélomobile caréné, coffre arrière un peu plus grand.',
+        vehicle_pricing: [{ price_per_minute: 0.02, price_per_km: 0, price_per_cargo_slot: 0 }] },
+      { id: 'vh-4', model: 'Vélo cargo', license_plate: 'VC-01', seat_count: 1, seats: 1,
+        vehicle_type: 'velo', is_reservable: true, is_available: true, color: 'Vert',
+        cargo_capacity_m3: 0.4, cargo_slots: 2, notes: 'Caisse avant, deux sangles.',
+        vehicle_pricing: [{ price_per_minute: 0.01, price_per_km: 0, price_per_cargo_slot: 0 }] },
     ],
 
     vehicle_pricing: [
       { id: 'vp-1', vehicle_id: 'vh-1', price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00 },
-      { id: 'vp-2', vehicle_id: 'vh-2', price_per_minute: 0.05, price_per_km: 0.10, price_per_cargo_slot: 0.50 },
+      { id: 'vp-2', vehicle_id: 'vh-2', price_per_minute: 0.02, price_per_km: 0, price_per_cargo_slot: 0 },
+      { id: 'vp-3', vehicle_id: 'vh-3', price_per_minute: 0.02, price_per_km: 0, price_per_cargo_slot: 0 },
+      { id: 'vp-4', vehicle_id: 'vh-4', price_per_minute: 0.01, price_per_km: 0, price_per_cargo_slot: 0 },
+    ],
+
+    // Reservations directes : celle du visiteur (a venir) et une prise par
+    // quelqu'un d'autre, pour que la pastille « occupe » ait un cas a
+    // montrer. La RLS ne laisserait pas voir la seconde en vrai — ici elle
+    // ne sert qu'a alimenter vehicle_busy_slots.
+    vehicle_reservations: [
+      { id: 'vr-1', vehicle_id: 'vh-2', tenant_id: MOI, start_time: heures(26), end_time: heures(28),
+        total_minutes: 120, total_cost: 2.40, purpose: 'Aller au marché', status: 'confirmed',
+        created_at: jours(-1), vehicles: { model: 'Vélomobile 1', vehicle_type: 'velomobile', license_plate: 'VM-01' } },
+      { id: 'vr-2', vehicle_id: 'vh-3', tenant_id: 'p-2', start_time: heures(-1), end_time: heures(2),
+        total_minutes: 180, total_cost: 3.60, purpose: null, status: 'confirmed',
+        created_at: jours(-2), vehicles: { model: 'Vélomobile 2', vehicle_type: 'velomobile', license_plate: 'VM-02' } },
     ],
 
     // Les colonnes suivent celles de la table `trips` et de la vue
@@ -452,6 +479,8 @@
       { id: 'ra-4', user_id: MOI, resource_type: 'space', resource_id: 'sp-4' },
       { id: 'ra-5', user_id: MOI, resource_type: 'vehicle', resource_id: 'vh-1' },
       { id: 'ra-6', user_id: MOI, resource_type: 'vehicle', resource_id: 'vh-2' },
+      { id: 'ra-7', user_id: MOI, resource_type: 'vehicle', resource_id: 'vh-3' },
+      { id: 'ra-8', user_id: MOI, resource_type: 'vehicle', resource_id: 'vh-4' },
     ],
 
     // Vues d'administration : vides, la demo est cote locataire.
@@ -464,6 +493,24 @@
   // renvoie null sans erreur : l'appelant traite deja ce cas.
   var RPC = {
     check_space_availability: function () { return true; },
+    check_vehicle_availability: function () { return true; },
+    vehicle_busy_slots: function () {
+      return (DEMO.vehicle_reservations || [])
+        .filter(function (r) { return r.status !== 'cancelled'; })
+        .map(function (r) {
+          return { vehicle_id: r.vehicle_id, debut: r.start_time, fin: r.end_time, source: 'reservation' };
+        })
+        .concat((DEMO.trips || [])
+          .filter(function (t) { return t.status === 'published'; })
+          .map(function (t) {
+            return {
+              vehicle_id: t.vehicle_id,
+              debut: t.departure_time,
+              fin: new Date(new Date(t.departure_time).getTime() + 2 * 3600000).toISOString(),
+              source: 'trajet',
+            };
+          }));
+    },
     count_open_tickets: function () { return 1; },
     serre_occupancy: function () { return [{ zone_id: 'sz-1', occupee: true }]; },
     insert_usage_log: function () { return null; },
