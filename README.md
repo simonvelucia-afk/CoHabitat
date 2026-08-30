@@ -174,7 +174,32 @@ L'ancien module « Auto-partage » devient **Mobilité partagée** — *MaaS, Mo
 
 ### Traductions
 
-L'interface est disponible en **français, anglais et espagnol** (sélecteur dans la barre de navigation). Le module serre est entièrement traduit : libellés, stades, noms de cultures, unités, systèmes d'irrigation et fertilisants. Les **valeurs stockées en base restent en français** (`serre_cultures.culture`, `rendement_unite`…) — seul l'affichage est traduit, pour ne pas casser les données existantes ni les clés d'icônes.
+L'interface est disponible en **français, anglais, espagnol et chinois** (sélecteur dans la barre de navigation). Les **conditions d'utilisation** sont traduites dans les quatre langues. Le module serre est entièrement traduit : libellés, stades, noms de cultures, unités, systèmes d'irrigation et fertilisants. Les **valeurs stockées en base restent en français** (`serre_cultures.culture`, `rendement_unite`…) — seul l'affichage est traduit, pour ne pas casser les données existantes ni les clés d'icônes.
+
+### Mesure d'usage (analytics)
+
+`trackFeature(catégorie, action, détails)` écrit dans deux canaux : **Google Analytics 4** (uniquement après consentement explicite, Loi 25) et la table **`usage_logs`** de Supabase, lisible par les seuls administrateurs. `user_type` (`demo` / `resident`), la langue et l'horodatage sont posés par la fonction elle-même — un appelant n'a à fournir que ce qui est propre à son événement.
+
+Une catégorie = un module, en anglais snake_case ; l'action nomme ce qui vient de se passer. Le catalogue complet vit en commentaire au-dessus de `trackFeature()` dans `index.html`, et fait foi :
+
+| Catégorie | Actions |
+|-----------|---------|
+| `platform` | `resident_login`, `demo_login`, `language_select` |
+| `landing` | `landing_view`, `plan_hover`, `contact_click` |
+| `navigation` | `page_view` |
+| `shared_spaces` | `space_reserved` |
+| `shared_mobility` | `vehicle_reserved`, `vehicle_reservation_cancelled`, `trip_published`, `trip_cancelled`, `trip_seat_requested`, `trip_booking_cancelled`, `driver_offer_sent` |
+| `greenhouse` | `zone_rented`, `zone_released`, `harvest_logged`, `culture_saved` |
+| `lunch` | `kiosk_opened`, `queue_joined`, `queue_left` |
+| `bulletin_board` | `post_published`, `post_deleted` |
+| `tickets` | `ticket_created`, `ticket_message_sent`, `ticket_status_changed` |
+| `lab` | `rate_feature`, `submit_idea`, `vote_idea`, `unvote_idea`, `comment_idea`, `set_idea_status`, `idea_deleted`, `switch_tab` |
+| `network` | `network_space_booked` |
+| `federation` | `federated_space_booked` |
+
+La catégorie `covoiturage` a disparu au profit de `shared_mobility` : depuis que le module s'appelle Mobilité partagée, le covoiturage et la réservation de véhicule sont deux façons d'utiliser la même flotte et n'ont pas à se compter séparément. Les lignes déjà écrites dans `usage_logs` gardent l'ancien nom — c'est le prix d'un renommage, à retenir en lisant l'historique.
+
+Deux choses ne sont volontairement pas mesurées, faute d'écran correspondant : **l'annulation d'une réservation d'espace**, qui n'existe pas côté locataire (le remboursement se fait depuis Modulimo Admin), et **l'achat lunch**, qui se déroule dans le kiosque — une autre application, avec son propre suivi. CoHabitat ne voit du lunch que l'ouverture du kiosque et la file d'attente.
 
 ### Mode démo
 - Accès sans compte via bouton "Démo"

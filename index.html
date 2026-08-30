@@ -72,7 +72,43 @@ function _loadGA() {
 
 if (window._gaConsent === 'granted') { _loadGA(); }
 
+// Catalogue des evenements. Une categorie = un module de l'application,
+// en anglais snake_case (la moitie l'etait deja, et ce sont des cles de
+// requete, pas du texte affiche). L'action nomme ce qui vient de se
+// passer, au participe passe.
+//
+//   platform         resident_login, demo_login, language_select
+//   landing          landing_view, plan_hover, contact_click
+//   navigation       page_view
+//   shared_spaces    space_reserved
+//   shared_mobility  vehicle_reserved, vehicle_reservation_cancelled,
+//                    trip_published, trip_cancelled, trip_seat_requested,
+//                    trip_booking_cancelled, driver_offer_sent
+//   greenhouse       zone_rented, zone_released, harvest_logged, culture_saved
+//   lunch            kiosk_opened, queue_joined, queue_left
+//   bulletin_board   post_published, post_deleted
+//   tickets          ticket_created, ticket_message_sent, ticket_status_changed
+//   lab              rate_feature, submit_idea, vote_idea, unvote_idea,
+//                    comment_idea, set_idea_status, idea_deleted, switch_tab
+//   network          network_space_booked
+//   federation       federated_space_booked
+//
+// Ce que rien n'emet, faute d'ecran correspondant : l'annulation d'une
+// reservation d'espace, qui n'existe pas cote locataire (le remboursement
+// se fait depuis Modulimo Admin), et l'achat lunch, qui se passe dans le
+// kiosque — une autre application, avec son propre suivi. CoHabitat ne
+// voit du lunch que l'ouverture du kiosque et la file d'attente.
+//
+// « covoiturage » a disparu au profit de shared_mobility : depuis que le
+// module s'appelle Mobilite partagee, le covoiturage et la reservation de
+// vehicule sont deux facons d'utiliser la meme flotte, ils n'ont pas a se
+// compter separement. Les lignes deja ecrites gardent l'ancien nom, c'est
+// le prix d'un renommage — il vaut mieux que deux categories qui parlent
+// de la meme chose dans deux langues.
 function trackFeature(category, action, details = {}) {
+  // Pose ici plutot que repete a chaque appel : la nature du visiteur
+  // qualifie tous les evenements, pas seulement ceux ou l'on y pensait.
+  const type = typeof isDemo !== 'undefined' && isDemo ? 'demo' : 'resident';
   // GA4 — seulement si consentement accordé
   if (window._gaConsent === 'granted' && typeof gtag === 'function') {
     gtag('event', action, {
@@ -80,6 +116,7 @@ function trackFeature(category, action, details = {}) {
       page_path: window.location.pathname,
       page_title: document.title,
       timestamp: Date.now(),
+      user_type: type,
       ...details
     });
   }
@@ -7955,6 +7992,7 @@ async function lunchQueueJoin(machineId, event) {
       event.preventDefault();
       event.stopPropagation();
     }
+    trackFeature('lunch', 'queue_joined', { machine_id: machineId, queue_status: status });
     // Rafraîchir la carte immédiatement
     const card = document.getElementById('lunch-card-' + machineId);
     const mObj = _lunchMachines.find(function(x){ return x.id === machineId; }) || { id: machineId, name: machineId };
@@ -7983,6 +8021,7 @@ async function lunchQueueLeave(machineId) {
         }
       }
     }
+    trackFeature('lunch', 'queue_left', { machine_id: machineId });
     // Rafraîchir
     const card = document.getElementById('lunch-card-' + machineId);
     const mObj = _lunchMachines.find(function(x){ return x.id === machineId; }) || { id: machineId, name: machineId };
@@ -8123,6 +8162,7 @@ async function openKiosk(machineId, _ignoredPreOpenedTab) {
 
   // Maintenant que la row est en DB, on ouvre le popup. Le kiosque trouve
   // immediatement sa session des le 1er retry.
+  trackFeature('lunch', 'kiosk_opened', { machine_id: machineId });
   const opened = window.open(url, '_blank');
   if (!opened) {
     console.warn('[openKiosk] popup bloque par le navigateur — supprime la row orpheline');
@@ -9548,6 +9588,7 @@ async function serreAddRecolte(zoneId, cultureId, section) {
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }
   wrap.querySelector('[data-f="rqty2"]').value = '';
   serreFlash('Cueillette notée ✓');
+  trackFeature('greenhouse', 'harvest_logged', { qty: Number(qtyRaw), unit: unite || null, section });
   await serreRefreshCumul();
   serreLoadRecoltes(cultureId, wrap.querySelector('.serre-rec-list'));
 }
@@ -9593,6 +9634,9 @@ async function serreSaveCulture(sectionEl, card) {
   const badge = sectionEl.querySelector('.serre-badge');
   if (badge) badge.outerHTML = serreStatutBadge(payload.statut);
   serreFlash('Enregistré ✓');
+  trackFeature('greenhouse', 'culture_saved', {
+    culture: payload.culture, stage: payload.statut, section, is_new: !cultureId
+  });
 }
 
 async function serreSaveIrrigation(sectionEl, card) {
@@ -9728,6 +9772,7 @@ async function serreRentZone(zoneId, code, frais, dateFinPrevue) {
   const nb = document.getElementById('nav-balance');
   if (nb) nb.textContent = `${(currentProfile.virtual_balance || 0).toFixed(2)} $ CAD`;
   if (typeof buildNav === 'function') buildNav();
+  trackFeature('greenhouse', 'zone_rented', { zone_code: code, monthly_fee: fee, open_ended: !dateFinPrevue });
   await loadSerre();
   serreOpenZone(zoneId);
 }
@@ -9738,6 +9783,7 @@ async function serreReleaseZone(locId, code) {
   const { error } = await sb.from('serre_locations').update({ statut: 'terminee', date_fin: todayIso }).eq('id', locId);
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }
   toast('Zone libérée', 'success');
+  trackFeature('greenhouse', 'zone_released', { zone_code: code });
   await loadSerre();
   closeModal('modal-serre-zone');
 }
@@ -10140,7 +10186,7 @@ async function confirmBookSpace() {
   document.getElementById('nav-balance').textContent = `${currentProfile.virtual_balance.toFixed(2)}`;
 
   toast('Réservation confirmée !', 'success');
-  trackFeature('shared_spaces', 'space_reserved', { space_name: space?.name || '', cost: cost, slots: slots, user_type: isDemo ? 'demo' : 'resident' });
+  trackFeature('shared_spaces', 'space_reserved', { space_name: space?.name || '', cost, slots });
   closeModal('modal-book-space');
   await logRequest(currentBookingSpaceId, 'space', 'book', { reservation_id: res.id });
 }
@@ -10249,6 +10295,24 @@ function loadConditions() {
         { icon: "🍱", title: "Máquina Lunch", body: "El servicio Máquina Lunch permite a los residentes pedir comidas a través del quiosco interactivo. Los pedidos confirmados se debitan inmediatamente del saldo virtual. No se otorga reembolso por un pedido ya preparado o distribuido. Los horarios de servicio se muestran en el quiosco. En caso de avería o indisponibilidad, no se aplicará ninguna penalización y los créditos serán reembolsados automáticamente." },
         { icon: "🔄", title: "Modificaciones", body: "Modulimo se reserva el derecho de modificar estos términos en cualquier momento. Los residentes serán notificados a través del tablón de anuncios de la plataforma. El uso continuado de los servicios después de la modificación constituye la aceptación de los nuevos términos." },
         { icon: "📞", title: "Contacto", body: "Para cualquier pregunta sobre estos términos o servicios, comuníquese con la administración a través del tablón de anuncios de la plataforma o en contribution@modulimo.com." }
+      ]
+    },
+    zh: {
+      title: "使用条款 — Modulimo CoHabitat",
+      subtitle: "社区资源管理平台",
+      updated: "自 2026 年 4 月 1 日起生效",
+      sections: [
+        { icon: "📋", title: "总则", body: "本条款约束 Modulimo 社区居民通过 CoHabitat 平台使用的全部数字服务。使用其中任何一项服务，即表示您完整接受本条款。本条款适用于所有在住居民及其获授权的受抚养人。" },
+        { icon: "👤", title: "资格与访问权限", body: "服务仅面向 Modulimo 的在住居民及其获授权的受抚养人。新居民须经管理员批准，账户方可激活并获得平台访问权限。使用预约功能的前提是楼宇管理员为您开通居民套餐（本地套餐或网络套餐）：本地套餐可使用本楼资源，网络套餐则扩展至 Modulimo 网络中各楼宇的共享资源。管理员可随时暂停或撤销居民的平台访问权限，无需事先通知。公共空间与车辆的访问权限按资源逐项授予 — 管理员可限制某一项资源而不影响其他资源。每位居民可随时在个人资料中暂停其受抚养人对公共资源的使用。账户被暂停、虚拟余额不足或租金逾期的居民，其服务访问权限可被暂停，直至情况恢复正常。对于违反本条款的居民，Modulimo 保留暂停或撤销其访问权限的权利。" },
+        { icon: "🪪", title: "驾驶员审批", body: "希望担任驾驶员的居民须获得管理方批准。在审批过程中，Modulimo 保留对申请人进行背景核查的权利，包括犯罪记录核查，并在适用情况下调取驾驶记录摘要。申请人将被事先告知，并须提供书面同意。拒绝同意将导致资格申请被自动驳回。" },
+        { icon: "💳", title: "虚拟余额与计费", body: "每位居民拥有一个由管理方管理的 CoHabitat 虚拟积分余额。使用服务时将自动扣款。积分不可兑换为现金。余额不足时，付费服务的访问权限可能受限，直至账户充值。" },
+        { icon: "⚠️", title: "责任与处理", body: "每位居民对自己的行为负责，并承诺尊重社区其他成员。Modulimo 作为技术服务提供方，对居民之间发生的事件不承担责任；对因其无法控制的原因导致系统故障而产生的任何损失、服务中断或损害，亦不承担责任，包括但不限于基础设施故障、第三方供应商故障、网络攻击、自然灾害或任何不可预见的情况。任何滥用社区资源、不遵守本规则或被管理方认定为不当的行为，均可能导致平台访问权限被临时暂停或永久取消，且不退还已投入的余额。" },
+        { icon: "🔒", title: "隐私与删除权", body: "所收集的个人信息（姓名、单元、电话、电子邮件）仅用于社区服务的协调，不会转交第三方。根据魁北克第 25 号法律，您可直接在个人资料中申请删除个人数据。申请提交后，管理员将对您的账户进行匿名化处理 — 您的个人信息将被清除并替换为通用数据，而交易记录将以匿名形式保留以供记账之用。在演示模式下，所显示的全部数据均为虚构。" },
+        { icon: "🚗", title: "共享出行（MaaS）", body: "共享出行将楼内车辆、卧式车与居民之间的拼车合为一项服务。按小时预约的车辆按使用时长扣费；居民承诺按约定时间归还车辆，保持清洁与良好状态，且在时段开始前不足两小时的取消仍照常计费。关于拼车：驾驶员承诺完成所公布的行程，在约定地点接载已接受的乘客，并将社区车辆以取用时的清洁状态归还。费用依据车辆使用时长及每位乘客的实际里程计算。驾驶员因其提供的服务享有折扣。乘客承诺按约定时间到达上车地点。任何未告知的迟到均可能导致取消且不予退款。" },
+        { icon: "🏠", title: "公共空间", body: "公共空间按平台所示的可用情况开放预约。预约一经确认，居民即承诺按预定时间使用该空间、遵守最大容纳人数，并在离开时保持场地整洁完好。取消须在预约开始前至少 2 小时提出，方可全额退回所扣积分。" },
+        { icon: "🍱", title: "午餐机", body: "午餐机服务允许居民通过交互式取餐终端订餐。确认的订单将立即从虚拟余额中扣除。已备好或已发放的订单不予退款。服务时间显示在终端上。如遇故障或不可用，不收取任何罚金，积分将自动退回。" },
+        { icon: "🔄", title: "条款的修改", body: "Modulimo 保留随时修改本条款的权利。居民将通过平台公告板获得通知。修改后继续使用服务即视为接受新条款。" },
+        { icon: "📞", title: "联系方式", body: "如对本条款或服务有任何疑问，请通过平台公告板或发送邮件至 contribution@modulimo.com 与管理方联系。" }
       ]
     }
   };
@@ -11091,7 +11155,7 @@ async function submitTripBooking() {
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
   await logRequest(currentBookingTripId, 'trip', 'request', { booking_id: data.id });
   toast('Demande envoyée ! Le chauffeur doit l\'accepter.', 'success');
-  trackFeature('covoiturage', 'booking_request', { seats: seats, cargo: cargo, user_type: isDemo ? 'demo' : 'resident' });
+  trackFeature('shared_mobility', 'trip_seat_requested', { seats, cargo });
   closeModal('modal-book-trip');
 }
 
@@ -11102,6 +11166,7 @@ async function cancelBooking(bookingId) {
     .eq('id', bookingId);
   if (error) { toast('Erreur annulation', 'error'); return; }
   toast('Réservation annulée', 'success');
+  trackFeature('shared_mobility', 'trip_booking_cancelled', {});
   loadTrips();
 }
 
@@ -11112,6 +11177,7 @@ async function cancelTrip(tripId) {
     .eq('id', tripId);
   if (error) { toast('Erreur annulation', 'error'); return; }
   toast('Trajet annulé', 'success');
+  trackFeature('shared_mobility', 'trip_cancelled', {});
   loadTrips();
 }
 
@@ -11800,6 +11866,7 @@ async function submitCreateTrip() {
   }
 
   toast(dates.length > 1 ? `${dates.length} trajets publiés !` : 'Trajet publié !', 'success');
+  trackFeature('shared_mobility', 'trip_published', { count: dates.length, seats, recurring: dates.length > 1 });
   closeModal('modal-create-trip');
   loadTrips();
 }
@@ -11962,7 +12029,7 @@ async function submitDriverOffer() {
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
 
   toast('Proposition envoyée au passager !', 'success');
-  trackFeature('covoiturage', 'driver_offer', { vehicle_id: vehicleId, user_type: isDemo ? 'demo' : 'resident' });
+  trackFeature('shared_mobility', 'driver_offer_sent', { vehicle_id: vehicleId });
   closeModal('modal-driver-offer');
 }
 
@@ -16016,6 +16083,7 @@ async function bbPostMessage() {
   if (error) { toast(pt('bbErrPost') + error.message, 'error'); return; }
   ta.value = '';
   toast(pt('bbPosted'), 'success');
+  trackFeature('bulletin_board', 'post_published', { length: content.length });
   loadBabillard();
 }
 
@@ -16023,6 +16091,7 @@ async function bbDeletePost(id) {
   if (!confirm(pt('bbConfirmDelete'))) return;
   const { error } = await sb.from('bulletin_board').delete().eq('id', id);
   if (error) { toast(pt('bbErrDelete') + error.message, 'error'); return; }
+  trackFeature('bulletin_board', 'post_deleted', {});
   document.getElementById(`bb-post-${id}`)?.remove();
   const feed = document.getElementById('bb-feed');
   if (feed && !feed.querySelector('.bb-post')) {
@@ -16474,6 +16543,7 @@ async function labDeleteIdee(id) {
   if (!confirm(pt('labConfirmDeleteIdee'))) return;
   const { error } = await sb.from('lab_idees').delete().eq('id', id);
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  trackFeature('lab', 'idea_deleted', {});
   await loadLab();
 }
 
@@ -16686,6 +16756,7 @@ async function tkSubmitCreate() {
   if (error) { toast(pt('tkErrCreate') + error.message, 'error'); return; }
   closeModal('modal-ticket-create');
   toast(pt('tkCreated'), 'success');
+  trackFeature('tickets', 'ticket_created', { ticket_category: category, priority });
   await loadTickets();
   if (data?.id) tkOpenDetail(data.id, false);
 }
@@ -16787,6 +16858,7 @@ async function tkSubmitReply() {
   if (error) { toast(pt('tkErrReply') + error.message, 'error'); return; }
   document.getElementById('tk-detail-reply').value = '';
   toast(pt('tkReplied'), 'success');
+  trackFeature('tickets', 'ticket_message_sent', { by_staff: isStaff, internal: isInternal });
   // Recharge le fil (sans tout refermer)
   await tkOpenDetail(_tkOpenId, _tkOpenIsAdmin);
   // Refresh listes en arriere-plan
@@ -16802,6 +16874,7 @@ async function tkChangeStatus() {
   const { error } = await sb.from('tickets').update(patch).eq('id', _tkOpenId);
   if (error) { toast(pt('tkErrStatus') + error.message, 'error'); return; }
   toast(pt('tkStatusChanged'), 'success');
+  trackFeature('tickets', 'ticket_status_changed', { ticket_status: newStatus, by: 'staff' });
   // Mettre a jour les caches
   [_tkCache, _tkAdminCache].forEach(arr => {
     const t = arr.find(x => x.id === _tkOpenId);
@@ -16818,6 +16891,7 @@ async function tkCloseAsOwner() {
   const { error } = await sb.from('tickets').update({ status: 'closed' }).eq('id', _tkOpenId);
   if (error) { toast(pt('tkErrStatus') + error.message, 'error'); return; }
   toast(pt('tkClosed'), 'success');
+  trackFeature('tickets', 'ticket_status_changed', { ticket_status: 'closed', by: 'owner' });
   closeModal('modal-ticket-detail');
   loadTickets();
 }
