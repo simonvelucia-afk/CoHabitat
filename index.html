@@ -1281,7 +1281,8 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .lab-tab:hover { color: var(--text); }
 .lab-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-.lab-intro {
+.lab-intro,
+.mob-intro {
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
@@ -1539,7 +1540,8 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .lab-fil-auteur { color: var(--accent); font-weight: 600; }
 .lab-fil-form { display: flex; gap: 8px; align-items: flex-start; }
 .lab-fil-form textarea { flex: 1; resize: vertical; min-height: 40px; font-size: 0.85rem; }
-.lab-empty {
+.lab-empty,
+.mob-empty {
   text-align: center;
   padding: 60px 20px;
   color: var(--text3);
@@ -1548,6 +1550,98 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 @media (max-width: 600px) {
   .lab-grid { grid-template-columns: 1fr; }
   .lab-idee { gap: 10px; padding: 14px; }
+}
+
+/* ===== MOBILITE PARTAGEE — flotte reservable ===== */
+/* Les cartes reprennent .card (grille des espaces communs) : reserver un
+   velomobile et reserver une salle sont le meme geste, ils doivent se
+   presenter pareil. Ce qui suit ne fait qu'ajouter ce que la flotte a en
+   propre — le regroupement par mode et la pastille de disponibilite. */
+.mob-groupe-titre {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0 2px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text2);
+}
+.mob-groupe-titre::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.mob-groupe-titre:first-child { margin-top: 0; }
+.mob-dispo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text2);
+  margin-top: 8px;
+}
+.mob-pastille {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.mob-pastille.libre   { background: var(--accent2); }
+.mob-pastille.occupee { background: var(--accent3); }
+.mob-notes {
+  font-size: 0.8rem;
+  color: var(--text3);
+  line-height: 1.5;
+  margin-top: 6px;
+}
+/* Creneaux pris, dans la fenetre de reservation : une liste courte, lisible
+   d'un coup d'oeil, pour choisir une heure libre sans tatonner. */
+.mob-busy {
+  margin-top: 4px;
+  max-height: 132px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.mob-busy-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: var(--text2);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+}
+.mob-busy-item span:last-child { color: var(--text3); white-space: nowrap; }
+.mob-busy-vide { font-size: 0.8rem; color: var(--text3); }
+/* Mes reservations a venir : une ligne par creneau, l'annulation au bout. */
+.mob-resv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+.mob-resv-quoi { font-weight: 600; font-size: 0.92rem; color: var(--text); }
+.mob-resv-quand { font-size: 0.82rem; color: var(--text2); margin-top: 3px; }
+.mob-resv-cout { font-size: 0.82rem; color: var(--accent); white-space: nowrap; }
+.mob-section-titre {
+  font-size: 1rem;
+  color: var(--text);
+  margin: 30px 0 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
 }
 
 /* ===== BILLETS (TICKETS) ===== */
@@ -1804,7 +1898,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
   <div class="landing-features">
     <div class="feat-item"><div class="feat-icon">🔒</div><div class="feat-title">Sécurité et confidentialité</div><div class="feat-desc">Données isolées par bâtiment, conformité Loi 25, suppression sur demande.</div></div>
     <div class="feat-item"><div class="feat-icon">🏠</div><div class="feat-title">Espaces communs</div><div class="feat-desc">Réservations en ligne, tarification au créneau de 15 minutes, historique complet.</div></div>
-    <div class="feat-item"><div class="feat-icon">🚗</div><div class="feat-title">Auto-partage</div><div class="feat-desc">Covoiturage entre résidents, calcul automatique des coûts, gestion des trajets.</div></div>
+    <div class="feat-item"><div class="feat-icon">🚗</div><div class="feat-title">Mobilité partagée</div><div class="feat-desc">Véhicules et vélomobiles réservables à l'heure, covoiturage entre résidents, coûts calculés automatiquement.</div></div>
     <div class="feat-item"><div class="feat-icon">🍱</div><div class="feat-title">Machine Lunch</div><div class="feat-desc">Kiosque de commande de repas avec interface tactile et gestion des cases réfrigérées.</div></div>
     <div class="feat-item"><div class="feat-icon">👨‍👩‍👧</div><div class="feat-title">Gestion des dépendants</div><div class="feat-desc">Accès individualisé par ressource pour chaque membre du foyer.</div></div>
     <div class="feat-item"><div class="feat-icon">📊</div><div class="feat-title">Statistiques</div><div class="feat-desc">Rapport d'utilisation et export CSV pour les administrateurs.</div></div>
@@ -2066,19 +2160,20 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
     <div id="page-trips" class="page">
       <div class="section-header">
         <div class="section-title">
-          <h2 data-pt="Auto-partage & Véhicules">Auto-partage & Véhicules</h2>
-          <p data-pt="Véhicules disponibles et réservation de trajets">Véhicules disponibles et réservation de trajets</p>
+          <h2 data-pt="mobTitle">🚗 Mobilité partagée</h2>
+          <p data-pt="mobSubtitle">MaaS — Mobility as a Service : véhicules, vélomobiles et covoiturage réunis dans une seule offre</p>
         </div>
         <button class="btn btn-primary btn-sm" id="btn-create-trip" style="display:none" onclick="openCreateTrip()" data-pt="+ Publier un trajet">
           + Publier un trajet
         </button>
       </div>
       <div class="admin-tabs">
-        <button class="admin-tab active" onclick="switchTripsTab('available')" data-pt="Trajets disponibles">Trajets disponibles</button>
-        <button class="admin-tab" id="requests-tab" onclick="switchTripsTab('requests')" data-pt="Demandes passagers">Demandes passagers</button>
-        <button class="admin-tab" onclick="switchTripsTab('mine')" data-pt="Mes trajets">Mes trajets</button>
-        <button class="admin-tab" id="driver-tab" style="display:none" onclick="switchTripsTab('driving')" data-pt="En tant que chauffeur">En tant que chauffeur</button>
-        <button class="admin-tab" id="history-tab" style="display:none" onclick="switchTripsTab('history')" data-pt="Historique">🕐 Historique</button>
+        <button class="admin-tab active" data-tab="fleet" onclick="switchTripsTab('fleet')" data-pt="mobTabFleet">🚲 Réserver un véhicule</button>
+        <button class="admin-tab" data-tab="available" onclick="switchTripsTab('available')" data-pt="Trajets disponibles">Trajets disponibles</button>
+        <button class="admin-tab" data-tab="requests" id="requests-tab" onclick="switchTripsTab('requests')" data-pt="Demandes passagers">Demandes passagers</button>
+        <button class="admin-tab" data-tab="mine" onclick="switchTripsTab('mine')" data-pt="Mes trajets">Mes trajets</button>
+        <button class="admin-tab" data-tab="driving" id="driver-tab" style="display:none" onclick="switchTripsTab('driving')" data-pt="En tant que chauffeur">En tant que chauffeur</button>
+        <button class="admin-tab" data-tab="history" id="history-tab" style="display:none" onclick="switchTripsTab('history')" data-pt="Historique">🕐 Historique</button>
       </div>
 
       <!-- Formule de tarification accordion -->
@@ -2544,7 +2639,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
             <input type="checkbox" id="dep-allow-spaces" style="width:auto;margin:0;"> Réservation d'espaces
           </label>
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:0.9rem;">
-            <input type="checkbox" id="dep-allow-trips" style="width:auto;margin:0;"> Auto-partage
+            <input type="checkbox" id="dep-allow-trips" style="width:auto;margin:0;"> 🚗 Mobilité partagée
           </label>
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;font-size:0.9rem;">
             <input type="checkbox" id="dep-allow-lunch" style="width:auto;margin:0;"> 🍱 Machine Lunch
@@ -2800,6 +2895,43 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-book-space')">Annuler</button>
       <button class="btn btn-primary" onclick="confirmBookSpace()">Confirmer la réservation</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reserver un vehicule (mobilite partagee) -->
+<div class="modal-overlay" id="modal-book-vehicle">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="mob-book-title">Réserver un véhicule</h3>
+      <button class="modal-close" onclick="closeModal('modal-book-vehicle')">×</button>
+    </div>
+    <div class="form-group">
+      <label data-pt="mobDate">Date</label>
+      <input type="date" id="mob-date">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label data-pt="mobStart">Heure de début</label>
+        <input type="time" id="mob-start" step="900">
+      </div>
+      <div class="form-group">
+        <label data-pt="mobEnd">Heure de fin</label>
+        <input type="time" id="mob-end" step="900">
+      </div>
+    </div>
+    <div class="form-group">
+      <label data-pt="mobPurpose">Motif (facultatif)</label>
+      <input type="text" id="mob-purpose" maxlength="300" placeholder="Courses, rendez-vous, sortie…" autocomplete="off">
+    </div>
+    <div class="info-box" id="mob-cost-preview"></div>
+    <div class="form-group" style="margin-top:12px">
+      <label data-pt="mobBusy">Créneaux déjà pris</label>
+      <div class="mob-busy" id="mob-busy-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-book-vehicle')" data-pt="Annuler">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmBookVehicle()" data-pt="mobConfirm">Confirmer la réservation</button>
     </div>
   </div>
 </div>
@@ -3128,12 +3260,27 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
     </div>
     <div class="form-row">
       <div class="form-group">
+        <label>Type</label>
+        <select id="veh-type">
+          <option value="auto">🚗 Automobile</option>
+          <option value="velomobile">🚲 Vélomobile</option>
+          <option value="velo">🚴 Vélo</option>
+          <option value="autre">🛴 Autre</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Nombre de places</label>
         <input type="number" id="veh-seats" placeholder="5" min="1" value="5">
       </div>
+    </div>
+    <div class="form-row">
       <div class="form-group">
         <label>Espace cargo (m³)</label>
         <input type="number" id="veh-cargo" placeholder="0" min="0" step="0.1" value="0">
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" id="veh-notes" placeholder="Consignes d'usage, particularités…">
       </div>
     </div>
     <div class="form-row">
@@ -3165,6 +3312,13 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
       <label>Réduction chauffeur (%)</label>
       <input type="number" id="veh-driver-reduction" placeholder="25" min="0" max="100" step="1" value="25">
       <small style="color:var(--text3)">Le chauffeur obtient cette réduction sur sa part du coût en reconnaissance du service rendu.</small>
+    </div>
+    <div class="form-group">
+      <label>
+        <input type="checkbox" id="veh-reservable" style="width:auto;margin-right:6px" checked>
+        Réservable à l'heure (libre-service)
+      </label>
+      <small style="color:var(--text3)">Décoché, le véhicule reste dans la flotte mais n'est accessible que par un trajet publié.</small>
     </div>
     <div class="form-group">
       <label>
@@ -4729,7 +4883,7 @@ async function loadAppModules() {
   if (isDemo) {
     // En demonstration, les modules viennent du jeu local : c'est ce que
     // pilote le panneau de configuration, et cela permet de montrer un
-    // immeuble sans serre ou sans auto-partage selon l'interlocuteur.
+    // immeuble sans serre ou sans mobilite partagee selon l'interlocuteur.
     const { data: reglages } = await sb.from('system_settings')
       .select('key, value')
       .in('key', ['module_trips', 'module_lunch', 'module_serre',
@@ -5160,8 +5314,54 @@ const PT = {
     'Aucun espace disponible': 'Aucun espace disponible',
     'Chargement…': 'Chargement…',
     // Trips
-    'Auto-partage & Véhicules': 'Auto-partage & Véhicules',
-    'Véhicules disponibles et réservation de trajets': 'Véhicules disponibles et réservation de trajets',
+    'mobTitle': '🚗 Mobilité partagée',
+    'mobSubtitle': 'MaaS — Mobility as a Service : véhicules, vélomobiles et covoiturage réunis dans une seule offre',
+    'mobTabFleet': '🚲 Réserver un véhicule',
+    'mobFleetIntro': 'Réservez un véhicule du bâtiment pour la durée qui vous convient. Le coût est calculé au temps d\'utilisation et débité de votre solde. Un véhicule engagé sur un covoiturage n\'apparaît pas libre sur ce créneau.',
+    'mobTypeAuto': 'Automobile',
+    'mobTypeVelomobile': 'Vélomobile',
+    'mobTypeVelo': 'Vélo',
+    'mobTypeAutre': 'Autre',
+    'mobSeatsShort': 'place(s)',
+    'mobPerMin': '/ min',
+    'mobFleetEmpty': 'Aucun véhicule réservable pour le moment.',
+    'mobNotReservable': 'Covoiturage seulement',
+    'mobRestricted': '🔒 Véhicule restreint',
+    'mobBookTitle': 'Réserver',
+    'mobDate': 'Date',
+    'mobStart': 'Heure de début',
+    'mobEnd': 'Heure de fin',
+    'mobPurpose': 'Motif (facultatif)',
+    'mobPurposePlaceholder': 'Courses, rendez-vous, sortie…',
+    'mobConfirm': 'Confirmer la réservation',
+    'mobBusy': 'Créneaux déjà pris',
+    'mobBusyNone': 'Aucun créneau pris dans les 14 prochains jours.',
+    'mobBusyTrip': 'covoiturage',
+    'mobBusyResv': 'réservation',
+    'mobMyResv': 'Mes réservations de véhicule',
+    'mobNoResv': 'Vous n\'avez aucune réservation de véhicule à venir.',
+    'mobErrFields': 'Veuillez remplir la date et les heures.',
+    'mobErrOrder': 'L\'heure de fin doit être après le début.',
+    'mobErrPast': 'Ce créneau est déjà passé.',
+    'mobErrTooLong': 'Une réservation ne peut pas dépasser 7 jours.',
+    'mobErrFunds': 'Solde insuffisant pour cette réservation.',
+    'mobErrTaken': 'Ce véhicule n\'est pas libre sur ce créneau.',
+    'mobBooked': 'Véhicule réservé !',
+    'mobConfirmCancel': 'Annuler cette réservation ?',
+    'mobConfirmCancelLate': 'Le créneau commence dans moins de 2 heures : l\'annulation ne sera pas remboursée. Continuer ?',
+    'mobCancelled': 'Réservation annulée.',
+    'mobRefunded': 'Réservation annulée — crédits remboursés.',
+    'mobDemoUnavail': 'Réservation indisponible en mode démo.',
+    'mobUntil': 'jusqu’à',
+    'mobFree': 'Libre',
+    'mobDurationLabel': 'Durée',
+    'mobCostLabel': 'Coût total',
+    'mobHoursShort': 'h',
+    'mobMinShort': 'min',
+    'mobVehicle': 'Véhicule',
+    'mobDemoBtn': 'Mode démo',
+    'mobStat': 'Véhicules réservés',
+    'mobMigration': "Réservation indisponible : la table <code>vehicle_reservations</code> n'existe pas encore. Appliquez la migration <code>sql/031_mobilite_partagee.sql</code> sur Supabase.",
     '+ Publier un trajet': '+ Publier un trajet',
     'Trajets disponibles': 'Trajets disponibles',
     'Demandes passagers': 'Demandes passagers',
@@ -5272,8 +5472,8 @@ const PT = {
     'labFnD_spaces': 'Réservation des salles et équipements par tranches de 15 min.',
     'labFn_serre': 'Serre communautaire',
     'labFnD_serre': 'Plan de la serre, zones, cultures, cueillettes et conditions.',
-    'labFn_trips': 'Auto-partage',
-    'labFnD_trips': 'Trajets, demandes de passagers et cargo.',
+    'labFn_trips': 'Mobilité partagée',
+    'labFnD_trips': 'Réservation de véhicules et de vélomobiles, covoiturage, cargo.',
     'labFn_lunch': 'Machine Lunch',
     'labFnD_lunch': 'Cases réfrigérées, file d\'attente et retraits.',
     'labFn_tickets': 'Billets',
@@ -5370,8 +5570,54 @@ const PT = {
     'Réserver': 'Book',
     'Aucun espace disponible': 'No spaces available',
     'Chargement…': 'Loading…',
-    'Auto-partage & Véhicules': 'Carpooling & Vehicles',
-    'Véhicules disponibles et réservation de trajets': 'Available vehicles and trip booking',
+    'mobTitle': '🚗 Shared mobility',
+    'mobSubtitle': 'MaaS — Mobility as a Service: vehicles, velomobiles and carpooling in a single offer',
+    'mobTabFleet': '🚲 Book a vehicle',
+    'mobFleetIntro': 'Book one of the building\'s vehicles for as long as you need. The cost is based on usage time and charged to your balance. A vehicle committed to a carpool trip does not show as free for that slot.',
+    'mobTypeAuto': 'Car',
+    'mobTypeVelomobile': 'Velomobile',
+    'mobTypeVelo': 'Bicycle',
+    'mobTypeAutre': 'Other',
+    'mobSeatsShort': 'seat(s)',
+    'mobPerMin': '/ min',
+    'mobFleetEmpty': 'No bookable vehicle at the moment.',
+    'mobNotReservable': 'Carpooling only',
+    'mobRestricted': '🔒 Vehicle restricted',
+    'mobBookTitle': 'Book',
+    'mobDate': 'Date',
+    'mobStart': 'Start time',
+    'mobEnd': 'End time',
+    'mobPurpose': 'Purpose (optional)',
+    'mobPurposePlaceholder': 'Errands, appointment, outing…',
+    'mobConfirm': 'Confirm booking',
+    'mobBusy': 'Slots already taken',
+    'mobBusyNone': 'No slot taken in the next 14 days.',
+    'mobBusyTrip': 'carpool',
+    'mobBusyResv': 'booking',
+    'mobMyResv': 'My vehicle bookings',
+    'mobNoResv': 'You have no upcoming vehicle bookings.',
+    'mobErrFields': 'Please fill in the date and times.',
+    'mobErrOrder': 'The end time must be after the start time.',
+    'mobErrPast': 'That slot is already in the past.',
+    'mobErrTooLong': 'A booking cannot exceed 7 days.',
+    'mobErrFunds': 'Insufficient balance for this booking.',
+    'mobErrTaken': 'This vehicle is not free for that slot.',
+    'mobBooked': 'Vehicle booked!',
+    'mobConfirmCancel': 'Cancel this booking?',
+    'mobConfirmCancelLate': 'The slot starts in less than 2 hours: the cancellation will not be refunded. Continue?',
+    'mobCancelled': 'Booking cancelled.',
+    'mobRefunded': 'Booking cancelled — credits refunded.',
+    'mobDemoUnavail': 'Booking unavailable in demo mode.',
+    'mobUntil': 'until',
+    'mobFree': 'Free',
+    'mobDurationLabel': 'Duration',
+    'mobCostLabel': 'Total cost',
+    'mobHoursShort': 'h',
+    'mobMinShort': 'min',
+    'mobVehicle': 'Vehicle',
+    'mobDemoBtn': 'Demo mode',
+    'mobStat': 'Vehicles booked',
+    'mobMigration': 'Booking unavailable: the <code>vehicle_reservations</code> table does not exist yet. Apply the <code>sql/031_mobilite_partagee.sql</code> migration to Supabase.',
     '+ Publier un trajet': '+ Post a trip',
     'Trajets disponibles': 'Available trips',
     'Demandes passagers': 'Passenger requests',
@@ -5480,8 +5726,8 @@ const PT = {
     'labFnD_spaces': 'Booking rooms and equipment in 15-minute slots.',
     'labFn_serre': 'Community greenhouse',
     'labFnD_serre': 'Greenhouse plan, zones, crops, harvests and conditions.',
-    'labFn_trips': 'Car sharing',
-    'labFnD_trips': 'Trips, passenger requests and cargo.',
+    'labFn_trips': 'Shared mobility',
+    'labFnD_trips': 'Vehicle and velomobile booking, carpooling, cargo.',
     'labFn_lunch': 'Lunch Machine',
     'labFnD_lunch': 'Refrigerated lockers, queue and pickups.',
     'labFn_tickets': 'Tickets',
@@ -5721,8 +5967,54 @@ const PT = {
     'Réserver': 'Reservar',
     'Aucun espace disponible': 'No hay espacios disponibles',
     'Chargement…': 'Cargando…',
-    'Auto-partage & Véhicules': 'Coche compartido & Vehículos',
-    'Véhicules disponibles et réservation de trajets': 'Vehículos disponibles y reserva de viajes',
+    'mobTitle': '🚗 Movilidad compartida',
+    'mobSubtitle': 'MaaS — Mobility as a Service: vehículos, velomóviles y carpooling en una sola oferta',
+    'mobTabFleet': '🚲 Reservar un vehículo',
+    'mobFleetIntro': 'Reserve un vehículo del edificio durante el tiempo que necesite. El coste se calcula según el tiempo de uso y se descuenta de su saldo. Un vehículo comprometido en un viaje compartido no aparece libre en ese tramo.',
+    'mobTypeAuto': 'Automóvil',
+    'mobTypeVelomobile': 'Velomóvil',
+    'mobTypeVelo': 'Bicicleta',
+    'mobTypeAutre': 'Otro',
+    'mobSeatsShort': 'plaza(s)',
+    'mobPerMin': '/ min',
+    'mobFleetEmpty': 'Ningún vehículo reservable por el momento.',
+    'mobNotReservable': 'Solo carpooling',
+    'mobRestricted': '🔒 Vehículo restringido',
+    'mobBookTitle': 'Reservar',
+    'mobDate': 'Fecha',
+    'mobStart': 'Hora de inicio',
+    'mobEnd': 'Hora de fin',
+    'mobPurpose': 'Motivo (opcional)',
+    'mobPurposePlaceholder': 'Compras, cita, salida…',
+    'mobConfirm': 'Confirmar la reserva',
+    'mobBusy': 'Tramos ya ocupados',
+    'mobBusyNone': 'Ningún tramo ocupado en los próximos 14 días.',
+    'mobBusyTrip': 'carpooling',
+    'mobBusyResv': 'reserva',
+    'mobMyResv': 'Mis reservas de vehículo',
+    'mobNoResv': 'No tiene ninguna reserva de vehículo próxima.',
+    'mobErrFields': 'Complete la fecha y las horas.',
+    'mobErrOrder': 'La hora de fin debe ser posterior al inicio.',
+    'mobErrPast': 'Ese tramo ya ha pasado.',
+    'mobErrTooLong': 'Una reserva no puede superar los 7 días.',
+    'mobErrFunds': 'Saldo insuficiente para esta reserva.',
+    'mobErrTaken': 'Este vehículo no está libre en ese tramo.',
+    'mobBooked': '¡Vehículo reservado!',
+    'mobConfirmCancel': '¿Cancelar esta reserva?',
+    'mobConfirmCancelLate': 'El tramo empieza en menos de 2 horas: la cancelación no será reembolsada. ¿Continuar?',
+    'mobCancelled': 'Reserva cancelada.',
+    'mobRefunded': 'Reserva cancelada — créditos reembolsados.',
+    'mobDemoUnavail': 'Reserva no disponible en modo demo.',
+    'mobUntil': 'hasta',
+    'mobFree': 'Libre',
+    'mobDurationLabel': 'Duración',
+    'mobCostLabel': 'Coste total',
+    'mobHoursShort': 'h',
+    'mobMinShort': 'min',
+    'mobVehicle': 'Vehículo',
+    'mobDemoBtn': 'Modo demo',
+    'mobStat': 'Vehículos reservados',
+    'mobMigration': 'Reserva no disponible: la tabla <code>vehicle_reservations</code> aún no existe. Aplique la migración <code>sql/031_mobilite_partagee.sql</code> en Supabase.',
     '+ Publier un trajet': '+ Publicar un viaje',
     'Trajets disponibles': 'Viajes disponibles',
     'Demandes passagers': 'Solicitudes de pasajeros',
@@ -5831,8 +6123,8 @@ const PT = {
     'labFnD_spaces': 'Reserva de salas y equipos en tramos de 15 min.',
     'labFn_serre': 'Invernadero comunitario',
     'labFnD_serre': 'Plano del invernadero, zonas, cultivos, cosechas y condiciones.',
-    'labFn_trips': 'Coche compartido',
-    'labFnD_trips': 'Viajes, solicitudes de pasajeros y carga.',
+    'labFn_trips': 'Movilidad compartida',
+    'labFnD_trips': 'Reserva de vehículos y velomóviles, carpooling, carga.',
     'labFn_lunch': 'Lunch Machine',
     'labFnD_lunch': 'Casilleros refrigerados, cola y retiros.',
     'labFn_tickets': 'Tiques',
@@ -6104,8 +6396,54 @@ const PT = {
     'Réserver': '预约',
     'Aucun espace disponible': '暂无可用空间',
     'Chargement…': '加载中…',
-    'Auto-partage & Véhicules': '汽车共享与车辆',
-    'Véhicules disponibles et réservation de trajets': '可用车辆与行程预约',
+    'mobTitle': '🚗 共享出行',
+    'mobSubtitle': 'MaaS — 出行即服务：车辆、卧式车与拼车合为一项服务',
+    'mobTabFleet': '🚲 预约车辆',
+    'mobFleetIntro': '按需预约楼内车辆。费用按使用时长计算，从您的余额中扣除。已安排拼车的车辆在该时段不显示为可用。',
+    'mobTypeAuto': '汽车',
+    'mobTypeVelomobile': '卧式车',
+    'mobTypeVelo': '自行车',
+    'mobTypeAutre': '其他',
+    'mobSeatsShort': '座',
+    'mobPerMin': '/ 分钟',
+    'mobFleetEmpty': '目前没有可预约的车辆。',
+    'mobNotReservable': '仅限拼车',
+    'mobRestricted': '🔒 车辆受限',
+    'mobBookTitle': '预约',
+    'mobDate': '日期',
+    'mobStart': '开始时间',
+    'mobEnd': '结束时间',
+    'mobPurpose': '事由（选填）',
+    'mobPurposePlaceholder': '采购、就诊、出行…',
+    'mobConfirm': '确认预约',
+    'mobBusy': '已占用时段',
+    'mobBusyNone': '未来 14 天内没有占用时段。',
+    'mobBusyTrip': '拼车',
+    'mobBusyResv': '预约',
+    'mobMyResv': '我的车辆预约',
+    'mobNoResv': '您没有即将到来的车辆预约。',
+    'mobErrFields': '请填写日期和时间。',
+    'mobErrOrder': '结束时间必须晚于开始时间。',
+    'mobErrPast': '该时段已过去。',
+    'mobErrTooLong': '单次预约不得超过 7 天。',
+    'mobErrFunds': '余额不足，无法完成预约。',
+    'mobErrTaken': '该车辆在此时段不可用。',
+    'mobBooked': '车辆已预约！',
+    'mobConfirmCancel': '取消这次预约？',
+    'mobConfirmCancelLate': '时段将在 2 小时内开始：取消将不予退款。是否继续？',
+    'mobCancelled': '预约已取消。',
+    'mobRefunded': '预约已取消 — 积分已退回。',
+    'mobDemoUnavail': '演示模式下无法预约。',
+    'mobUntil': '至',
+    'mobFree': '可用',
+    'mobDurationLabel': '时长',
+    'mobCostLabel': '总费用',
+    'mobHoursShort': '小时',
+    'mobMinShort': '分钟',
+    'mobVehicle': '车辆',
+    'mobDemoBtn': '演示模式',
+    'mobStat': '车辆预约',
+    'mobMigration': '暂不可预约：<code>vehicle_reservations</code> 数据表尚不存在。请在 Supabase 上执行迁移 <code>sql/031_mobilite_partagee.sql</code>。',
     '+ Publier un trajet': '+ 发布行程',
     'Trajets disponibles': '可搭乘的行程',
     'Demandes passagers': '乘客需求',
@@ -6206,8 +6544,8 @@ const PT = {
     'labFnD_spaces': '以 15 分钟为单位预约场地和设备。',
     'labFn_serre': '社区温室',
     'labFnD_serre': '温室平面图、区域、作物、采收与环境数据。',
-    'labFn_trips': '共享汽车',
-    'labFnD_trips': '行程、乘客申请与货舱。',
+    'labFn_trips': '共享出行',
+    'labFnD_trips': '车辆与卧式车预约、拼车、货舱。',
     'labFn_lunch': '午餐机',
     'labFnD_lunch': '冷藏格口、排队与取餐。',
     'labFn_tickets': '工单',
@@ -6513,7 +6851,7 @@ const LANGS = {
     navLab: 'LAB',
     navTickets: 'Billets',
     navSpaces: 'Espaces',
-    navTrips: 'Auto-partage',
+    navTrips: 'Mobilité partagée',
     navLunch: '🍱 Lunch',
     navTransactions: 'Transactions',
     navAdmin: 'Admin',
@@ -6608,7 +6946,7 @@ const LANGS = {
     navLab: 'LAB',
     navTickets: 'Tickets',
     navSpaces: 'Spaces',
-    navTrips: 'Carpooling',
+    navTrips: 'Shared mobility',
     navLunch: '🍱 Lunch',
     navTransactions: 'Transactions',
     navAdmin: 'Admin',
@@ -6690,7 +7028,7 @@ const LANGS = {
     navLab: 'LAB',
     navTickets: 'Tickets',
     navSpaces: 'Espacios',
-    navTrips: 'Coche compartido',
+    navTrips: 'Movilidad compartida',
     navLunch: '🍱 Comida',
     navTransactions: 'Transacciones',
     navAdmin: 'Admin',
@@ -6771,7 +7109,7 @@ const LANGS = {
     navLab: 'LAB',
     navTickets: '工单',
     navSpaces: '空间',
-    navTrips: '拼车',
+    navTrips: '共享出行',
     navLunch: '🍱 午餐',
     navTransactions: '交易',
     navAdmin: '管理',
@@ -7077,7 +7415,7 @@ function buildNav() {
 
   // Structure de la navigation, partagee par les onglets et le tiroir.
   //
-  // `condense` regroupe en plus Auto-partage et Machine Lunch sous
+  // `condense` regroupe en plus Mobilite partagee et Machine Lunch sous
   // Espaces. C'est le repli employe quand la rangee ne tient pas : la
   // barre du haut — logo, langue, horloge, solde, personne connectee —
   // doit rester visible en toutes circonstances, ce sont les onglets qui
@@ -7183,7 +7521,7 @@ function ajusterNav() {
   // connectee, qui restent visibles en toutes circonstances.
   //
   //   1. structure complete ;
-  //   2. Auto-partage et Machine Lunch replies sous Espaces ;
+  //   2. Mobilite partagee et Machine Lunch replies sous Espaces ;
   //   3. menu burger.
   //
   // On repart toujours de l'etape 1 : en tournant la tablette ou en
@@ -7218,7 +7556,7 @@ function ajusterNav() {
 })();
 
 function navigateTo(page) {
-  if (page === 'trips' && !window.appModules.trips) { toast('Module Auto-partage non activé', 'info'); return; }
+  if (page === 'trips' && !window.appModules.trips) { toast('Module Mobilité partagée non activé', 'info'); return; }
   if (page === 'lunch' && !window.appModules.lunch) { toast('Module Machine Lunch non activé', 'info'); return; }
   // Workaround sb wedge state : on ne recree le client que si on quitte
   // la page Lunch (le seul cas qui wedge sb dans l'observe). Recreer a
@@ -8016,12 +8354,14 @@ async function loadDashboard() {
   // Mode démo — données fictives
   if (isDemo) {
     document.getElementById('dashboard-stats').innerHTML = [
-      { label: 'Réservations d\'espaces', value: 4 },
-      { label: 'Covoiturages', value: 2 },
+      { label: pt('Réservations d\'espaces'), value: 4 },
+      { label: pt('mobStat'), value: 1 },
+      { label: pt('Covoiturages'), value: 2 },
       { label: 'Solde', value: `${(currentProfile.virtual_balance || 0).toFixed(2)} $` },
     ].map(s => `<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value">${s.value}</div></div>`).join('');
     const demoRes = [
       { type: 'Espace', name: 'Salon commun A', date: new Date(Date.now() - 1*86400000).toISOString(), cost: 12.00, status: 'confirmed' },
+      { type: 'Véhicule', name: 'Vélomobile 1', date: new Date(Date.now() + 2*86400000).toISOString(), cost: 1.20, status: 'confirmed' },
       { type: 'Trajet', name: 'Montréal → Québec', date: new Date(Date.now() - 3*86400000).toISOString(), cost: 15.00, status: 'accepted' },
       { type: 'Espace', name: 'Terrasse', date: new Date(Date.now() - 7*86400000).toISOString(), cost: 8.00, status: 'completed' },
       { type: 'Espace', name: 'Salle de réunion B', date: new Date(Date.now() - 10*86400000).toISOString(), cost: 6.00, status: 'completed' },
@@ -8044,8 +8384,10 @@ async function loadDashboard() {
   // Stats réelles
   const { data: sRes } = await sb.from('space_reservations').select('id, status').eq('tenant_id', currentProfile.id);
   const { data: tBook } = await sb.from('trip_bookings').select('id, status').eq('passenger_id', currentProfile.id);
+  const { data: vRes } = await sb.from('vehicle_reservations').select('id').eq('tenant_id', currentProfile.id).neq('status', 'cancelled');
   const stats = [
     { label: pt('Réservations d\'espaces'), value: sRes?.length || 0 },
+    { label: pt('mobStat'), value: vRes?.length || 0 },
     { label: pt('Covoiturages'), value: tBook?.length || 0 },
     { label: pt('Solde'), value: `${(currentProfile.virtual_balance || 0).toFixed(2)} $` },
   ];
@@ -8060,8 +8402,10 @@ async function loadDashboard() {
   // Réservations récentes
   const { data: sRes2 } = await sb.from('space_reservations').select('*, common_spaces(name)').eq('tenant_id', currentProfile.id).order('created_at', { ascending: false }).limit(5);
   const { data: tBook2 } = await sb.from('trip_bookings').select('*, trips(title, departure_time)').eq('passenger_id', currentProfile.id).order('created_at', { ascending: false }).limit(5);
+  const { data: vRes2 } = await sb.from('vehicle_reservations').select('*, vehicles(model)').eq('tenant_id', currentProfile.id).order('start_time', { ascending: false }).limit(5);
   const combined = [
     ...(sRes2 || []).map(r => ({ type: pt('Espace'), name: r.common_spaces?.name, date: r.start_time, cost: r.total_cost, status: r.status })),
+    ...(vRes2 || []).map(r => ({ type: pt('mobVehicle'), name: r.vehicles?.model, date: r.start_time, cost: r.total_cost, status: r.status })),
     ...(tBook2 || []).map(r => ({ type: pt('Trajet'), name: r.trips?.title, date: r.trips?.departure_time, cost: r.total_cost, status: r.status }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
 
@@ -9804,7 +10148,7 @@ async function confirmBookSpace() {
 // ==========================================
 // TRIPS
 // ==========================================
-let currentTripsTab = 'available';
+let currentTripsTab = 'fleet';
 
 async function loadTrips() {
   const isDriver = currentProfile?.is_approved_driver;
@@ -9814,13 +10158,16 @@ async function loadTrips() {
   document.getElementById('requests-tab').style.display = '';
   const accordion = document.getElementById('trips-formula-accordion');
   if (accordion) accordion.style.display = currentTripsTab === 'available' ? '' : 'none';
+  document.querySelectorAll('#page-trips .admin-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === currentTripsTab);
+  });
   await renderTripsTab();
 }
 
 function switchTripsTab(tab) {
   currentTripsTab = tab;
-  document.querySelectorAll('#page-trips .admin-tab').forEach((t, i) => {
-    t.classList.toggle('active', ['available', 'requests', 'mine', 'driving', 'history'][i] === tab);
+  document.querySelectorAll('#page-trips .admin-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === tab);
   });
   const accordion = document.getElementById('trips-formula-accordion');
   if (accordion) accordion.style.display = tab === 'available' ? '' : 'none';
@@ -9861,7 +10208,7 @@ function loadConditions() {
         { icon: "💳", title: "Solde virtuel et facturation", body: "Chaque résident dispose d'un solde virtuel en crédits CoHabitat géré par l'administration. Les transactions sont débitées automatiquement lors de l'utilisation des services. Les crédits ne sont pas remboursables en espèces. En cas de solde insuffisant, l'accès aux services payants peut être restreint jusqu'au rechargement du compte." },
         { icon: "⚠️", title: "Responsabilités et sanctions", body: "Chaque résident est responsable de son comportement et s'engage à traiter les autres membres de la communauté avec respect. Modulimo agit à titre de facilitateur technologique et ne peut être tenu responsable des incidents survenant entre résidents, ni d'aucune perte, interruption de service ou dommage résultant d'un mauvais fonctionnement du système attribuable à des causes hors de son contrôle, incluant sans s'y limiter les pannes d'infrastructure, les défaillances de fournisseurs tiers, les cyberattaques, les catastrophes naturelles ou toute situation imprévue. Toute mauvaise utilisation des ressources communautaires, tout non-respect des présentes règles ou tout comportement jugé inapproprié par l'administration peut entraîner la suspension temporaire ou le retrait permanent du droit d'accès à la plateforme, sans remboursement du solde engagé." },
         { icon: "🔒", title: "Confidentialité et droit à l'effacement", body: "Les informations personnelles collectées (nom, unité, téléphone, courriel) sont utilisées exclusivement pour la coordination des services communautaires. Elles ne sont pas transmises à des tiers. Conformément à la Loi 25 (Québec), vous pouvez demander la suppression de vos données personnelles directement depuis votre profil. Suite à votre demande, un administrateur procédera à l'anonymisation de votre compte — vos informations personnelles seront effacées et remplacées par des données génériques, tandis que vos transactions seront conservées de façon anonyme à des fins comptables. En mode démo, toutes les données affichées sont fictives." },
-        { icon: "🚗", title: "Auto-partage et covoiturage", body: "Le chauffeur s'engage à effectuer le trajet annoncé, à prendre en charge les passagers acceptés aux points convenus, et à retourner le véhicule communautaire propre et dans l'état où il l'a trouvé. Le coût est calculé selon la durée d'utilisation du véhicule et les kilomètres réels parcourus par chaque passager. Le chauffeur bénéficie d'une réduction en reconnaissance du service rendu. Le passager s'engage à être présent au point d'embarquement à l'heure convenue. Tout retard non signalé peut entraîner l'annulation sans remboursement." },
+        { icon: "🚗", title: "Mobilité partagée (MaaS)", body: "La mobilité partagée réunit dans une seule offre les véhicules du bâtiment, les vélomobiles et le covoiturage entre résidents. Un véhicule réservé à l'heure est débité selon sa durée d'utilisation ; le résident s'engage à le rendre à l'heure convenue, propre et en bon état, et toute annulation faite moins de deux heures avant le début du créneau reste facturée. Pour le covoiturage : le chauffeur s'engage à effectuer le trajet annoncé, à prendre en charge les passagers acceptés aux points convenus, et à retourner le véhicule communautaire propre et dans l'état où il l'a trouvé. Le coût est calculé selon la durée d'utilisation du véhicule et les kilomètres réels parcourus par chaque passager. Le chauffeur bénéficie d'une réduction en reconnaissance du service rendu. Le passager s'engage à être présent au point d'embarquement à l'heure convenue. Tout retard non signalé peut entraîner l'annulation sans remboursement." },
         { icon: "🏠", title: "Espaces communs", body: "Les espaces communs sont réservables selon les disponibilités affichées sur la plateforme. Une réservation confirmée engage le résident à utiliser l'espace au moment prévu, à respecter la capacité maximale autorisée, et à laisser les lieux propres et en bon état. Toute annulation doit être effectuée au moins 2 heures avant le début de la réservation pour obtenir un remboursement complet des crédits débités." },
         { icon: "🍱", title: "Machine Lunch", body: "Le service Machine Lunch permet aux résidents de commander des repas via la borne interactive. Les commandes confirmées sont débitées immédiatement du solde virtuel. Aucun remboursement n'est accordé pour une commande déjà préparée ou distribuée. Les horaires de service sont affichés sur la borne. En cas de panne ou d'indisponibilité, aucune pénalité ne sera appliquée et les crédits seront remboursés automatiquement." },
         { icon: "🔄", title: "Modifications des conditions", body: "Modulimo se réserve le droit de modifier les présentes conditions à tout moment. Les résidents seront informés par voie d'affichage sur le babillard de la plateforme. L'utilisation continue des services après modification vaut acceptation des nouvelles conditions." },
@@ -9879,7 +10226,7 @@ function loadConditions() {
         { icon: "💳", title: "Virtual Balance and Billing", body: "Each resident has a virtual CoHabitat credit balance managed by the administration. Transactions are automatically debited when services are used. Credits are not redeemable for cash. If the balance is insufficient, access to paid services may be restricted until the account is topped up." },
         { icon: "⚠️", title: "Responsibilities and Sanctions", body: "Each resident is responsible for their conduct and agrees to treat other community members with respect. Modulimo acts as a technology facilitator and cannot be held responsible for incidents between residents, nor for any loss, service interruption, or damage resulting from system malfunction attributable to causes beyond its control, including without limitation infrastructure failures, third-party provider failures, cyberattacks, natural disasters, or any unforeseen situation. Any misuse of community resources, failure to comply with these rules, or behavior deemed inappropriate may result in temporary suspension or permanent withdrawal of platform access, without reimbursement of any committed balance." },
         { icon: "🔒", title: "Privacy and Right to Erasure", body: "Personal information collected (name, unit, phone, email) is used exclusively for community service coordination. It is not transmitted to third parties. In accordance with Quebec's Law 25, you may request deletion of your personal data directly from your profile. Following your request, an administrator will anonymize your account — your personal information will be erased and replaced with generic data, while your transactions will be retained anonymously for accounting purposes. In demo mode, all displayed data is fictitious." },
-        { icon: "🚗", title: "Carpooling and Vehicle Sharing", body: "The driver agrees to complete the announced trip, pick up accepted passengers at agreed points, and return the vehicle clean and in the condition it was found. The cost is calculated based on vehicle usage time and actual kilometers traveled by each passenger. The driver receives a discount in recognition of service rendered. The passenger agrees to be present at the boarding point on time. Any unnotified delay may result in cancellation without refund." },
+        { icon: "🚗", title: "Shared mobility (MaaS)", body: "Shared mobility brings the building's vehicles, velomobiles and resident carpooling together in a single offer. A vehicle booked by the hour is charged for its usage time; the resident agrees to return it at the agreed time, clean and in good condition, and any cancellation made less than two hours before the slot starts remains charged. For carpooling: the driver agrees to complete the announced trip, pick up accepted passengers at agreed points, and return the vehicle clean and in the condition it was found. The cost is calculated based on vehicle usage time and actual kilometers traveled by each passenger. The driver receives a discount in recognition of service rendered. The passenger agrees to be present at the boarding point on time. Any unnotified delay may result in cancellation without refund." },
         { icon: "🏠", title: "Common Spaces", body: "Common spaces are bookable based on availability shown on the platform. A confirmed reservation commits the resident to use the space at the scheduled time, respect the maximum authorized capacity, and leave the premises clean and in good condition. Cancellations must be made at least 2 hours before the reservation start time for a full credit refund." },
         { icon: "🍱", title: "Lunch Machine", body: "The Lunch Machine service allows residents to order meals through the interactive kiosk. Confirmed orders are immediately debited from the virtual balance. No refund is granted for an order already prepared or distributed. Service hours are displayed on the kiosk. In case of breakdown or unavailability, no penalty will be applied and credits will be automatically refunded." },
         { icon: "🔄", title: "Amendments", body: "Modulimo reserves the right to modify these terms at any time. Residents will be notified through the platform bulletin board. Continued use of services after modification constitutes acceptance of the new terms." },
@@ -9897,7 +10244,7 @@ function loadConditions() {
         { icon: "💳", title: "Saldo virtual y facturación", body: "Cada residente dispone de un saldo virtual de créditos CoHabitat gestionado por la administración. Las transacciones se debitan automáticamente al utilizar los servicios. Los créditos no son reembolsables en efectivo. Si el saldo es insuficiente, el acceso a los servicios de pago puede restringirse hasta que se recargue la cuenta." },
         { icon: "⚠️", title: "Responsabilidades y sanciones", body: "Cada residente es responsable de su conducta y se compromete a tratar a los demás miembros de la comunidad con respeto. Modulimo actúa como facilitador tecnológico y no puede ser responsable de los incidentes entre residentes, ni de ninguna pérdida, interrupción del servicio o daño resultante de un mal funcionamiento del sistema atribuible a causas fuera de su control, incluyendo sin limitación fallos de infraestructura, fallos de proveedores externos, ciberataques, desastres naturales o cualquier situación imprevista. Cualquier uso indebido de los recursos comunitarios, incumplimiento de estas normas o comportamiento inapropiado puede resultar en la suspensión temporal o la retirada permanente del acceso a la plataforma, sin reembolso del saldo comprometido." },
         { icon: "🔒", title: "Privacidad y derecho al olvido", body: "La información personal recopilada (nombre, unidad, teléfono, correo electrónico) se utiliza exclusivamente para la coordinación de los servicios comunitarios. No se transmite a terceros. De conformidad con la Ley 25 de Quebec, puede solicitar la eliminación de sus datos personales directamente desde su perfil. Tras su solicitud, un administrador procederá a anonimizar su cuenta — su información personal será eliminada y reemplazada por datos genéricos, mientras que sus transacciones se conservarán de forma anónima con fines contables. En modo demo, todos los datos mostrados son ficticios." },
-        { icon: "🚗", title: "Carpooling y vehículos compartidos", body: "El conductor se compromete a realizar el viaje anunciado, recoger a los pasajeros aceptados en los puntos acordados, y devolver el vehículo limpio y en el estado en que lo encontró. El costo se calcula según el tiempo de uso del vehículo y los kilómetros reales recorridos por cada pasajero. El conductor recibe un descuento en reconocimiento del servicio prestado. El pasajero se compromete a estar presente en el punto de embarque a tiempo. Cualquier retraso no notificado puede resultar en cancelación sin reembolso." },
+        { icon: "🚗", title: "Movilidad compartida (MaaS)", body: "La movilidad compartida reúne en una sola oferta los vehículos del edificio, los velomóviles y el carpooling entre residentes. Un vehículo reservado por horas se cobra según su tiempo de uso; el residente se compromete a devolverlo a la hora acordada, limpio y en buen estado, y toda cancelación realizada menos de dos horas antes del inicio del tramo se cobra igualmente. Para el carpooling: el conductor se compromete a realizar el viaje anunciado, recoger a los pasajeros aceptados en los puntos acordados, y devolver el vehículo limpio y en el estado en que lo encontró. El costo se calcula según el tiempo de uso del vehículo y los kilómetros reales recorridos por cada pasajero. El conductor recibe un descuento en reconocimiento del servicio prestado. El pasajero se compromete a estar presente en el punto de embarque a tiempo. Cualquier retraso no notificado puede resultar en cancelación sin reembolso." },
         { icon: "🏠", title: "Espacios comunes", body: "Los espacios comunes se pueden reservar según la disponibilidad mostrada en la plataforma. Una reserva confirmada compromete al residente a usar el espacio en el momento programado, respetar la capacidad máxima autorizada, y dejar las instalaciones limpias y en buen estado. Las cancelaciones deben realizarse al menos 2 horas antes del inicio de la reserva para obtener un reembolso completo de créditos." },
         { icon: "🍱", title: "Máquina Lunch", body: "El servicio Máquina Lunch permite a los residentes pedir comidas a través del quiosco interactivo. Los pedidos confirmados se debitan inmediatamente del saldo virtual. No se otorga reembolso por un pedido ya preparado o distribuido. Los horarios de servicio se muestran en el quiosco. En caso de avería o indisponibilidad, no se aplicará ninguna penalización y los créditos serán reembolsados automáticamente." },
         { icon: "🔄", title: "Modificaciones", body: "Modulimo se reserva el derecho de modificar estos términos en cualquier momento. Los residentes serán notificados a través del tablón de anuncios de la plataforma. El uso continuado de los servicios después de la modificación constituye la aceptación de los nuevos términos." },
@@ -9950,6 +10297,11 @@ async function renderTripsTab() {
   const grid = document.getElementById('trips-grid');
   grid.innerHTML = `<div class="loading"><div class="spinner"></div> ${pt('Chargement…')}</div>`;
 
+  if (currentTripsTab === 'fleet') {
+    await renderVehicleFleet();
+    return;
+  }
+
   let query = sb.from('trips_with_details').select('*');
 
   if (currentTripsTab === 'available') {
@@ -9990,6 +10342,399 @@ async function renderTripsTab() {
   } else {
     renderAvailableTrips(tripsCache);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  MOBILITE PARTAGEE — reservation directe d'un vehicule
+// ═══════════════════════════════════════════════════════════════════════
+// Le covoiturage suppose un chauffeur approuve, des passagers, un depart
+// et une destination. Les velomobiles du batiment ne se prennent pas
+// comme ca : on en prend un pour une heure, seul, sans annoncer ou l'on
+// va. D'ou cette reservation directe, calquee sur celle des espaces
+// communs — un vehicule, un creneau, un cout au temps d'utilisation.
+//
+// Les deux usages partagent la meme flotte et se voient l'un l'autre :
+// check_vehicle_availability() regarde les reservations ET les trajets
+// publies (migration sql/031_mobilite_partagee.sql).
+
+const MOB_TYPES = ['velomobile', 'velo', 'auto', 'autre'];
+const MOB_TYPE_ICONE = { auto: '🚗', velomobile: '🚲', velo: '🚴', autre: '🛴' };
+const MOB_TYPE_PT    = { auto: 'mobTypeAuto', velomobile: 'mobTypeVelomobile', velo: 'mobTypeVelo', autre: 'mobTypeAutre' };
+// Sans creneau declare, un trajet occupe le vehicule deux heures — meme
+// hypothese que la fonction SQL, pour que l'ecran et la base disent la
+// meme chose.
+const MOB_TRAJET_DUREE_MS = 2 * 3600 * 1000;
+// Au-dela, l'annulation n'est plus remboursee : meme regle que les
+// espaces communs, annoncee dans les conditions d'utilisation.
+const MOB_REMBOURSEMENT_MS = 2 * 3600 * 1000;
+
+let mobFleetCache   = [];
+let mobBusyCache    = [];   // { vehicle_id, debut, fin, source }
+let mobResvCache    = [];
+let mobBookVehicleId = null;
+// La table peut manquer tant que la migration n'a pas ete jouee. On le dit
+// une fois, en haut de l'onglet, plutot que de laisser des boutons qui
+// echouent en silence.
+let mobTablesManquantes = false;
+
+// Debiter ou crediter le solde pour une reservation de vehicule.
+//
+// Deux chemins, selon l'installation : avec centrale, on passe par
+// balanceOps (idempotence, outbox, rejeu) ; sans centrale — instance
+// autonome — le solde est local et adjust_balance() fait le travail.
+// confirmBookSpace() ne connait que le premier, ce qui le casse sur une
+// appliance ; on ne reproduit pas ce trou.
+//
+// Le type 'vehicle_reservation' doit figurer dans la liste blanche de
+// finance-bridge (cote centrale) en plus du CHECK de transactions.type
+// pose par sql/031_mobilite_partagee.sql. S'il manque, le debit est
+// refuse et la reservation s'annule d'elle-meme, avec le message
+// d'erreur de la centrale.
+async function mobAjusterSolde({ amount, type, description, reference_id, idempotency_key }) {
+  if (_balanceOps) {
+    return await _balanceOps.commit({
+      amount, type, description, reference_id,
+      reference_type: 'vehicle_reservation',
+      idempotency_key
+    });
+  }
+  const { data, error } = await sb.rpc('adjust_balance', {
+    p_user_id: currentProfile.id,
+    p_amount: amount,
+    p_type: type,
+    p_reference_id: reference_id,
+    p_reference_type: 'vehicle_reservation',
+    p_description: description
+  });
+  if (error) return { ok: false, error: error.message, retryable: false };
+  return { ok: true, virtual_balance: typeof data === 'number' ? data : null };
+}
+
+function mobType(v)      { return MOB_TYPES.includes(v?.vehicle_type) ? v.vehicle_type : 'auto'; }
+function mobPrixMin(v)   { return Number(v?.vehicle_pricing?.[0]?.price_per_minute) || 0; }
+function mobReservable(v){ return v?.is_reservable !== false; }
+
+function mobHeure(iso) {
+  return new Date(iso).toLocaleTimeString(appLocale(), { hour: '2-digit', minute: '2-digit' });
+}
+function mobDateHeure(iso) {
+  return new Date(iso).toLocaleString(appLocale(), { dateStyle: 'medium', timeStyle: 'short' });
+}
+function mobDuree(minutes) {
+  const h = Math.floor(minutes / 60), m = minutes % 60;
+  if (!h) return `${m} ${pt('mobMinShort')}`;
+  return m ? `${h} ${pt('mobHoursShort')} ${m} ${pt('mobMinShort')}` : `${h} ${pt('mobHoursShort')}`;
+}
+
+async function renderVehicleFleet() {
+  const grid = document.getElementById('trips-grid');
+  if (!grid) return;
+  grid.innerHTML = `<div class="loading"><div class="spinner"></div> ${pt('Chargement…')}</div>`;
+
+  // La flotte est triee cote client : ordonner sur vehicle_type ferait
+  // echouer la requete tant que la colonne n'existe pas.
+  const { data: vehicles, error } = await sb.from('vehicles')
+    .select('*, vehicle_pricing(price_per_minute, price_per_km)')
+    .eq('is_available', true)
+    .order('model');
+
+  if (error) {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>${escHtml(error.message)}</p></div>`;
+    return;
+  }
+  mobFleetCache = vehicles || [];
+
+  const maintenant = new Date().toISOString();
+  const [creneaux, resv] = await Promise.all([
+    sb.rpc('vehicle_busy_slots', { p_vehicle_id: null, p_jours: 14 }),
+    currentProfile?.id
+      ? sb.from('vehicle_reservations')
+          .select('*, vehicles(model, vehicle_type, license_plate)')
+          .eq('tenant_id', currentProfile.id)
+          .neq('status', 'cancelled')
+          .gte('end_time', maintenant)
+          .order('start_time')
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  mobBusyCache = creneaux.data || [];
+  mobResvCache = resv.data || [];
+  mobTablesManquantes = !!resv.error;
+  if (resv.error) console.warn('vehicle_reservations indisponible :', resv.error.message);
+
+  const reservables = mobFleetCache.filter(mobReservable);
+  const parType = {};
+  for (const v of mobFleetCache) (parType[mobType(v)] ||= []).push(v);
+
+  let html = '';
+  if (mobTablesManquantes) {
+    html += `<div class="mob-intro" style="border-left-color:var(--accent3)">⚠️ ${pt('mobMigration')}</div>`;
+  }
+  html += `<div class="mob-intro">${escHtml(pt('mobFleetIntro'))}</div>`;
+
+  if (!reservables.length && !mobFleetCache.length) {
+    html += `<div class="empty-state"><div class="empty-icon">🚲</div><p>${pt('mobFleetEmpty')}</p></div>`;
+  } else {
+    html += '<div class="cards-grid">';
+    for (const type of MOB_TYPES) {
+      const liste = parType[type];
+      if (!liste || !liste.length) continue;
+      html += `<div class="mob-groupe-titre">${MOB_TYPE_ICONE[type]} ${escHtml(pt(MOB_TYPE_PT[type]))}</div>`;
+      html += liste.map(v => mobCarteVehicule(v)).join('');
+    }
+    html += '</div>';
+  }
+
+  html += `<h3 class="mob-section-titre">📅 ${escHtml(pt('mobMyResv'))}</h3>`;
+  html += mobResvCache.length
+    ? mobResvCache.map(r => mobLigneReservation(r)).join('')
+    : `<div class="mob-empty">${escHtml(pt('mobNoResv'))}</div>`;
+
+  grid.innerHTML = html;
+}
+
+function mobCarteVehicule(v) {
+  const type    = mobType(v);
+  const prix    = mobPrixMin(v);
+  const parHeure = prix * 60;
+  const occupe  = mobCreneauEnCours(v.id);
+  const acces   = hasVehicleAccess(v.id);
+  const dispo   = occupe
+    ? `<span class="mob-pastille occupee"></span>${escHtml(pt('mobUntil'))} ${mobHeure(occupe.fin)}`
+    : `<span class="mob-pastille libre"></span>${escHtml(pt('mobFree'))}`;
+
+  let action;
+  if (isDemo) {
+    action = `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="${escHtml(pt('mobDemoUnavail'))}">🔒 ${escHtml(pt('mobDemoBtn'))}</button>`;
+  } else if (!mobReservable(v)) {
+    action = `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;">${escHtml(pt('mobNotReservable'))}</button>`;
+  } else if (!acces) {
+    action = `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5;cursor:not-allowed;" title="Accès au véhicule restreint — contactez l'administrateur">${escHtml(pt('mobRestricted'))}</button>`;
+  } else {
+    action = `<button class="btn btn-primary btn-sm" onclick="openBookVehicle('${v.id}')">${escHtml(pt('Réserver'))}</button>`;
+  }
+
+  return `
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">${MOB_TYPE_ICONE[type]} ${escHtml(v.model)}</div>
+        <div class="card-subtitle">${escHtml(v.license_plate || '')}${v.color ? ' · ' + escHtml(v.color) : ''}</div>
+      </div>
+      <span class="badge badge-gray">${escHtml(pt(MOB_TYPE_PT[type]))}</span>
+    </div>
+    <div class="card-meta">
+      <span class="meta-item">👥 ${v.seat_count || 1} ${escHtml(pt('mobSeatsShort'))}</span>
+      ${v.cargo_capacity_m3 ? `<span class="meta-item">📦 ${v.cargo_capacity_m3} m³</span>` : ''}
+    </div>
+    ${v.notes ? `<div class="mob-notes">${escHtml(v.notes)}</div>` : ''}
+    <div class="card-price">${prix.toFixed(2)} $ <small style="font-size:.75rem;color:var(--text2)">${escHtml(pt('mobPerMin'))}</small>
+      <small style="font-size:.75rem;color:var(--text3)"> · ${parHeure.toFixed(2)} $ / ${escHtml(pt('mobHoursShort'))}</small></div>
+    <div class="mob-dispo">${dispo}</div>
+    <div class="card-actions">${action}</div>
+  </div>`;
+}
+
+// Creneau qui couvre l'instant present, s'il y en a un.
+function mobCreneauEnCours(vehicleId) {
+  const now = Date.now();
+  return mobBusyCache.find(c => c.vehicle_id === vehicleId
+    && new Date(c.debut).getTime() <= now && new Date(c.fin).getTime() > now) || null;
+}
+
+function mobLigneReservation(r) {
+  const type = mobType(r.vehicles);
+  const debut = new Date(r.start_time);
+  const bientot = debut.getTime() - Date.now() < MOB_REMBOURSEMENT_MS;
+  return `
+  <div class="mob-resv" id="mob-resv-${r.id}">
+    <div style="min-width:0">
+      <div class="mob-resv-quoi">${MOB_TYPE_ICONE[type]} ${escHtml(r.vehicles?.model || pt('mobVehicle'))}</div>
+      <div class="mob-resv-quand">${mobDateHeure(r.start_time)} → ${mobHeure(r.end_time)} · ${mobDuree(r.total_minutes)}${r.purpose ? ' · ' + escHtml(r.purpose) : ''}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span class="mob-resv-cout">${Number(r.total_cost || 0).toFixed(2)} $</span>
+      <button class="btn btn-danger btn-sm" onclick="cancelVehicleReservation('${r.id}', ${bientot})">${escHtml(pt('Annuler'))}</button>
+    </div>
+  </div>`;
+}
+
+function openBookVehicle(vehicleId) {
+  if (isDemo) { toast(pt('mobDemoUnavail'), 'info'); return; }
+  if (!checkActive()) return;
+  const v = mobFleetCache.find(x => x.id === vehicleId);
+  if (!v) return;
+  mobBookVehicleId = vehicleId;
+
+  document.getElementById('mob-book-title').textContent = `${pt('mobBookTitle')} — ${v.model}`;
+  const maintenant = new Date();
+  document.getElementById('mob-date').value = maintenant.toISOString().split('T')[0];
+  // Prochaine demi-heure ronde : personne ne reserve pour « dans 3 minutes ».
+  const depart = new Date(maintenant.getTime() + 30 * 60000);
+  depart.setMinutes(depart.getMinutes() < 30 ? 30 : 0, 0, 0);
+  if (depart < maintenant) depart.setHours(depart.getHours() + 1);
+  const hhmm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  document.getElementById('mob-start').value = hhmm(depart);
+  document.getElementById('mob-end').value = hhmm(new Date(depart.getTime() + 3600000));
+  document.getElementById('mob-purpose').value = '';
+
+  mobRenderBusy(vehicleId);
+  updateVehicleCostPreview();
+  openModal('modal-book-vehicle');
+}
+
+function mobRenderBusy(vehicleId) {
+  const box = document.getElementById('mob-busy-list');
+  if (!box) return;
+  const slots = mobBusyCache
+    .filter(c => c.vehicle_id === vehicleId)
+    .sort((a, b) => new Date(a.debut) - new Date(b.debut));
+  box.innerHTML = slots.length
+    ? slots.map(c => `<div class="mob-busy-item">
+        <span>${mobDateHeure(c.debut)} → ${mobHeure(c.fin)}</span>
+        <span>${escHtml(pt(c.source === 'trajet' ? 'mobBusyTrip' : 'mobBusyResv'))}</span>
+      </div>`).join('')
+    : `<div class="mob-busy-vide">${escHtml(pt('mobBusyNone'))}</div>`;
+}
+
+// Bornes saisies -> { debut, fin, minutes, cout }, ou null si incomplet.
+function mobCreneauSaisi() {
+  const date  = document.getElementById('mob-date')?.value;
+  const start = document.getElementById('mob-start')?.value;
+  const end   = document.getElementById('mob-end')?.value;
+  if (!date || !start || !end) return null;
+  const debut = new Date(`${date}T${start}:00`);
+  const fin   = new Date(`${date}T${end}:00`);
+  // Une fin plus petite que le debut se lit comme un passage de minuit :
+  // « 22:00 → 01:00 » veut dire trois heures, pas moins vingt-et-une.
+  if (fin <= debut) fin.setDate(fin.getDate() + 1);
+  const minutes = Math.round((fin - debut) / 60000);
+  const v = mobFleetCache.find(x => x.id === mobBookVehicleId);
+  return { debut, fin, minutes, cout: Math.round(minutes * mobPrixMin(v) * 100) / 100 };
+}
+
+function updateVehicleCostPreview() {
+  const box = document.getElementById('mob-cost-preview');
+  if (!box) return;
+  const c = mobCreneauSaisi();
+  if (!c) { box.innerHTML = ''; return; }
+  box.innerHTML = `<strong>${pt('mobDurationLabel')} :</strong> ${mobDuree(c.minutes)}`
+    + ` — <strong>${pt('mobCostLabel')} :</strong> ${c.cout.toFixed(2)} $`;
+}
+
+['mob-date', 'mob-start', 'mob-end'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', updateVehicleCostPreview);
+});
+
+async function confirmBookVehicle() {
+  if (isDemo) { toast(pt('mobDemoUnavail'), 'info'); return; }
+  if (!ensureCentralOnline('reservation')) return;
+
+  const c = mobCreneauSaisi();
+  if (!c) { toast(pt('mobErrFields'), 'error'); return; }
+  if (c.minutes <= 0)          { toast(pt('mobErrOrder'), 'error'); return; }
+  if (c.fin <= new Date())     { toast(pt('mobErrPast'), 'error'); return; }
+  if (c.minutes > 7 * 24 * 60) { toast(pt('mobErrTooLong'), 'error'); return; }
+
+  const v = mobFleetCache.find(x => x.id === mobBookVehicleId);
+  if (!v) return;
+  if (currentProfile.virtual_balance < c.cout) { toast(pt('mobErrFunds'), 'error'); return; }
+
+  const debutISO = c.debut.toISOString();
+  const finISO   = c.fin.toISOString();
+
+  const { data: libre, error: dispoErr } = await sb.rpc('check_vehicle_availability', {
+    p_vehicle_id: mobBookVehicleId, p_start: debutISO, p_end: finISO
+  });
+  if (dispoErr) { toast('Erreur : ' + dispoErr.message, 'error'); return; }
+  if (libre === false) { toast(pt('mobErrTaken'), 'error'); return; }
+
+  const { data: res, error } = await sb.from('vehicle_reservations').insert({
+    vehicle_id: mobBookVehicleId,
+    tenant_id: currentProfile.id,
+    start_time: debutISO,
+    end_time: finISO,
+    total_minutes: c.minutes,
+    total_cost: c.cout,
+    purpose: document.getElementById('mob-purpose')?.value?.trim() || null,
+    status: 'confirmed'
+  }).select().single();
+  if (error) { toast('Erreur lors de la réservation : ' + error.message, 'error'); return; }
+
+  // Debit via balanceOps, comme les espaces : la centrale reste la source
+  // de verite et la cle d'idempotence tient sur l'id de la reservation.
+  const debit = await mobAjusterSolde({
+    amount: -c.cout,
+    type: 'vehicle_reservation',
+    description: `Reservation ${v.model}`,
+    reference_id: res.id,
+    idempotency_key: `vehicle-resv:${res.id}`
+  });
+  if (!debit.ok && !debit.queued) {
+    // Meme raison que pour les espaces : on annule par UPDATE, pas par
+    // DELETE — aucune policy DELETE n'existe, et le creneau se libere des
+    // que le statut passe a 'cancelled'.
+    await sb.from('vehicle_reservations').update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancel_reason: 'Débit central refusé — annulation automatique'
+    }).eq('id', res.id);
+    if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant (central)', 'error');
+    else toast(`Erreur debit central (${debit.error || 'inconnue'}) — reservation annulee`, 'error');
+    return;
+  }
+  if (debit.queued) {
+    toast('Réservation enregistrée — débit en cours de synchronisation', 'info');
+  } else if (typeof debit.virtual_balance === 'number') {
+    currentProfile.virtual_balance = debit.virtual_balance;
+  }
+  const pastille = document.getElementById('nav-balance');
+  if (pastille) pastille.textContent = `${currentProfile.virtual_balance.toFixed(2)} $ CAD`;
+
+  toast(pt('mobBooked'), 'success');
+  trackFeature('shared_mobility', 'vehicle_reserved', {
+    vehicle_type: mobType(v), minutes: c.minutes, cost: c.cout
+  });
+  closeModal('modal-book-vehicle');
+  await logRequest(mobBookVehicleId, 'vehicle', 'book', { reservation_id: res.id });
+  await renderVehicleFleet();
+}
+
+async function cancelVehicleReservation(id, bientot) {
+  if (isDemo) { toast(pt('mobDemoUnavail'), 'info'); return; }
+  if (!confirm(pt(bientot ? 'mobConfirmCancelLate' : 'mobConfirmCancel'))) return;
+
+  const r = mobResvCache.find(x => x.id === id);
+  const { error } = await sb.from('vehicle_reservations').update({
+    status: 'cancelled',
+    cancelled_at: new Date().toISOString(),
+    cancel_reason: bientot ? 'Annulation tardive (moins de 2 h)' : 'Annulé par le résident'
+  }).eq('id', id);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+
+  // Remboursement seulement si l'annulation arrive plus de 2 h avant le
+  // debut — la meme regle que les espaces communs, ecrite noir sur blanc
+  // dans les conditions d'utilisation.
+  let rembourse = false;
+  if (!bientot && r && Number(r.total_cost) > 0) {
+    const credit = await mobAjusterSolde({
+      amount: Number(r.total_cost),
+      type: 'vehicle_reservation_refund',
+      description: `Annulation ${r.vehicles?.model || ''}`.trim(),
+      reference_id: id,
+      idempotency_key: `vehicle-resv-refund:${id}`
+    });
+    rembourse = !!(credit.ok || credit.queued);
+    if (credit.ok && typeof credit.virtual_balance === 'number') {
+      currentProfile.virtual_balance = credit.virtual_balance;
+      const pastille = document.getElementById('nav-balance');
+      if (pastille) pastille.textContent = `${currentProfile.virtual_balance.toFixed(2)} $ CAD`;
+    }
+  }
+
+  toast(pt(rembourse ? 'mobRefunded' : 'mobCancelled'), 'success');
+  trackFeature('shared_mobility', 'vehicle_reservation_cancelled', { refunded: rembourse });
+  await renderVehicleFleet();
 }
 
 function renderAvailableTrips(trips) {
@@ -11497,7 +12242,7 @@ async function loadContractPage() {
     ] : [
       { icon: '📋', title: 'Dispositions générales', text: 'Les présentes conditions régissent l\'utilisation de l\'ensemble des services numériques mis à disposition des résidents de la communauté Modulimo via la plateforme CoHabitat.' },
       { icon: '🏠', title: 'Espaces communs', text: 'Les réservations sont soumises à disponibilité. Toute réservation non annulée au moins 2 heures à l\'avance sera facturée au tarif plein. Le résident est responsable de l\'état de l\'espace.' },
-      { icon: '🚗', title: 'Auto-partage', text: 'Le covoiturage est basé sur la confiance mutuelle entre résidents. Tout incident doit être déclaré dans les 24 heures.' },
+      { icon: '🚗', title: 'Mobilité partagée', text: 'Véhicules et vélomobiles se réservent à l\'heure ; le covoiturage repose sur la confiance mutuelle entre résidents. Tout incident doit être déclaré dans les 24 heures.' },
       { icon: '🍱', title: 'Machine Lunch', text: 'Les commandes confirmées sont débitées immédiatement du solde virtuel. Aucun remboursement pour une commande déjà préparée.' },
       { icon: '💳', title: 'Solde virtuel', text: 'Le solde virtuel CoHabitat n\'est pas remboursable en argent. En cas de résiliation, le solde restant est perdu après 30 jours.' },
       { icon: '🛡', title: 'Protection des données', text: 'Vos données sont protégées conformément à la Loi 25. Suppression disponible sur demande depuis votre profil. Vos données ne sont jamais vendues.' },
@@ -11912,7 +12657,7 @@ async function loadDependents() {
   }
 
   el.innerHTML = data.map(d => {
-    const svcs = [d.allow_spaces && '🏠 Espaces', d.allow_trips && '🚗 Auto-partage', d.allow_lunch && '🍱 Lunch'].filter(Boolean).join(' · ') || '<span style="color:var(--accent3)">Aucun service</span>';
+    const svcs = [d.allow_spaces && '🏠 Espaces', d.allow_trips && '🚗 Mobilité partagée', d.allow_lunch && '🍱 Lunch'].filter(Boolean).join(' · ') || '<span style="color:var(--accent3)">Aucun service</span>';
     const age = d.age ? `${d.age} ans` : '';
     const actions = isDemo ? '' : `
       <button class="btn btn-success btn-sm" onclick="openTransfer('${d.id}','${d.name.replace(/'/g, "\\'")}','${(d.virtual_balance||0).toFixed(2)}')">💳 Crédits</button>
@@ -13757,7 +14502,7 @@ const DEMANDE_FIELD_MAP = [
     ['digital_comfort', 'Aisance numérique (1-5)'],
     ['payment_pref', 'Mode de paiement préféré'],
     ['comm_pref', 'Communication préférée'],
-    ['ch_salle_commune', 'Salles communes'], ['ch_autopartage', 'Auto-partage'],
+    ['ch_salle_commune', 'Salles communes'], ['ch_autopartage', 'Mobilité partagée'],
     ['ch_babillard', 'Babillard'], ['ch_atelier', 'Atelier partagé'],
     ['ch_reseau', 'Services réseau Modulimo'], ['ch_evenements', 'Participer aux événements']
   ]},
@@ -14671,7 +15416,7 @@ async function loadAdminVehicles() {
   const { data } = await sb.from('vehicles').select('*, vehicle_pricing(price_per_minute, price_per_km, price_per_cargo_slot)').order('model');
   document.getElementById('admin-vehicles-tbody').innerHTML = (data || []).map(v => `
     <tr>
-      <td>${escHtml(v.model)}</td>
+      <td>${{ auto: '🚗', velomobile: '🚲', velo: '🚴', autre: '🛴' }[v.vehicle_type] || '🚗'} ${escHtml(v.model)}${v.is_reservable === false ? '' : ' <span class="badge badge-green" style="font-size:10px">libre-service</span>'}</td>
       <td>${escHtml(v.license_plate)}</td>
       <td>${v.seat_count}</td>
       <td>${v.cargo_capacity_m3 || 0}</td>
@@ -14690,7 +15435,9 @@ async function loadAdminVehicles() {
 function openAddVehicle() {
   editingId = null;
   document.getElementById('vehicle-modal-title').textContent = 'Ajouter un véhicule';
-  ['veh-model','veh-plate','veh-color'].forEach(id => document.getElementById(id).value = '');
+  ['veh-model','veh-plate','veh-color','veh-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('veh-type').value = 'auto';
+  document.getElementById('veh-reservable').checked = true;
   document.getElementById('veh-seats').value = '5';
   document.getElementById('veh-cargo').value = '0';
   document.getElementById('veh-year').value = new Date().getFullYear();
@@ -14715,6 +15462,9 @@ async function editVehicle(id) {
   document.getElementById('vehicle-modal-title').textContent = 'Modifier le véhicule';
   document.getElementById('veh-model').value = v.model;
   document.getElementById('veh-plate').value = v.license_plate;
+  document.getElementById('veh-type').value = v.vehicle_type || 'auto';
+  document.getElementById('veh-reservable').checked = v.is_reservable !== false;
+  document.getElementById('veh-notes').value = v.notes || '';
   document.getElementById('veh-seats').value = v.seat_count;
   document.getElementById('veh-cargo').value = v.cargo_capacity_m3 || 0;
   document.getElementById('veh-color').value = v.color || '';
@@ -14742,6 +15492,9 @@ async function saveVehicle() {
   const cargo = parseFloat(document.getElementById('veh-cargo').value) || 0;
   const color = document.getElementById('veh-color').value.trim();
   const year = parseInt(document.getElementById('veh-year').value) || null;
+  const vehType = document.getElementById('veh-type').value || 'auto';
+  const reservable = document.getElementById('veh-reservable').checked;
+  const notes = document.getElementById('veh-notes').value.trim() || null;
   const priceMin = parseFloat(document.getElementById('veh-price-min').value) || 0;
   const priceKm = parseFloat(document.getElementById('veh-price-km').value) || 0;
   const priceCargo = parseFloat(document.getElementById('veh-price-cargo').value) || 0;
@@ -14754,7 +15507,7 @@ async function saveVehicle() {
 
   if (!model || !plate) { toast('Modèle et plaque requis', 'error'); return; }
 
-  const vehicleFields = { model, license_plate: plate, seat_count: seats, cargo_capacity_m3: cargo, color, year, is_available: available, is_network_shared: networkShared, network_priority_hours: networkShared ? priorityHours : null, network_price_per_minute: networkShared ? networkPriceMin : null, network_price_per_km: networkShared ? networkPriceKm : null };
+  const vehicleFields = { model, license_plate: plate, seat_count: seats, cargo_capacity_m3: cargo, color, year, vehicle_type: vehType, is_reservable: reservable, notes, is_available: available, is_network_shared: networkShared, network_priority_hours: networkShared ? priorityHours : null, network_price_per_minute: networkShared ? networkPriceMin : null, network_price_per_km: networkShared ? networkPriceKm : null };
 
   let vehicleId = editingId;
   if (editingId) {
@@ -14918,7 +15671,7 @@ async function loadSettings() {
   // Modules activables — affichés en premier avec des toggles
   const moduleKeys = ['module_trips', 'module_lunch', 'module_serre'];
   const moduleLabels = {
-    module_trips: '🚗 Module Auto-partage (covoiturage + véhicules)',
+    module_trips: '🚗 Module Mobilité partagée (véhicules, vélomobiles, covoiturage)',
     module_lunch: '🍱 Module Machine Lunch (kiosque + commandes)',
     module_serre: '🌱 Module Serre (zones de culture louables au mois)'
   };
@@ -14984,7 +15737,7 @@ async function loadSettings() {
 }
 
 const MODULE_DESCRIPTIONS = {
-  module_trips: 'Module Auto-partage : covoiturage, véhicules et demandes de passagers',
+  module_trips: 'Module Mobilité partagée : réservation de véhicules, covoiturage et demandes de passagers',
   module_lunch: 'Module Machine Lunch : kiosque et commandes (nécessite la centrale Modulimo)',
   module_serre: 'Module Serre : zones de culture louées au mois et capteurs'
 };
@@ -16524,7 +17277,7 @@ window.setConsent = function setConsent(choix) {
  * Visible uniquement en mode demonstration. Permet d'activer ou
  * de couper les modules optionnels en pleine presentation, pour
  * montrer l'application telle qu'elle serait chez l'interlocuteur
- * — un immeuble sans serre, sans auto-partage, etc.
+ * — un immeuble sans serre, sans mobilite partagee, etc.
  *
  * Les interrupteurs appellent saveModuleSetting(), exactement la
  * meme fonction que le panneau d'administration : il n'y a donc
@@ -16557,7 +17310,7 @@ window.setConsent = function setConsent(choix) {
   };
 
   var MODULES = [
-    { cle: 'module_trips', titre: '🚗 Auto-partage', detail: 'Covoiturage, véhicules, demandes de passagers' },
+    { cle: 'module_trips', titre: '🚗 Mobilité partagée', detail: 'Véhicules et vélomobiles réservables, covoiturage' },
     { cle: 'module_lunch', titre: '🍱 Machine Lunch', detail: 'Kiosque et commandes — nécessite la centrale' },
     { cle: 'module_serre', titre: '🌱 Serre',        detail: 'Zones de culture louées au mois, capteurs' },
   ];

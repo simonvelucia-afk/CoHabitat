@@ -112,8 +112,20 @@ Dans Supabase → **Authentication → URL Configuration**:
 - Tableau de bord avec solde et réservations
 - **Résumé « Ma serre »** sur le tableau de bord : zones louées et cultures en cours (par section, avec stade et dates), récoltes passées avec rendement cumulé par unité, et locations terminées
 - Réservation d'espaces communs par tranches de 15 min
-- Consultation et demande de covoiturage
+- Réservation d'un véhicule ou d'un vélomobile à l'heure, et demande de covoiturage
 - Historique des transactions
+
+### Mobilité partagée (MaaS)
+
+L'ancien module « Auto-partage » devient **Mobilité partagée** — *MaaS, Mobility as a Service* : les véhicules du bâtiment, les vélomobiles et le covoiturage entre résidents sont réunis dans une seule offre, sous le même onglet.
+
+- **Réservation directe d'un véhicule** (onglet 🚲 *Réserver un véhicule*, affiché en premier) : un véhicule, un créneau, un coût calculé au **temps d'utilisation** (`vehicle_pricing.price_per_minute`) et débité du solde virtuel. C'est ce qui rend les **vélomobiles du bâtiment** réservables : on en prend un pour une heure, seul, sans annoncer où l'on va — ce que le covoiturage, qui suppose un chauffeur approuvé et des passagers, ne permettait pas
+- **Flotte multimodale** : chaque véhicule porte un type (`vehicle_type` : automobile, vélomobile, vélo, autre) et un drapeau `is_reservable`. Décoché, le véhicule reste dans la flotte mais n'est accessible que par un trajet publié. La liste est groupée par mode, avec une pastille de disponibilité (libre / occupé jusqu'à…)
+- **Les deux usages se voient l'un l'autre** : `check_vehicle_availability()` regarde les réservations **et** les trajets publiés, si bien qu'un vélomobile engagé sur un covoiturage n'apparaît pas libre sur ce créneau. Un trajet sans heure d'arrivée estimée réserve le véhicule deux heures
+- **Créneaux déjà pris** affichés dans la fenêtre de réservation (`vehicle_busy_slots()`), bornes seulement — jamais qui a réservé
+- **Annulation** : remboursement intégral si elle a lieu plus de 2 h avant le début du créneau, comme pour les espaces communs ; passé ce délai le créneau reste facturé, et l'écran le dit avant de confirmer
+- Migration : `sql/031_mobilite_partagee.sql`
+- ⚠️ **Sur une installation branchée à la centrale Modulimo**, ajoutez `vehicle_reservation` et `vehicle_reservation_refund` à la liste blanche de types de `finance-bridge` (elle vit dans le projet central, hors de ce dépôt). Sans cela le débit est refusé et la réservation s'annule d'elle-même. Une instance autonome n'est pas concernée : elle passe par `adjust_balance()`, que la migration suffit à débloquer
 
 ### Chauffeurs approuvés
 - Publication de trajets avec arrêts intermédiaires
@@ -144,7 +156,7 @@ Dans Supabase → **Authentication → URL Configuration**:
 
 ### LAB — amélioration continue
 - Sous-menu **🧪 LAB** du Babillard : le babillard sert à la vie de l'immeuble, le LAB à celle de l'application
-- **Qualifier les fonctions** : une note de 1 à 5 par fonction (babillard, tableau de bord, espaces, serre, auto-partage, Machine Lunch, billets, transactions, profil, multilingue, usage mobile, et le LAB lui-même) avec un commentaire libre. Moyenne communautaire, répartition des notes et commentaires reçus s'affichent sur chaque carte ; on peut revenir modifier sa note à tout moment. Les fonctions des modules désactivés n'apparaissent pas
+- **Qualifier les fonctions** : une note de 1 à 5 par fonction (babillard, tableau de bord, espaces, serre, mobilité partagée, Machine Lunch, billets, transactions, profil, multilingue, usage mobile, et le LAB lui-même) avec un commentaire libre. Moyenne communautaire, répartition des notes et commentaires reçus s'affichent sur chaque carte ; on peut revenir modifier sa note à tout moment. Les fonctions des modules désactivés n'apparaissent pas
 - **Idées à brainstormer** : proposer une amélioration ou une nouvelle fonction, appuyer les idées des autres (un vote par personne) et en discuter dans un fil. Filtres par statut et par type, tri par appuis ou par date
 - **Suivi par l'admin** : cycle `nouveau → à l'étude → planifié → en cours → livré / écarté`, avec un mot de l'équipe visible par tout le monde sous l'idée
 - **Tout est stocké en base** (tables `lab_*`), pas dans le navigateur : c'est la matière première des prochaines versions
@@ -182,6 +194,7 @@ L'interface est disponible en **français, anglais et espagnol** (sélecteur dan
 | `space_reservations` | Réservations d'espaces |
 | `vehicles` | Véhicules |
 | `vehicle_pricing` | Tarification des véhicules |
+| `vehicle_reservations` | Réservation directe d'un véhicule sur un créneau (libre-service) |
 | `trips` | Trajets publiés par chauffeurs |
 | `trip_stops` | Arrêts intermédiaires |
 | `trip_bookings` | Demandes passagers |
