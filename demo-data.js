@@ -121,7 +121,7 @@
 
     // ── Véhicules et trajets ─────────────────────────────────
     vehicles: [
-      { id: 'vh-1', model: 'Kia Niro EV', license_plate: 'ABC 123', seat_count: 5, seats: 5,
+      { id: 'vh-1', model: 'Minivan électrique 1', license_plate: 'MV-01', seat_count: 7, seats: 7,
         vehicle_type: 'auto', is_reservable: true, is_available: true, color: 'Blanc',
         cargo_capacity_m3: 1.2, cargo_slots: 3, notes: 'Recharge au sous-sol, câble dans le coffre.',
         vehicle_pricing: [{ price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00 }] },
@@ -133,17 +133,17 @@
         vehicle_type: 'velomobile', is_reservable: true, is_available: true, color: 'Bleu',
         cargo_capacity_m3: 0.15, cargo_slots: 1, notes: 'Vélomobile caréné, coffre arrière un peu plus grand.',
         vehicle_pricing: [{ price_per_minute: 0.02, price_per_km: 0, price_per_cargo_slot: 0 }] },
-      { id: 'vh-4', model: 'Vélo cargo', license_plate: 'VC-01', seat_count: 1, seats: 1,
-        vehicle_type: 'velo', is_reservable: true, is_available: true, color: 'Vert',
-        cargo_capacity_m3: 0.4, cargo_slots: 2, notes: 'Caisse avant, deux sangles.',
-        vehicle_pricing: [{ price_per_minute: 0.01, price_per_km: 0, price_per_cargo_slot: 0 }] },
+      { id: 'vh-4', model: 'Minivan électrique 2', license_plate: 'MV-02', seat_count: 7, seats: 7,
+        vehicle_type: 'auto', is_reservable: true, is_available: true, color: 'Gris',
+        cargo_capacity_m3: 1.2, cargo_slots: 3, notes: 'Attelage pour la remorque du jardin.',
+        vehicle_pricing: [{ price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00 }] },
     ],
 
     vehicle_pricing: [
       { id: 'vp-1', vehicle_id: 'vh-1', price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00 },
       { id: 'vp-2', vehicle_id: 'vh-2', price_per_minute: 0.02, price_per_km: 0, price_per_cargo_slot: 0 },
       { id: 'vp-3', vehicle_id: 'vh-3', price_per_minute: 0.02, price_per_km: 0, price_per_cargo_slot: 0 },
-      { id: 'vp-4', vehicle_id: 'vh-4', price_per_minute: 0.01, price_per_km: 0, price_per_cargo_slot: 0 },
+      { id: 'vp-4', vehicle_id: 'vh-4', price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00 },
     ],
 
     // Reservations directes : celle du visiteur (a venir) et une prise par
@@ -184,7 +184,7 @@
     trips_with_details: [
       { id: 'tr-3', title: 'Sortie au parc — Mont-Royal', driver_id: 'p-2',
         driver_name: 'Camille Bernard', driver_unit: 'A-101',
-        vehicle_id: 'vh-1', vehicle_model: 'Kia Niro EV', license_plate: 'ABC 123',
+        vehicle_id: 'vh-1', vehicle_model: 'Minivan électrique 1', license_plate: 'MV-01',
         departure_time: heures(6), available_seats: 4, booked_seats: 3,
         cargo_available_pct: 100, booked_cargo_pct: 40, estimated_distance_km: 12.4,
         price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00,
@@ -192,7 +192,7 @@
         departure_point: 'Entrée principale', destination: 'Lac aux Castors' },
       { id: 'tr-1', title: 'Épicerie — Marché Jean-Talon', driver_id: 'p-2',
         driver_name: 'Camille Bernard', driver_unit: 'A-101',
-        vehicle_id: 'vh-1', vehicle_model: 'Kia Niro EV', license_plate: 'ABC 123',
+        vehicle_id: 'vh-1', vehicle_model: 'Minivan électrique 1', license_plate: 'MV-01',
         departure_time: heures(20), available_seats: 4, booked_seats: 1,
         cargo_available_pct: 100, booked_cargo_pct: 20, estimated_distance_km: 7.5,
         price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00,
@@ -200,7 +200,7 @@
         departure_point: 'Entrée principale', destination: 'Marché Jean-Talon' },
       { id: 'tr-2', title: 'Centre-ville — bureaux', driver_id: 'p-3',
         driver_name: 'Julien Moreau', driver_unit: 'C-310',
-        vehicle_id: 'vh-1', vehicle_model: 'Kia Niro EV', license_plate: 'ABC 123',
+        vehicle_id: 'vh-1', vehicle_model: 'Minivan électrique 1', license_plate: 'MV-01',
         departure_time: heures(44), available_seats: 4, booked_seats: 2,
         cargo_available_pct: 100, booked_cargo_pct: 0, estimated_distance_km: 9.1,
         price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00,
