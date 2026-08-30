@@ -493,7 +493,26 @@
   // renvoie null sans erreur : l'appelant traite deja ce cas.
   var RPC = {
     check_space_availability: function () { return true; },
-    check_vehicle_availability: function () { return true; },
+    // Repond vraiment, plutot que « oui » systematiquement : en
+    // demonstration on peut desormais reserver un vehicule, et un parcours
+    // qui accepte un creneau deja pris n'apprend rien a personne. Meme
+    // regle que la fonction SQL — reservations ET trajets publies, deux
+    // heures par trajet sans heure d'arrivee.
+    check_vehicle_availability: function (a) {
+      if (!a || !a.p_vehicle_id) return true;
+      var deb = new Date(a.p_start).getTime();
+      var fin = new Date(a.p_end).getTime();
+      var pris = (DEMO.vehicle_reservations || [])
+        .filter(function (r) { return r.vehicle_id === a.p_vehicle_id && r.status !== 'cancelled'; })
+        .map(function (r) { return [new Date(r.start_time).getTime(), new Date(r.end_time).getTime()]; });
+      (DEMO.trips || [])
+        .filter(function (t) { return t.vehicle_id === a.p_vehicle_id && t.status === 'published'; })
+        .forEach(function (t) {
+          var d = new Date(t.departure_time).getTime();
+          pris.push([d, d + 2 * 3600000]);
+        });
+      return !pris.some(function (c) { return deb < c[1] && fin > c[0]; });
+    },
     vehicle_busy_slots: function () {
       return (DEMO.vehicle_reservations || [])
         .filter(function (r) { return r.status !== 'cancelled'; })

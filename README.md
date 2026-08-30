@@ -204,6 +204,7 @@ Deux choses ne sont volontairement pas mesurées, faute d'écran correspondant :
 ### Mode démo
 - Accès sans compte via bouton "Démo"
 - Consultation complète sans restriction
+- **Réservation de véhicule jouable de bout en bout** : choix du créneau, refus si le véhicule est déjà pris (par une réservation ou par un covoiturage), débit du solde, apparition dans « Mes réservations », annulation avec remboursement. Tout vit dans le jeu de données local — rien ne sort du navigateur, rien n'est facturé, et un rechargement de la page remet tout à zéro. Les lignes créées portent la mention « fictive »
 - Toutes les actions sont loggées pour analyse
 - Aucune réservation réelle n'est créée
 
