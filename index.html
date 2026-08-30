@@ -5418,6 +5418,15 @@ const PT = {
     'mobMinShort': 'min',
     'mobVehicle': 'Véhicule',
     'mobDemoBtn': 'Mode démo',
+    'mobFeesTitle': 'Que couvre le tarif ?',
+    'mobFeesTimeTitle': 'Le tarif à la minute',
+    'mobFeesTime': "Il couvre ce qui court avec le temps, que le véhicule roule ou non : assurance, amortissement du véhicule, stationnement, et l'entretien du réseau de recharge — celui-ci coûte la même chose qu'on l'utilise beaucoup ou peu. Réserver, c'est immobiliser le véhicule pour soi.",
+    'mobFeesKmTitle': 'Le tarif au kilomètre',
+    'mobFeesKm': "Il couvre ce qui court avec la distance : l'électricité réellement consommée à la recharge, les pneus, les freins, l'entretien mécanique.",
+    'mobFeesNote': "Les deux sont facturés séparément pour que chacun paie ce qu'il utilise : garder un véhicule une journée sans rouler consomme du temps mais peu de kilomètres ; un aller-retour rapide fait l'inverse. Un seul tarif surfacturerait l'un et offrirait l'autre.",
+    'mobFeesVelo': "Les vélomobiles n'ont pas de tarif au kilomètre : rouler ne leur coûte presque rien.",
+    'mobFeesShort': "Le temps couvre l'assurance, l'amortissement et le réseau de recharge ; les kilomètres, l'électricité et l'usure.",
+    'mobFeesShortVelo': "Le tarif couvre l'entretien et l'amortissement du vélomobile.",
     'mobReturn': 'Rendre le véhicule',
     'mobReturnConfirm': 'Confirmer le retour',
     'mobReturned': 'Rendu',
@@ -5689,6 +5698,15 @@ const PT = {
     'mobMinShort': 'min',
     'mobVehicle': 'Vehicle',
     'mobDemoBtn': 'Demo mode',
+    'mobFeesTitle': 'What does the rate cover?',
+    'mobFeesTimeTitle': 'The per-minute rate',
+    'mobFeesTime': 'It covers what runs with time, whether the vehicle moves or not: insurance, vehicle depreciation, parking, and the upkeep of the charging network — which costs the same whether it is used a lot or a little. Booking means holding the vehicle for yourself.',
+    'mobFeesKmTitle': 'The per-kilometre rate',
+    'mobFeesKm': 'It covers what runs with distance: the electricity actually drawn when charging, tyres, brakes, mechanical servicing.',
+    'mobFeesNote': 'The two are billed separately so that everyone pays for what they use: keeping a vehicle all day without driving uses time but few kilometres; a quick round trip does the opposite. A single rate would overcharge one and give away the other.',
+    'mobFeesVelo': 'Velomobiles have no per-kilometre rate: riding them costs almost nothing.',
+    'mobFeesShort': 'Time covers insurance, depreciation and the charging network; kilometres cover electricity and wear.',
+    'mobFeesShortVelo': 'The rate covers upkeep and depreciation of the velomobile.',
     'mobReturn': 'Return the vehicle',
     'mobReturnConfirm': 'Confirm return',
     'mobReturned': 'Returned',
@@ -6101,6 +6119,15 @@ const PT = {
     'mobMinShort': 'min',
     'mobVehicle': 'Vehículo',
     'mobDemoBtn': 'Modo demo',
+    'mobFeesTitle': '¿Qué cubre la tarifa?',
+    'mobFeesTimeTitle': 'La tarifa por minuto',
+    'mobFeesTime': 'Cubre lo que corre con el tiempo, ruede el vehículo o no: seguro, amortización del vehículo, aparcamiento y el mantenimiento de la red de recarga — que cuesta lo mismo se use mucho o poco. Reservar es inmovilizar el vehículo para uno mismo.',
+    'mobFeesKmTitle': 'La tarifa por kilómetro',
+    'mobFeesKm': 'Cubre lo que corre con la distancia: la electricidad realmente consumida al recargar, los neumáticos, los frenos, el mantenimiento mecánico.',
+    'mobFeesNote': 'Ambas se cobran por separado para que cada cual pague lo que usa: tener un vehículo todo el día sin rodar consume tiempo pero pocos kilómetros; una ida y vuelta rápida hace lo contrario. Una tarifa única encarecería una y regalaría la otra.',
+    'mobFeesVelo': 'Los velomóviles no tienen tarifa por kilómetro: rodar no les cuesta casi nada.',
+    'mobFeesShort': 'El tiempo cubre el seguro, la amortización y la red de recarga; los kilómetros, la electricidad y el desgaste.',
+    'mobFeesShortVelo': 'La tarifa cubre el mantenimiento y la amortización del velomóvil.',
     'mobReturn': 'Devolver el vehículo',
     'mobReturnConfirm': 'Confirmar la devolución',
     'mobReturned': 'Devuelto',
@@ -6545,6 +6572,15 @@ const PT = {
     'mobMinShort': '分钟',
     'mobVehicle': '车辆',
     'mobDemoBtn': '演示模式',
+    'mobFeesTitle': '费用包含什么？',
+    'mobFeesTimeTitle': '按分钟计费的部分',
+    'mobFeesTime': '它覆盖与时间相关的开支，无论车辆是否行驶：保险、车辆折旧、停车位，以及充电网络的维护 —— 无论使用多寡，这笔开支都一样。预约意味着把车辆留给自己。',
+    'mobFeesKmTitle': '按公里计费的部分',
+    'mobFeesKm': '它覆盖与里程相关的开支：充电时实际消耗的电量、轮胎、刹车、机械保养。',
+    'mobFeesNote': '两者分开计费，是为了让各人只为自己实际使用的部分付费：整天占用却几乎不开，耗的是时间而非里程；一趟快速往返则恰好相反。若只用一种费率，必然一边多收、一边白送。',
+    'mobFeesVelo': '卧式篷车没有公里费率：骑行几乎不产生成本。',
+    'mobFeesShort': '时长费用覆盖保险、折旧与充电网络；公里费用覆盖电费与损耗。',
+    'mobFeesShortVelo': '该费率覆盖卧式篷车的保养与折旧。',
     'mobReturn': '归还车辆',
     'mobReturnConfirm': '确认归还',
     'mobReturned': '已归还',
@@ -10622,6 +10658,7 @@ async function renderVehicleFleet() {
   html += `<div class="mob-intro">${escHtml(pt('mobFleetIntro'))}`
     + (isDemo ? ` <strong>${escHtml(pt('mobDemoNotice'))}</strong>` : '')
     + `</div>`;
+  html += mobBlocFrais();
 
   if (!reservables.length && !mobFleetCache.length) {
     html += `<div class="empty-state"><div class="empty-icon">🚲</div><p>${pt('mobFleetEmpty')}</p></div>`;
@@ -10642,6 +10679,41 @@ async function renderVehicleFleet() {
     : `<div class="mob-empty">${escHtml(pt('mobNoResv'))}</div>`;
 
   grid.innerHTML = html;
+}
+
+// Ce que les tarifs couvrent. Deux natures de frais, deux tarifs — et le
+// dire evite la lecture la plus naturelle et la plus fausse : « on me
+// facture deux fois ».
+function mobBlocFrais() {
+  const ouvert = !!window._mobFraisOuvert;
+  const ligne = (titre, corps) => `
+    <div style="background:var(--surface);border-radius:var(--radius-sm);padding:14px;">
+      <div style="font-size:.78rem;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${escHtml(titre)}</div>
+      <div style="font-size:.88rem;color:var(--text);line-height:1.6">${escHtml(corps)}</div>
+    </div>`;
+  return `
+  <div style="margin-bottom:16px;">
+    <button onclick="mobToggleFrais()" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 16px;text-align:left;cursor:pointer;color:var(--text);display:flex;justify-content:space-between;align-items:center;font-size:.9rem;font-family:inherit;">
+      <span>💡 ${escHtml(pt('mobFeesTitle'))}</span>
+      <span id="mob-frais-chevron" style="transition:transform .2s;${ouvert ? 'transform:rotate(180deg)' : ''}">▼</span>
+    </button>
+    <div id="mob-frais-corps" style="display:${ouvert ? '' : 'none'};border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);padding:18px;background:var(--surface2);">
+      <div style="display:grid;gap:12px;">
+        ${ligne('⏱ ' + pt('mobFeesTimeTitle'), pt('mobFeesTime'))}
+        ${ligne('🛣 ' + pt('mobFeesKmTitle'), pt('mobFeesKm'))}
+      </div>
+      <p style="font-size:.82rem;color:var(--text3);margin-top:14px;line-height:1.6">${escHtml(pt('mobFeesNote'))}</p>
+      <p style="font-size:.82rem;color:var(--text3);margin-top:8px;line-height:1.6">${escHtml(pt('mobFeesVelo'))}</p>
+    </div>
+  </div>`;
+}
+
+function mobToggleFrais() {
+  window._mobFraisOuvert = !window._mobFraisOuvert;
+  const corps = document.getElementById('mob-frais-corps');
+  const chevron = document.getElementById('mob-frais-chevron');
+  if (corps) corps.style.display = window._mobFraisOuvert ? '' : 'none';
+  if (chevron) chevron.style.transform = window._mobFraisOuvert ? 'rotate(180deg)' : '';
 }
 
 function mobCarteVehicule(v) {
@@ -10760,7 +10832,8 @@ function mobUpdateReturnPreview() {
   const temps = Number(r.time_cost ?? r.total_cost) || 0;
   box.innerHTML = `<strong>${pt('mobTimeCostLabel')} :</strong> ${temps.toFixed(2)} $ ${escHtml(pt('mobAlreadyCharged'))}`
     + `<br><strong>${pt('mobKmCostLabel')} :</strong> ${sup.toFixed(2)} $`
-    + `<br><strong>${pt('mobCostLabel')} :</strong> ${(temps + sup).toFixed(2)} $`;
+    + `<br><strong>${pt('mobCostLabel')} :</strong> ${(temps + sup).toFixed(2)} $`
+    + `<div style="margin-top:8px;font-size:0.8rem;color:var(--text3)">${escHtml(pt('mobFeesShort'))}</div>`;
 }
 
 async function mobConfirmReturn() {
@@ -10876,7 +10949,8 @@ function updateVehicleCostPreview() {
   const km = mobPrixKm(v);
   box.innerHTML = `<strong>${pt('mobDurationLabel')} :</strong> ${mobDuree(c.minutes)}`
     + ` — <strong>${pt('mobTimeCostLabel')} :</strong> ${c.cout.toFixed(2)} $`
-    + (km ? `<div style="margin-top:6px;font-size:0.84rem;color:var(--text2)">${escHtml(pt('mobKmNotice'))} ${km.toFixed(2)} $ / km</div>` : '');
+    + (km ? `<div style="margin-top:6px;font-size:0.84rem;color:var(--text2)">${escHtml(pt('mobKmNotice'))} ${km.toFixed(2)} $ / km</div>` : '')
+    + `<div style="margin-top:6px;font-size:0.8rem;color:var(--text3)">${escHtml(pt(km ? 'mobFeesShort' : 'mobFeesShortVelo'))}</div>`;
 }
 
 ['mob-date', 'mob-start', 'mob-end'].forEach(id => {
