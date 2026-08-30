@@ -1254,6 +1254,302 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   font-size: 0.95rem;
 }
 
+/* ===== LAB (amelioration continue) ===== */
+/* Le LAB reprend la grammaire visuelle du babillard — meme surface, meme
+   bordure, meme rythme vertical — parce qu'il vit dans le meme menu. Ce
+   qui lui est propre : les etoiles et les jauges, qui doivent se lire
+   d'un coup d'oeil sans qu'on ait a cliquer. */
+.lab-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.lab-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text2);
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+.lab-tab:hover { color: var(--text); }
+.lab-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.lab-intro {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  margin-bottom: 22px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text2);
+}
+
+/* --- Qualification des fonctions --- */
+.lab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+.lab-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  transition: border-color var(--transition);
+}
+.lab-card:hover { border-color: var(--surface3); }
+.lab-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.lab-card-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lab-card-avg {
+  font-size: 0.78rem;
+  color: var(--text3);
+  white-space: nowrap;
+}
+.lab-card-avg strong { color: var(--accent); font-size: 0.9rem; }
+.lab-card-desc {
+  font-size: 0.82rem;
+  color: var(--text3);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+/* Les etoiles sont des boutons : assez grandes pour le doigt (34 px),
+   sans fond ni bordure pour ne pas alourdir la carte. */
+.lab-stars { display: flex; gap: 2px; }
+.lab-star {
+  background: none;
+  border: none;
+  padding: 2px;
+  width: 30px; height: 30px;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text3);
+  transition: transform var(--transition), color var(--transition);
+}
+.lab-star:hover { transform: scale(1.15); }
+.lab-star.on { color: var(--accent); }
+.lab-star.readonly { cursor: default; }
+.lab-star.readonly:hover { transform: none; }
+.lab-note-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lab-note-label {
+  font-size: 0.76rem;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.lab-card textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 62px;
+  margin-top: 10px;
+  font-size: 0.86rem;
+}
+.lab-card-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+/* .btn-primary est en width:100% globalement — dessine pour la boite de
+   connexion. Dans une rangee d'actions, chaque bouton reprend sa largeur
+   naturelle, sinon le dernier s'etale seul sur sa ligne. */
+.lab-card-actions .btn,
+.lab-fil-form .btn { width: auto; margin-top: 0; }
+/* Barre de repartition des notes : 5 segments, du plus bas au plus haut. */
+.lab-bars { margin-top: 10px; display: flex; flex-direction: column; gap: 3px; }
+.lab-bar-row { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--text3); }
+.lab-bar-track { flex: 1; height: 5px; background: var(--surface3); border-radius: 99px; overflow: hidden; }
+.lab-bar-fill { height: 100%; background: var(--accent); border-radius: 99px; }
+.lab-avis {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lab-avis-item {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text2);
+  word-break: break-word;
+}
+/* pre-wrap sur le texte seul : porte sur la boite, il ferait remonter a
+   l'ecran l'indentation du gabarit qui l'entoure. */
+.lab-avis-texte, .lab-fil-texte { white-space: pre-wrap; }
+.lab-avis-item .lab-avis-auteur { color: var(--accent); font-weight: 600; }
+
+/* --- Idees --- */
+.lab-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.lab-toolbar select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  width: auto;
+  min-width: 180px;
+  max-width: 100%;
+}
+.lab-idee {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.lab-idee:hover { border-color: var(--surface3); }
+/* Le vote est une colonne a gauche : compteur au-dessus, fleche dessous,
+   comme partout ailleurs — on n'invente pas un geste de plus. */
+.lab-vote {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  min-width: 48px;
+  cursor: pointer;
+  color: var(--text2);
+  font-family: inherit;
+  transition: border-color var(--transition), color var(--transition);
+}
+.lab-vote:hover { border-color: var(--accent); color: var(--text); }
+.lab-vote.on { border-color: var(--accent); color: var(--accent); background: rgba(200,169,110,0.10); }
+.lab-vote-count { font-size: 1rem; font-weight: 600; line-height: 1; }
+.lab-vote-label { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.lab-idee-body { flex: 1; min-width: 0; }
+.lab-idee-titre {
+  font-weight: 600;
+  font-size: 0.98rem;
+  color: var(--text);
+  margin-bottom: 6px;
+  word-break: break-word;
+}
+.lab-idee-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 0.76rem;
+  color: var(--text3);
+  margin-bottom: 10px;
+}
+.lab-idee-desc {
+  font-size: 0.89rem;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.lab-reponse {
+  margin-top: 10px;
+  background: rgba(200,169,110,0.10);
+  border: 1px solid rgba(200,169,110,0.35);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.lab-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.lab-st-nouveau   { background: rgba(200,169,110,0.18); color: #d8b66a; }
+.lab-st-a_l_etude { background: rgba( 96,160,224,0.18); color: #6fb3e8; }
+.lab-st-planifie  { background: rgba(126,184,160,0.18); color: #7eb8a0; }
+.lab-st-en_cours  { background: rgba(224,150, 96,0.18); color: #e89c70; }
+.lab-st-livre     { background: rgba(110,200,140,0.20); color: #82d2a0; }
+.lab-st-ecarte    { background: rgba(180,180,180,0.15); color: #aaa; }
+.lab-type-amelioration { background: rgba(126,184,160,0.14); color: #7eb8a0; }
+.lab-type-nouveaute    { background: rgba(200,169,110,0.14); color: #c8a96e; }
+.lab-fil {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lab-fil-msg {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 11px;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  word-break: break-word;
+}
+.lab-fil-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.74rem;
+  color: var(--text3);
+  margin-bottom: 5px;
+}
+.lab-fil-auteur { color: var(--accent); font-weight: 600; }
+.lab-fil-form { display: flex; gap: 8px; align-items: flex-start; }
+.lab-fil-form textarea { flex: 1; resize: vertical; min-height: 40px; font-size: 0.85rem; }
+.lab-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text3);
+  font-size: 0.95rem;
+}
+@media (max-width: 600px) {
+  .lab-grid { grid-template-columns: 1fr; }
+  .lab-idee { gap: 10px; padding: 14px; }
+}
+
 /* ===== BILLETS (TICKETS) ===== */
 .tk-toolbar {
   display: flex;
@@ -1622,6 +1918,56 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
 
       <!-- Feed -->
       <div id="bb-feed"></div>
+    </div>
+
+    <!-- ==================== TENANT: LAB ==================== -->
+    <!-- Le LAB est le pendant applicatif du babillard : on y parle de
+         l'outil plutot que de l'immeuble. Deux vues, parce qu'il y a deux
+         gestes distincts — juger ce qui existe, imaginer ce qui manque. -->
+    <div id="page-lab" class="page">
+      <div class="section-header">
+        <div class="section-title">
+          <h2 data-pt="labTitle">🧪 LAB</h2>
+          <p style="color:var(--text2);font-size:0.9rem" data-pt="labSubtitle">Amélioration continue — votre avis façonne la prochaine version</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="labOpenIdee()" data-pt="labNewIdea">+ Nouvelle idée</button>
+      </div>
+
+      <div class="lab-intro" data-pt="labIntro">Notez les fonctions que vous utilisez, dites ce qui vous gêne, proposez ce qui manque. Chaque note et chaque idée est lue et alimente les prochaines versions de l'application.</div>
+
+      <div class="lab-tabs">
+        <button class="lab-tab active" id="lab-tab-qualif" onclick="labSwitchTab('qualif')" data-pt="labTabQualif">⭐ Qualifier les fonctions</button>
+        <button class="lab-tab" id="lab-tab-idees" onclick="labSwitchTab('idees')" data-pt="labTabIdees">💡 Idées à brainstormer</button>
+      </div>
+
+      <div id="lab-view-qualif">
+        <div id="lab-fonctions" class="lab-grid"></div>
+      </div>
+
+      <div id="lab-view-idees" style="display:none">
+        <div class="lab-toolbar">
+          <select id="lab-filter-statut" onchange="labRenderIdees()">
+            <option value="actives" data-pt="labFilterActives">En discussion</option>
+            <option value="" data-pt="labFilterAll">Toutes</option>
+            <option value="nouveau" data-pt="labStNouveau">Nouveau</option>
+            <option value="a_l_etude" data-pt="labStEtude">À l'étude</option>
+            <option value="planifie" data-pt="labStPlanifie">Planifié</option>
+            <option value="en_cours" data-pt="labStEnCours">En cours</option>
+            <option value="livre" data-pt="labStLivre">Livré</option>
+            <option value="ecarte" data-pt="labStEcarte">Écarté</option>
+          </select>
+          <select id="lab-filter-type" onchange="labRenderIdees()">
+            <option value="" data-pt="labTypeAll">Améliorations et nouveautés</option>
+            <option value="amelioration" data-pt="labTypeAmelioration">Amélioration</option>
+            <option value="nouveaute" data-pt="labTypeNouveaute">Nouvelle fonction</option>
+          </select>
+          <select id="lab-sort" onchange="labRenderIdees()">
+            <option value="votes" data-pt="labSortVotes">Les plus appuyées</option>
+            <option value="recent" data-pt="labSortRecent">Les plus récentes</option>
+          </select>
+        </div>
+        <div id="lab-idees"></div>
+      </div>
     </div>
 
     <!-- ==================== TENANT: BILLETS ==================== -->
@@ -4854,6 +5200,94 @@ const PT = {
     'bbConfirmDelete': 'Supprimer ce message ?',
     'bbErrDelete': 'Erreur : ',
     'bbAuthor': 'Locataire',
+    // LAB
+    'labTitle': '🧪 LAB',
+    'labSubtitle': 'Amélioration continue — votre avis façonne la prochaine version',
+    'labIntro': 'Notez les fonctions que vous utilisez, dites ce qui vous gêne, proposez ce qui manque. Chaque note et chaque idée est lue et alimente les prochaines versions de l\'application.',
+    'labNewIdea': '+ Nouvelle idée',
+    'labTabQualif': '⭐ Qualifier les fonctions',
+    'labTabIdees': '💡 Idées à brainstormer',
+    'labFilterActives': 'En discussion',
+    'labFilterAll': 'Toutes',
+    'labStNouveau': 'Nouveau',
+    'labStEtude': 'À l\'étude',
+    'labStPlanifie': 'Planifié',
+    'labStEnCours': 'En cours',
+    'labStLivre': 'Livré',
+    'labStEcarte': 'Écarté',
+    'labTypeAll': 'Améliorations et nouveautés',
+    'labTypeAmelioration': 'Amélioration',
+    'labTypeNouveaute': 'Nouvelle fonction',
+    'labSortVotes': 'Les plus appuyées',
+    'labSortRecent': 'Les plus récentes',
+    'labLoading': 'Chargement…',
+    'labError': 'Erreur de chargement. Vérifiez que les tables <code>lab_*</code> existent dans Supabase (migration <code>sql/030_lab.sql</code>).',
+    'labNoIdea': 'Aucune idée pour le moment. Lancez le premier chantier !',
+    'labAvgNone': 'Pas encore noté',
+    'labAvgOne': 'avis',
+    'labAvgMany': 'avis',
+    'labYourNote': 'Votre note',
+    'labSave': 'Enregistrer',
+    'labNoteSaved': 'Merci, votre évaluation est enregistrée.',
+    'labNotePlaceholder': 'Ce qui fonctionne, ce qui vous gêne, ce qui vous ferait gagner du temps…',
+    'labSuggest': '💡 Proposer une amélioration',
+    'labSeeAvis': 'Voir les commentaires',
+    'labHideAvis': 'Masquer les commentaires',
+    'labNoAvis': 'Aucun commentaire sur cette fonction.',
+    'labVoteLabel': 'appui',
+    'labVoteLabelP': 'appuis',
+    'labComments': 'Commentaires',
+    'labCommentPlaceholder': 'Ajouter au brainstorm…',
+    'labCommentSend': 'Envoyer',
+    'labCommentPosted': 'Commentaire ajouté.',
+    'labConfirmDeleteIdee': 'Supprimer cette idée et tout son fil ?',
+    'labConfirmDeleteComm': 'Supprimer ce commentaire ?',
+    'labIdeaModalTitle': 'Nouvelle idée',
+    'labFieldType': 'Type',
+    'labFieldFonction': 'Fonction concernée',
+    'labFonctionNone': 'Aucune en particulier',
+    'labFieldTitre': 'Titre',
+    'labTitrePlaceholder': 'Résumez l\'idée en une ligne…',
+    'labFieldDesc': 'Description',
+    'labDescPlaceholder': 'Quel est le besoin ? Dans quelle situation ? À quoi ressemblerait la solution idéale ?',
+    'labSubmitIdea': 'Publier',
+    'labIdeaPosted': 'Idée publiée ! Merci de faire avancer l’app.',
+    'labErrTitre': 'Le titre doit faire au moins 3 caractères.',
+    'labErrDesc': 'La description ne peut pas être vide.',
+    'labErrNote': 'Choisissez d\'abord un nombre d\'étoiles.',
+    'labDemoUnavail': 'Indisponible en mode démo — connectez-vous pour contribuer.',
+    'labStatut': 'Statut',
+    'labApply': 'Appliquer',
+    'labReponse': 'Réponse de l’équipe',
+    'labReponsePlaceholder': 'Mot de l\'équipe : pourquoi c\'est planifié, écarté, ou ce qu\'il manque pour décider…',
+    'labStatutSaved': 'Statut mis à jour.',
+    'labBy': 'par',
+    'labAdminHint': 'Admin : vous pouvez faire avancer le statut d\'une idée et répondre à son auteur.',
+    'labFonctionsIntro': 'Une note de 1 à 5 par fonction, et un commentaire si vous voulez préciser. Vous pouvez revenir la modifier à tout moment.',
+    'labFn_babillard': 'Babillard',
+    'labFnD_babillard': 'Annonces et messages entre voisins.',
+    'labFn_dashboard': 'Tableau de bord',
+    'labFnD_dashboard': 'Solde, réservations en cours, résumé personnel.',
+    'labFn_spaces': 'Espaces communs',
+    'labFnD_spaces': 'Réservation des salles et équipements par tranches de 15 min.',
+    'labFn_serre': 'Serre communautaire',
+    'labFnD_serre': 'Plan de la serre, zones, cultures, cueillettes et conditions.',
+    'labFn_trips': 'Auto-partage',
+    'labFnD_trips': 'Trajets, demandes de passagers et cargo.',
+    'labFn_lunch': 'Machine Lunch',
+    'labFnD_lunch': 'Cases réfrigérées, file d\'attente et retraits.',
+    'labFn_tickets': 'Billets',
+    'labFnD_tickets': 'Requêtes au concierge et suivi de leur résolution.',
+    'labFn_transactions': 'Transactions',
+    'labFnD_transactions': 'Historique du solde virtuel et des paiements.',
+    'labFn_profile': 'Profil et contrat',
+    'labFnD_profile': 'Vos informations, votre bail, les conditions d\'utilisation.',
+    'labFn_langues': 'Multilingue',
+    'labFnD_langues': 'Français, anglais, espagnol, chinois.',
+    'labFn_mobile': 'Usage mobile',
+    'labFnD_mobile': 'Confort sur téléphone et tablette, installation en application.',
+    'labFn_lab': 'Le LAB lui-même',
+    'labFnD_lab': 'Cette page : est-ce la bonne façon de vous faire participer ?',
     // Tickets
     'navTickets': 'Billets',
     'tkTitle': '🎫 Billets',
@@ -4974,6 +5408,94 @@ const PT = {
     'bbConfirmDelete': 'Delete this message?',
     'bbErrDelete': 'Error: ',
     'bbAuthor': 'Tenant',
+    // LAB
+    'labTitle': '🧪 LAB',
+    'labSubtitle': 'Continuous improvement — your feedback shapes the next version',
+    'labIntro': 'Rate the features you use, tell us what gets in your way, suggest what is missing. Every rating and every idea is read and feeds the next versions of the app.',
+    'labNewIdea': '+ New idea',
+    'labTabQualif': '⭐ Rate the features',
+    'labTabIdees': '💡 Ideas to brainstorm',
+    'labFilterActives': 'Under discussion',
+    'labFilterAll': 'All',
+    'labStNouveau': 'New',
+    'labStEtude': 'Under review',
+    'labStPlanifie': 'Planned',
+    'labStEnCours': 'In progress',
+    'labStLivre': 'Shipped',
+    'labStEcarte': 'Declined',
+    'labTypeAll': 'Improvements and new features',
+    'labTypeAmelioration': 'Improvement',
+    'labTypeNouveaute': 'New feature',
+    'labSortVotes': 'Most supported',
+    'labSortRecent': 'Most recent',
+    'labLoading': 'Loading…',
+    'labError': 'Loading error. Check that the <code>lab_*</code> tables exist in Supabase (migration <code>sql/030_lab.sql</code>).',
+    'labNoIdea': 'No ideas yet. Start the first one!',
+    'labAvgNone': 'Not rated yet',
+    'labAvgOne': 'rating',
+    'labAvgMany': 'ratings',
+    'labYourNote': 'Your rating',
+    'labSave': 'Save',
+    'labNoteSaved': 'Thanks, your rating has been saved.',
+    'labNotePlaceholder': 'What works, what gets in your way, what would save you time…',
+    'labSuggest': '💡 Suggest an improvement',
+    'labSeeAvis': 'Show comments',
+    'labHideAvis': 'Hide comments',
+    'labNoAvis': 'No comments on this feature.',
+    'labVoteLabel': 'support',
+    'labVoteLabelP': 'supports',
+    'labComments': 'Comments',
+    'labCommentPlaceholder': 'Add to the brainstorm…',
+    'labCommentSend': 'Send',
+    'labCommentPosted': 'Comment added.',
+    'labConfirmDeleteIdee': 'Delete this idea and its whole thread?',
+    'labConfirmDeleteComm': 'Delete this comment?',
+    'labIdeaModalTitle': 'New idea',
+    'labFieldType': 'Type',
+    'labFieldFonction': 'Related feature',
+    'labFonctionNone': 'None in particular',
+    'labFieldTitre': 'Title',
+    'labTitrePlaceholder': 'Sum up the idea in one line…',
+    'labFieldDesc': 'Description',
+    'labDescPlaceholder': 'What is the need? In what situation? What would the ideal solution look like?',
+    'labSubmitIdea': 'Publish',
+    'labIdeaPosted': 'Idea published! Thanks for moving the app forward.',
+    'labErrTitre': 'The title must be at least 3 characters.',
+    'labErrDesc': 'The description cannot be empty.',
+    'labErrNote': 'Pick a number of stars first.',
+    'labDemoUnavail': 'Unavailable in demo mode — sign in to contribute.',
+    'labStatut': 'Status',
+    'labApply': 'Apply',
+    'labReponse': 'Team reply',
+    'labReponsePlaceholder': 'A word from the team: why it is planned, declined, or what is missing to decide…',
+    'labStatutSaved': 'Status updated.',
+    'labBy': 'by',
+    'labAdminHint': 'Admin: you can move an idea along and reply to its author.',
+    'labFonctionsIntro': 'A rating from 1 to 5 per feature, plus a comment if you want to be specific. You can come back and change it any time.',
+    'labFn_babillard': 'Bulletin board',
+    'labFnD_babillard': 'Announcements and messages between neighbours.',
+    'labFn_dashboard': 'Dashboard',
+    'labFnD_dashboard': 'Balance, current bookings, personal summary.',
+    'labFn_spaces': 'Common spaces',
+    'labFnD_spaces': 'Booking rooms and equipment in 15-minute slots.',
+    'labFn_serre': 'Community greenhouse',
+    'labFnD_serre': 'Greenhouse plan, zones, crops, harvests and conditions.',
+    'labFn_trips': 'Car sharing',
+    'labFnD_trips': 'Trips, passenger requests and cargo.',
+    'labFn_lunch': 'Lunch Machine',
+    'labFnD_lunch': 'Refrigerated lockers, queue and pickups.',
+    'labFn_tickets': 'Tickets',
+    'labFnD_tickets': 'Requests to the caretaker and how they get resolved.',
+    'labFn_transactions': 'Transactions',
+    'labFnD_transactions': 'History of the virtual balance and payments.',
+    'labFn_profile': 'Profile and contract',
+    'labFnD_profile': 'Your details, your lease, the terms of use.',
+    'labFn_langues': 'Multilingual',
+    'labFnD_langues': 'French, English, Spanish, Chinese.',
+    'labFn_mobile': 'Mobile use',
+    'labFnD_mobile': 'Comfort on phone and tablet, install as an app.',
+    'labFn_lab': 'The LAB itself',
+    'labFnD_lab': 'This page: is this the right way to involve you?',
     // Tickets
     'navTickets': 'Tickets',
     'tkTitle': '🎫 Tickets',
@@ -5237,6 +5759,94 @@ const PT = {
     'bbConfirmDelete': '¿Eliminar este mensaje?',
     'bbErrDelete': 'Error: ',
     'bbAuthor': 'Inquilino',
+    // LAB
+    'labTitle': '🧪 LAB',
+    'labSubtitle': 'Mejora continua — tu opinión define la próxima versión',
+    'labIntro': 'Califica las funciones que usas, cuéntanos qué te molesta y propón lo que falta. Cada calificación y cada idea se lee y alimenta las próximas versiones de la aplicación.',
+    'labNewIdea': '+ Nueva idea',
+    'labTabQualif': '⭐ Calificar las funciones',
+    'labTabIdees': '💡 Ideas para debatir',
+    'labFilterActives': 'En discusión',
+    'labFilterAll': 'Todas',
+    'labStNouveau': 'Nueva',
+    'labStEtude': 'En estudio',
+    'labStPlanifie': 'Planificada',
+    'labStEnCours': 'En curso',
+    'labStLivre': 'Entregada',
+    'labStEcarte': 'Descartada',
+    'labTypeAll': 'Mejoras y novedades',
+    'labTypeAmelioration': 'Mejora',
+    'labTypeNouveaute': 'Nueva función',
+    'labSortVotes': 'Las más apoyadas',
+    'labSortRecent': 'Las más recientes',
+    'labLoading': 'Cargando…',
+    'labError': 'Error de carga. Verifica que las tablas <code>lab_*</code> existan en Supabase (migración <code>sql/030_lab.sql</code>).',
+    'labNoIdea': 'Todavía no hay ideas. ¡Lanza la primera!',
+    'labAvgNone': 'Sin calificar',
+    'labAvgOne': 'opinión',
+    'labAvgMany': 'opiniones',
+    'labYourNote': 'Tu calificación',
+    'labSave': 'Guardar',
+    'labNoteSaved': 'Gracias, tu calificación ha sido guardada.',
+    'labNotePlaceholder': 'Lo que funciona, lo que te molesta, lo que te haría ganar tiempo…',
+    'labSuggest': '💡 Proponer una mejora',
+    'labSeeAvis': 'Ver los comentarios',
+    'labHideAvis': 'Ocultar los comentarios',
+    'labNoAvis': 'Ningún comentario sobre esta función.',
+    'labVoteLabel': 'apoyo',
+    'labVoteLabelP': 'apoyos',
+    'labComments': 'Comentarios',
+    'labCommentPlaceholder': 'Añadir a la lluvia de ideas…',
+    'labCommentSend': 'Enviar',
+    'labCommentPosted': 'Comentario añadido.',
+    'labConfirmDeleteIdee': '¿Eliminar esta idea y todo su hilo?',
+    'labConfirmDeleteComm': '¿Eliminar este comentario?',
+    'labIdeaModalTitle': 'Nueva idea',
+    'labFieldType': 'Tipo',
+    'labFieldFonction': 'Función afectada',
+    'labFonctionNone': 'Ninguna en particular',
+    'labFieldTitre': 'Título',
+    'labTitrePlaceholder': 'Resume la idea en una línea…',
+    'labFieldDesc': 'Descripción',
+    'labDescPlaceholder': '¿Cuál es la necesidad? ¿En qué situación? ¿Cómo sería la solución ideal?',
+    'labSubmitIdea': 'Publicar',
+    'labIdeaPosted': '¡Idea publicada! Gracias por hacer avanzar la app.',
+    'labErrTitre': 'El título debe tener al menos 3 caracteres.',
+    'labErrDesc': 'La descripción no puede estar vacía.',
+    'labErrNote': 'Elige primero un número de estrellas.',
+    'labDemoUnavail': 'No disponible en modo demo — inicia sesión para contribuir.',
+    'labStatut': 'Estado',
+    'labApply': 'Aplicar',
+    'labReponse': 'Respuesta del equipo',
+    'labReponsePlaceholder': 'Unas palabras del equipo: por qué está planificada, descartada o qué falta para decidir…',
+    'labStatutSaved': 'Estado actualizado.',
+    'labBy': 'por',
+    'labAdminHint': 'Admin: puedes hacer avanzar el estado de una idea y responder a su autor.',
+    'labFonctionsIntro': 'Una calificación de 1 a 5 por función y un comentario si quieres precisar. Puedes volver a cambiarla en cualquier momento.',
+    'labFn_babillard': 'Tablón',
+    'labFnD_babillard': 'Anuncios y mensajes entre vecinos.',
+    'labFn_dashboard': 'Panel',
+    'labFnD_dashboard': 'Saldo, reservas en curso, resumen personal.',
+    'labFn_spaces': 'Espacios comunes',
+    'labFnD_spaces': 'Reserva de salas y equipos en tramos de 15 min.',
+    'labFn_serre': 'Invernadero comunitario',
+    'labFnD_serre': 'Plano del invernadero, zonas, cultivos, cosechas y condiciones.',
+    'labFn_trips': 'Coche compartido',
+    'labFnD_trips': 'Viajes, solicitudes de pasajeros y carga.',
+    'labFn_lunch': 'Lunch Machine',
+    'labFnD_lunch': 'Casilleros refrigerados, cola y retiros.',
+    'labFn_tickets': 'Tiques',
+    'labFnD_tickets': 'Solicitudes al conserje y seguimiento de su resolución.',
+    'labFn_transactions': 'Transacciones',
+    'labFnD_transactions': 'Historial del saldo virtual y de los pagos.',
+    'labFn_profile': 'Perfil y contrato',
+    'labFnD_profile': 'Tus datos, tu contrato, las condiciones de uso.',
+    'labFn_langues': 'Multilingüe',
+    'labFnD_langues': 'Francés, inglés, español, chino.',
+    'labFn_mobile': 'Uso móvil',
+    'labFnD_mobile': 'Comodidad en teléfono y tableta, instalación como aplicación.',
+    'labFn_lab': 'El LAB mismo',
+    'labFnD_lab': 'Esta página: ¿es la buena manera de hacerte participar?',
     // Tickets
     'navTickets': 'Tickets',
     'tkTitle': '🎫 Tickets',
@@ -5524,6 +6134,94 @@ const PT = {
     'bbConfirmDelete': '删除这条消息？',
     'bbErrDelete': '错误： ',
     'bbAuthor': '住户',
+    // LAB
+    'labTitle': '🧪 LAB',
+    'labSubtitle': '持续改进 — 您的意见塑造下一个版本',
+    'labIntro': '为您使用的功能评分，说出困扰您的地方，提出缺少的功能。每一个评分和每一个想法都会被阅读，并融入应用的后续版本。',
+    'labNewIdea': '+ 新想法',
+    'labTabQualif': '⭐ 功能评分',
+    'labTabIdees': '💡 待讨论的想法',
+    'labFilterActives': '讨论中',
+    'labFilterAll': '全部',
+    'labStNouveau': '新提交',
+    'labStEtude': '研究中',
+    'labStPlanifie': '已计划',
+    'labStEnCours': '进行中',
+    'labStLivre': '已上线',
+    'labStEcarte': '已搁置',
+    'labTypeAll': '改进与新功能',
+    'labTypeAmelioration': '改进',
+    'labTypeNouveaute': '新功能',
+    'labSortVotes': '支持最多',
+    'labSortRecent': '最新',
+    'labLoading': '加载中…',
+    'labError': '加载错误。请确认 Supabase 中存在 <code>lab_*</code> 数据表（迁移脚本 <code>sql/030_lab.sql</code>）。',
+    'labNoIdea': '暂无想法。来提第一个吧！',
+    'labAvgNone': '尚未评分',
+    'labAvgOne': '条评价',
+    'labAvgMany': '条评价',
+    'labYourNote': '您的评分',
+    'labSave': '保存',
+    'labNoteSaved': '谢谢，您的评分已保存。',
+    'labNotePlaceholder': '哪些好用、哪些不便、什么能帮您省时间…',
+    'labSuggest': '💡 提出改进建议',
+    'labSeeAvis': '查看评论',
+    'labHideAvis': '隐藏评论',
+    'labNoAvis': '该功能暂无评论。',
+    'labVoteLabel': '支持',
+    'labVoteLabelP': '支持',
+    'labComments': '评论',
+    'labCommentPlaceholder': '参与讨论…',
+    'labCommentSend': '发送',
+    'labCommentPosted': '评论已添加。',
+    'labConfirmDeleteIdee': '删除这个想法及其全部讨论？',
+    'labConfirmDeleteComm': '删除这条评论？',
+    'labIdeaModalTitle': '新想法',
+    'labFieldType': '类型',
+    'labFieldFonction': '相关功能',
+    'labFonctionNone': '无特定功能',
+    'labFieldTitre': '标题',
+    'labTitrePlaceholder': '用一句话概括这个想法…',
+    'labFieldDesc': '描述',
+    'labDescPlaceholder': '需求是什么？在什么情况下？理想的解决方案是怎样的？',
+    'labSubmitIdea': '发布',
+    'labIdeaPosted': '想法已发布！感谢您推动应用进步。',
+    'labErrTitre': '标题至少需要 3 个字符。',
+    'labErrDesc': '描述不能为空。',
+    'labErrNote': '请先选择星级。',
+    'labDemoUnavail': '演示模式下不可用 — 请登录后参与。',
+    'labStatut': '状态',
+    'labApply': '应用',
+    'labReponse': '团队回复',
+    'labReponsePlaceholder': '团队的说明：为何计划、为何搁置，或还缺什么才能决定…',
+    'labStatutSaved': '状态已更新。',
+    'labBy': '来自',
+    'labAdminHint': '管理员：您可以推进想法的状态并回复提出者。',
+    'labFonctionsIntro': '每项功能 1 至 5 分，如需说明可附上评论。您随时可以回来修改。',
+    'labFn_babillard': '公告板',
+    'labFnD_babillard': '邻里之间的公告与留言。',
+    'labFn_dashboard': '仪表板',
+    'labFnD_dashboard': '余额、进行中的预约、个人摘要。',
+    'labFn_spaces': '公共空间',
+    'labFnD_spaces': '以 15 分钟为单位预约场地和设备。',
+    'labFn_serre': '社区温室',
+    'labFnD_serre': '温室平面图、区域、作物、采收与环境数据。',
+    'labFn_trips': '共享汽车',
+    'labFnD_trips': '行程、乘客申请与货舱。',
+    'labFn_lunch': '午餐机',
+    'labFnD_lunch': '冷藏格口、排队与取餐。',
+    'labFn_tickets': '工单',
+    'labFnD_tickets': '向管理员提交请求并跟踪处理进度。',
+    'labFn_transactions': '交易记录',
+    'labFnD_transactions': '虚拟余额与付款的历史记录。',
+    'labFn_profile': '个人资料与合同',
+    'labFnD_profile': '您的信息、租约、使用条款。',
+    'labFn_langues': '多语言',
+    'labFnD_langues': '法语、英语、西班牙语、中文。',
+    'labFn_mobile': '移动端使用',
+    'labFnD_mobile': '手机和平板上的体验，安装为应用。',
+    'labFn_lab': 'LAB 本身',
+    'labFnD_lab': '这个页面：这是让您参与的好方式吗？',
     'navTickets': '工单',
     'tkTitle': '🎫 工单',
     'tkSubtitle': '由管理员处理的请求 —— 跟踪您的处理进度',
@@ -5748,6 +6446,7 @@ function ptApply() {
   if (activePage && typeof navigateTo === 'function') {
     const map = {
       'page-dashboard': 'dashboard',
+      'page-lab': 'lab',
       'page-tickets': 'tickets',
       'page-spaces': 'spaces',
       'page-trips': 'trips',
@@ -5811,6 +6510,7 @@ const LANGS = {
     navDashboard: 'Tableau de bord',
     navConditions: 'Conditions',
     navBabillard: '📌 Babillard',
+    navLab: 'LAB',
     navTickets: 'Billets',
     navSpaces: 'Espaces',
     navTrips: 'Auto-partage',
@@ -5905,6 +6605,7 @@ const LANGS = {
     navDashboard: 'Dashboard',
     navConditions: 'Terms',
     navBabillard: '📌 Bulletin board',
+    navLab: 'LAB',
     navTickets: 'Tickets',
     navSpaces: 'Spaces',
     navTrips: 'Carpooling',
@@ -5986,6 +6687,7 @@ const LANGS = {
     navDashboard: 'Tablero',
     navConditions: 'Condiciones',
     navBabillard: '📌 Tablón',
+    navLab: 'LAB',
     navTickets: 'Tickets',
     navSpaces: 'Espacios',
     navTrips: 'Coche compartido',
@@ -6066,6 +6768,7 @@ const LANGS = {
     navDashboard: '仪表板',
     navConditions: '条款',
     navBabillard: '📌 公告板',
+    navLab: 'LAB',
     navTickets: '工单',
     navSpaces: '空间',
     navTrips: '拼车',
@@ -6385,7 +7088,9 @@ function buildNav() {
     const espaces = { key: 'spaces', label: '🏢 ' + t('navSpaces') };
     if (condense && (trips.length || lunch.length)) espaces.enfants = [...trips, ...lunch];
     return [
-      { key: 'babillard', label: t('navBabillard') },
+      { key: 'babillard', label: t('navBabillard'), enfants: [
+        { key: 'lab', label: '🧪 ' + t('navLab') }
+      ] },
       { key: 'dashboard', label: '🏠 ' + t('navDashboard'), enfants: [
         { key: 'transactions', label: '💳 ' + t('navTransactions') }
       ] },
@@ -6562,6 +7267,7 @@ function navigateTo(page) {
     case 'dashboard': loadDashboard(); break;
     case 'conditions': loadConditions(); break;
     case 'babillard': loadBabillard(); break;
+    case 'lab': loadLab(); break;
     case 'tickets': loadTickets(); break;
     case 'spaces': loadSpaces(); break;
     case 'trips': loadTrips(); break;
@@ -6578,7 +7284,7 @@ function navigateTo(page) {
 }
 
 function pageName(page) {
-  const map = { conditions: 'conditions', dashboard: 'tableau', babillard: 'babillard', tickets: 'billet', spaces: 'espace', trips: 'auto', transactions: 'transaction', profile: 'profil', admin: 'admin', lunch: 'lunch' };
+  const map = { conditions: 'conditions', dashboard: 'tableau', babillard: 'babillard', lab: 'lab', tickets: 'billet', spaces: 'espace', trips: 'auto', transactions: 'transaction', profile: 'profil', admin: 'admin', lunch: 'lunch' };
   return map[page] || page;
 }
 
@@ -14571,6 +15277,513 @@ async function bbDeletePost(id) {
   }
 }
 
+
+// ==========================================
+// LAB — AMELIORATION CONTINUE
+// ==========================================
+// Le babillard fait circuler la parole entre voisins ; le LAB la fait
+// remonter vers l'app. Deux gestes, volontairement separes :
+//
+//   1. qualifier l'existant — une note de 1 a 5 par fonction, avec un
+//      commentaire libre. C'est la mesure : on voit tout de suite ce qui
+//      est bon et ce qui traine ;
+//   2. proposer — une amelioration ou une fonction qui manque, que la
+//      communaute appuie par un vote et enrichit par un fil de
+//      discussion.
+//
+// Tout est stocke en base (tables lab_*, migration sql/030_lab.sql) :
+// c'est la matiere premiere des prochaines versions, elle ne doit pas
+// vivre dans le navigateur de la personne qui l'a ecrite.
+
+// Liste des fonctions soumises a evaluation. Elle suit le code, pas la
+// base : une fonction retiree disparait d'ici, ses evaluations restent en
+// base sans gener personne. `module` masque l'entree quand le module
+// n'est pas active pour l'immeuble — on ne demande pas d'avis sur une
+// serre qui n'existe pas.
+const LAB_FONCTIONS = [
+  { key: 'babillard',    icon: '📌' },
+  { key: 'dashboard',    icon: '🏠' },
+  { key: 'spaces',       icon: '🏢' },
+  { key: 'serre',        icon: '🌱', module: 'serre' },
+  { key: 'trips',        icon: '🚗', module: 'trips' },
+  { key: 'lunch',        icon: '🍱', module: 'lunch' },
+  { key: 'tickets',      icon: '🎫' },
+  { key: 'transactions', icon: '💳' },
+  { key: 'profile',      icon: '👤' },
+  { key: 'langues',      icon: '🌐' },
+  { key: 'mobile',       icon: '📱' },
+  { key: 'lab',          icon: '🧪' },
+];
+
+const LAB_STATUTS = ['nouveau', 'a_l_etude', 'planifie', 'en_cours', 'livre', 'ecarte'];
+const LAB_STATUT_PT = {
+  nouveau: 'labStNouveau', a_l_etude: 'labStEtude', planifie: 'labStPlanifie',
+  en_cours: 'labStEnCours', livre: 'labStLivre', ecarte: 'labStEcarte'
+};
+
+let _labOnglet   = 'qualif';
+let _labEvals    = [];   // toutes les evaluations, toutes personnes confondues
+let _labIdees    = [];
+let _labVotes    = [];
+let _labComms    = [];
+let _labNotes    = {};   // fonction -> note cliquee mais pas encore enregistree
+let _labAvisOpen = {};   // fonction -> commentaires deplies ?
+let _labFilOpen  = {};   // idee_id  -> fil deplie ?
+
+function labFonctionsActives() {
+  return LAB_FONCTIONS.filter(f => !f.module || window.appModules?.[f.module] !== false);
+}
+
+function labEstAdmin() {
+  return currentProfile?.role === 'admin' || currentProfile?.role === 'principal_admin';
+}
+
+function labNom(ligne) {
+  const brut = ligne?.profiles?.full_name;
+  if (!brut) return pt('bbAuthor');
+  return isDemo ? anonName(ligne.profiles?.id || brut) : brut;
+}
+
+function labDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString(appLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function labSwitchTab(onglet) {
+  _labOnglet = onglet;
+  document.getElementById('lab-tab-qualif')?.classList.toggle('active', onglet === 'qualif');
+  document.getElementById('lab-tab-idees')?.classList.toggle('active', onglet === 'idees');
+  const vq = document.getElementById('lab-view-qualif');
+  const vi = document.getElementById('lab-view-idees');
+  if (vq) vq.style.display = onglet === 'qualif' ? '' : 'none';
+  if (vi) vi.style.display = onglet === 'idees' ? '' : 'none';
+  trackFeature('lab', 'switch_tab', { lab_tab: onglet });
+}
+
+// ── Chargement ──────────────────────────────────────────────────────────
+
+async function loadLab() {
+  const grille = document.getElementById('lab-fonctions');
+  const liste  = document.getElementById('lab-idees');
+  if (!grille || !liste) return;
+  grille.innerHTML = '<div class="lab-empty"><div class="spinner"></div>' + pt('labLoading') + '</div>';
+  liste.innerHTML  = '';
+
+  if (isDemo) {
+    labChargerDemo();
+    labRenderFonctions();
+    labRenderIdees();
+    return;
+  }
+
+  // Quatre tables, une seule attente : rien ne depend de rien ici.
+  const [evals, idees, votes, comms] = await Promise.all([
+    sb.from('lab_evaluations').select('*, profiles(id, full_name)').order('updated_at', { ascending: false }).limit(2000),
+    sb.from('lab_idees').select('*, profiles(id, full_name)').order('created_at', { ascending: false }).limit(300),
+    sb.from('lab_idee_votes').select('idee_id, user_id').limit(5000),
+    sb.from('lab_idee_commentaires').select('*, profiles(id, full_name)').order('created_at', { ascending: true }).limit(2000),
+  ]);
+
+  const err = evals.error || idees.error || votes.error || comms.error;
+  if (err) {
+    console.error('lab load error:', err);
+    grille.innerHTML = '<div class="lab-empty"><div class="empty-icon">⚠️</div>' + pt('labError') + '</div>';
+    liste.innerHTML  = '<div class="lab-empty"><div class="empty-icon">⚠️</div>' + pt('labError') + '</div>';
+    return;
+  }
+
+  _labEvals = evals.data || [];
+  _labIdees = idees.data || [];
+  _labVotes = votes.data || [];
+  _labComms = comms.data || [];
+  _labNotes = {};
+
+  labRenderFonctions();
+  labRenderIdees();
+}
+
+// Jeu de demonstration : le LAB doit se comprendre sans compte, sinon
+// personne ne devine a quoi sert l'onglet.
+function labChargerDemo() {
+  const jours = n => new Date(Date.now() - n * 86400000).toISOString();
+  const gens = [
+    { id: 'demo-a', full_name: 'Marie Côté' },
+    { id: 'demo-b', full_name: 'Julien Fortin' },
+    { id: 'demo-c', full_name: 'Alex Tremblay' },
+  ];
+  _labEvals = [
+    { id: 'e1', fonction: 'spaces',    note: 5, commentaire: "Réserver la salle commune prend dix secondes, rien à redire.", created_at: jours(9),  updated_at: jours(9),  profiles: gens[0], user_id: 'demo-a' },
+    { id: 'e2', fonction: 'spaces',    note: 4, commentaire: null, created_at: jours(6), updated_at: jours(6), profiles: gens[1], user_id: 'demo-b' },
+    { id: 'e3', fonction: 'trips',     note: 3, commentaire: "J'aimerais voir les trajets récurrents sans les republier chaque semaine.", created_at: jours(4), updated_at: jours(4), profiles: gens[1], user_id: 'demo-b' },
+    { id: 'e4', fonction: 'serre',     note: 5, commentaire: "Le plan vertical est très clair sur téléphone.", created_at: jours(3), updated_at: jours(3), profiles: gens[2], user_id: 'demo-c' },
+    { id: 'e5', fonction: 'babillard', note: 4, commentaire: null, created_at: jours(2), updated_at: jours(2), profiles: gens[0], user_id: 'demo-a' },
+    { id: 'e6', fonction: 'lunch',     note: 2, commentaire: "La file d'attente n'est pas évidente quand deux personnes arrivent en même temps.", created_at: jours(1), updated_at: jours(1), profiles: gens[2], user_id: 'demo-c' },
+  ];
+  _labIdees = [
+    { id: 'i1', type: 'nouveaute', fonction: null, titre: "Notifications par courriel pour les annonces importantes", description: "Un courriel quand une annonce est marquée urgente au babillard, pour ceux qui n'ouvrent pas l'app tous les jours.", statut: 'a_l_etude', reponse: null, created_at: jours(7), updated_at: jours(7), profiles: gens[0], user_id: 'demo-a' },
+    { id: 'i2', type: 'amelioration', fonction: 'trips', titre: "Trajets récurrents", description: "Publier un trajet une fois avec « tous les lundis » plutôt que de le recréer chaque semaine.", statut: 'planifie', reponse: "Retenu pour la prochaine version : la table trips accepte déjà une récurrence, il reste l'interface.", created_at: jours(5), updated_at: jours(2), profiles: gens[1], user_id: 'demo-b' },
+    { id: 'i3', type: 'amelioration', fonction: 'lunch', titre: "Voir sa position dans la file", description: "Afficher « vous êtes 2e » plutôt qu'un simple compteur.", statut: 'nouveau', reponse: null, created_at: jours(1), updated_at: jours(1), profiles: gens[2], user_id: 'demo-c' },
+  ];
+  _labVotes = [
+    { idee_id: 'i1', user_id: 'demo-b' }, { idee_id: 'i1', user_id: 'demo-c' },
+    { idee_id: 'i2', user_id: 'demo-a' }, { idee_id: 'i2', user_id: 'demo-c' }, { idee_id: 'i2', user_id: 'demo-b' },
+    { idee_id: 'i3', user_id: 'demo-a' },
+  ];
+  _labComms = [
+    { id: 'c1', idee_id: 'i2', contenu: "Avec la possibilité de sauter une semaine de vacances ?", created_at: jours(4), profiles: gens[2], user_id: 'demo-c' },
+    { id: 'c2', idee_id: 'i2', contenu: "Oui, une case « annuler cette occurrence » suffirait.", created_at: jours(3), profiles: gens[1], user_id: 'demo-b' },
+  ];
+  _labNotes = {};
+}
+
+// ── Vue 1 : qualifier les fonctions ─────────────────────────────────────
+
+function labStatsFonction(cle) {
+  const lignes = _labEvals.filter(e => e.fonction === cle);
+  const repartition = [0, 0, 0, 0, 0];   // index 0 = 1 etoile
+  let somme = 0;
+  for (const l of lignes) { repartition[l.note - 1]++; somme += l.note; }
+  return {
+    n: lignes.length,
+    moyenne: lignes.length ? somme / lignes.length : 0,
+    repartition,
+    avis: lignes.filter(l => (l.commentaire || '').trim()),
+  };
+}
+
+function labEtoiles(cle, active, interactif) {
+  let html = '<div class="lab-stars" id="lab-stars-' + cle + '">';
+  for (let i = 1; i <= 5; i++) {
+    const cls = 'lab-star' + (i <= active ? ' on' : '') + (interactif ? '' : ' readonly');
+    const clic = interactif ? ` onclick="labSetNote('${cle}',${i})"` : '';
+    const titre = interactif ? ` title="${i}/5"` : '';
+    html += `<button type="button" class="${cls}" data-n="${i}"${clic}${titre} aria-label="${i}/5">★</button>`;
+  }
+  return html + '</div>';
+}
+
+function labRenderFonctions() {
+  const grille = document.getElementById('lab-fonctions');
+  if (!grille) return;
+  const moi = currentProfile?.id;
+
+  grille.innerHTML = labFonctionsActives().map(f => {
+    const s = labStatsFonction(f.key);
+    const mienne = _labEvals.find(e => e.fonction === f.key && e.user_id === moi);
+    const note = _labNotes[f.key] ?? mienne?.note ?? 0;
+
+    const moyenne = s.n
+      ? `<strong>${s.moyenne.toFixed(1)}</strong> ★ · ${s.n} ${s.n > 1 ? pt('labAvgMany') : pt('labAvgOne')}`
+      : pt('labAvgNone');
+
+    // Repartition : seulement quand il y a de quoi comparer. Deux notes ne
+    // font pas une distribution, elles font du bruit visuel.
+    const barres = s.n >= 3 ? `<div class="lab-bars">` + [5, 4, 3, 2, 1].map(n => {
+      const c = s.repartition[n - 1];
+      const pct = s.n ? Math.round(c * 100 / s.n) : 0;
+      return `<div class="lab-bar-row"><span>${n}★</span>
+        <div class="lab-bar-track"><div class="lab-bar-fill" style="width:${pct}%"></div></div>
+        <span>${c}</span></div>`;
+    }).join('') + `</div>` : '';
+
+    const avis = s.avis.length ? `
+      <div class="lab-avis" id="lab-avis-${f.key}" style="display:${_labAvisOpen[f.key] ? '' : 'none'}">
+        ${s.avis.map(a => `<div class="lab-avis-item">
+            <span class="lab-avis-auteur">${escHtml(labNom(a))}</span>
+            <span style="color:var(--accent)">${'★'.repeat(a.note)}</span>
+            <span style="color:var(--text3)">· ${labDate(a.updated_at || a.created_at)}</span>
+            <div class="lab-avis-texte">${escHtml(a.commentaire)}</div>
+          </div>`).join('')}
+      </div>` : '';
+
+    const boutonAvis = s.avis.length
+      ? `<button class="btn btn-secondary btn-sm" onclick="labToggleAvis('${f.key}')" id="lab-avis-btn-${f.key}">${
+           (_labAvisOpen[f.key] ? pt('labHideAvis') : pt('labSeeAvis'))} (${s.avis.length})</button>`
+      : '';
+
+    return `
+    <div class="lab-card" id="lab-card-${f.key}">
+      <div class="lab-card-head">
+        <div class="lab-card-title">${f.icon} ${escHtml(pt('labFn_' + f.key))}</div>
+        <div class="lab-card-avg">${moyenne}</div>
+      </div>
+      <div class="lab-card-desc">${escHtml(pt('labFnD_' + f.key))}</div>
+      <div class="lab-note-row">
+        <span class="lab-note-label">${pt('labYourNote')}</span>
+        ${labEtoiles(f.key, note, true)}
+      </div>
+      <textarea id="lab-comm-${f.key}" maxlength="2000" placeholder="${escHtml(pt('labNotePlaceholder'))}">${escHtml(mienne?.commentaire || '')}</textarea>
+      <div class="lab-card-actions">
+        ${boutonAvis}
+        <button class="btn btn-secondary btn-sm" onclick="labOpenIdee('${f.key}')">${pt('labSuggest')}</button>
+        <button class="btn btn-primary btn-sm" onclick="labSaveNote('${f.key}')">${pt('labSave')}</button>
+      </div>
+      ${barres}
+      ${avis}
+    </div>`;
+  }).join('');
+}
+
+// Cliquer une etoile ne sauvegarde pas : on repeint les etoiles sur place
+// pour ne pas effacer le commentaire en cours de frappe.
+function labSetNote(cle, n) {
+  _labNotes[cle] = n;
+  const conteneur = document.getElementById('lab-stars-' + cle);
+  if (!conteneur) return;
+  conteneur.querySelectorAll('.lab-star').forEach(b => {
+    b.classList.toggle('on', Number(b.dataset.n) <= n);
+  });
+}
+
+function labToggleAvis(cle) {
+  _labAvisOpen[cle] = !_labAvisOpen[cle];
+  const bloc = document.getElementById('lab-avis-' + cle);
+  const btn  = document.getElementById('lab-avis-btn-' + cle);
+  if (bloc) bloc.style.display = _labAvisOpen[cle] ? '' : 'none';
+  if (btn) {
+    const n = btn.textContent.match(/\((\d+)\)/)?.[1] || '';
+    btn.textContent = (_labAvisOpen[cle] ? pt('labHideAvis') : pt('labSeeAvis')) + (n ? ` (${n})` : '');
+  }
+}
+
+async function labSaveNote(cle) {
+  if (isDemo) { toast(pt('labDemoUnavail'), 'info'); return; }
+  const moi = currentProfile?.id;
+  const mienne = _labEvals.find(e => e.fonction === cle && e.user_id === moi);
+  const note = _labNotes[cle] ?? mienne?.note ?? 0;
+  if (!note) { toast(pt('labErrNote'), 'error'); return; }
+
+  const commentaire = document.getElementById('lab-comm-' + cle)?.value?.trim() || null;
+  const { error } = await sb.from('lab_evaluations').upsert({
+    user_id: moi,
+    fonction: cle,
+    note,
+    commentaire,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'user_id,fonction' });
+
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  toast(pt('labNoteSaved'), 'success');
+  trackFeature('lab', 'rate_feature', { lab_feature: cle, lab_rating: note, lab_has_comment: !!commentaire });
+  delete _labNotes[cle];
+  await loadLab();
+}
+
+// ── Vue 2 : idees ───────────────────────────────────────────────────────
+
+function labVotesDe(id)   { return _labVotes.filter(v => v.idee_id === id).length; }
+function labAiVote(id)    { return _labVotes.some(v => v.idee_id === id && v.user_id === currentProfile?.id); }
+function labCommsDe(id)   { return _labComms.filter(c => c.idee_id === id); }
+
+function labRenderIdees() {
+  const liste = document.getElementById('lab-idees');
+  if (!liste) return;
+
+  const fStatut = document.getElementById('lab-filter-statut')?.value ?? 'actives';
+  const fType   = document.getElementById('lab-filter-type')?.value ?? '';
+  const tri     = document.getElementById('lab-sort')?.value ?? 'votes';
+
+  let lignes = _labIdees.slice();
+  // « En discussion » = tout ce qui n'est pas classe. Une idee livree ou
+  // ecartee reste consultable, mais n'encombre plus la liste de travail.
+  if (fStatut === 'actives') lignes = lignes.filter(i => i.statut !== 'livre' && i.statut !== 'ecarte');
+  else if (fStatut)          lignes = lignes.filter(i => i.statut === fStatut);
+  if (fType)                 lignes = lignes.filter(i => i.type === fType);
+
+  if (tri === 'votes') lignes.sort((a, b) => labVotesDe(b.id) - labVotesDe(a.id) || new Date(b.created_at) - new Date(a.created_at));
+  else                 lignes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  if (!lignes.length) {
+    liste.innerHTML = '<div class="lab-empty"><div class="empty-icon">💡</div>' + pt('labNoIdea') + '</div>';
+    return;
+  }
+
+  const admin = labEstAdmin();
+  liste.innerHTML = (admin ? `<div class="lab-intro">${pt('labAdminHint')}</div>` : '')
+    + lignes.map(i => labRenderIdee(i, admin)).join('');
+}
+
+function labRenderIdee(i, admin) {
+  const nVotes    = labVotesDe(i.id);
+  const jaiVote   = labAiVote(i.id);
+  const comms     = labCommsDe(i.id);
+  const estAuteur = i.user_id === currentProfile?.id;
+  const fonction  = i.fonction ? `<span>${escHtml(pt('labFn_' + i.fonction))}</span>` : '';
+  const filOuvert = !!_labFilOpen[i.id];
+
+  const outilsAdmin = admin ? `
+    <div style="margin-top:12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+        <label style="text-transform:none;font-size:0.82rem;color:var(--text2);margin:0;">${pt('labStatut')}</label>
+        <select id="lab-statut-${i.id}" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:0.86rem;">
+          ${LAB_STATUTS.map(s => `<option value="${s}"${s === i.statut ? ' selected' : ''}>${pt(LAB_STATUT_PT[s])}</option>`).join('')}
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="labSetStatut('${i.id}')">${pt('labApply')}</button>
+      </div>
+      <textarea id="lab-reponse-${i.id}" maxlength="2000" rows="2" style="width:100%;resize:vertical;font-size:0.85rem;" placeholder="${escHtml(pt('labReponsePlaceholder'))}">${escHtml(i.reponse || '')}</textarea>
+    </div>` : '';
+
+  const fil = `
+    <div class="lab-fil" id="lab-fil-${i.id}" style="display:${filOuvert ? '' : 'none'}">
+      ${comms.map(c => `
+        <div class="lab-fil-msg">
+          <div class="lab-fil-head">
+            <span class="lab-fil-auteur">${escHtml(labNom(c))}</span>
+            <span>${labDate(c.created_at)}${(c.user_id === currentProfile?.id || admin)
+              ? ` · <a href="javascript:void(0)" onclick="labDeleteComment('${c.id}')" style="color:var(--text3)">✕</a>` : ''}</span>
+          </div>
+          <div class="lab-fil-texte">${escHtml(c.contenu)}</div>
+        </div>`).join('')}
+      <div class="lab-fil-form">
+        <textarea id="lab-comm-idee-${i.id}" rows="1" maxlength="2000" placeholder="${escHtml(pt('labCommentPlaceholder'))}"></textarea>
+        <button class="btn btn-secondary btn-sm" onclick="labSendComment('${i.id}')">${pt('labCommentSend')}</button>
+      </div>
+    </div>`;
+
+  return `
+  <div class="lab-idee" id="lab-idee-${i.id}">
+    <button class="lab-vote${jaiVote ? ' on' : ''}" onclick="labToggleVote('${i.id}')" title="${pt('labVoteLabel')}">
+      <span>▲</span>
+      <span class="lab-vote-count">${nVotes}</span>
+      <span class="lab-vote-label">${nVotes > 1 ? pt('labVoteLabelP') : pt('labVoteLabel')}</span>
+    </button>
+    <div class="lab-idee-body">
+      <div class="lab-idee-titre">${escHtml(i.titre)}</div>
+      <div class="lab-idee-meta">
+        <span class="lab-badge lab-type-${i.type}">${pt(i.type === 'nouveaute' ? 'labTypeNouveaute' : 'labTypeAmelioration')}</span>
+        <span class="lab-badge lab-st-${i.statut}">${pt(LAB_STATUT_PT[i.statut] || 'labStNouveau')}</span>
+        ${fonction}
+        <span>${pt('labBy')} ${escHtml(labNom(i))} · ${labDate(i.created_at)}</span>
+        ${(estAuteur || labEstAdmin())
+          ? `<a href="javascript:void(0)" onclick="labDeleteIdee('${i.id}')" style="color:var(--text3);margin-left:auto">✕</a>` : ''}
+      </div>
+      <div class="lab-idee-desc">${escHtml(i.description)}</div>
+      ${i.reponse ? `<div class="lab-reponse"><strong>${pt('labReponse')} :</strong> ${escHtml(i.reponse)}</div>` : ''}
+      <div class="lab-card-actions" style="justify-content:flex-start">
+        <button class="btn btn-secondary btn-sm" onclick="labToggleFil('${i.id}')" id="lab-fil-btn-${i.id}">💬 ${pt('labComments')} (${comms.length})</button>
+      </div>
+      ${outilsAdmin}
+      ${fil}
+    </div>
+  </div>`;
+}
+
+function labToggleFil(id) {
+  _labFilOpen[id] = !_labFilOpen[id];
+  const bloc = document.getElementById('lab-fil-' + id);
+  if (bloc) bloc.style.display = _labFilOpen[id] ? '' : 'none';
+}
+
+async function labToggleVote(id) {
+  if (isDemo) { toast(pt('labDemoUnavail'), 'info'); return; }
+  const moi = currentProfile?.id;
+  const dejaVote = labAiVote(id);
+
+  const { error } = dejaVote
+    ? await sb.from('lab_idee_votes').delete().eq('idee_id', id).eq('user_id', moi)
+    : await sb.from('lab_idee_votes').insert({ idee_id: id, user_id: moi });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+
+  // Mise a jour locale : un vote doit repondre au doigt, pas au reseau.
+  _labVotes = dejaVote
+    ? _labVotes.filter(v => !(v.idee_id === id && v.user_id === moi))
+    : [..._labVotes, { idee_id: id, user_id: moi }];
+  trackFeature('lab', dejaVote ? 'unvote_idea' : 'vote_idea', { lab_idea: id });
+  labRenderIdees();
+}
+
+async function labSendComment(id) {
+  if (isDemo) { toast(pt('labDemoUnavail'), 'info'); return; }
+  const ta = document.getElementById('lab-comm-idee-' + id);
+  const contenu = ta?.value?.trim();
+  if (!contenu) return;
+  const { error } = await sb.from('lab_idee_commentaires').insert({
+    idee_id: id, user_id: currentProfile.id, contenu
+  });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  ta.value = '';
+  toast(pt('labCommentPosted'), 'success');
+  trackFeature('lab', 'comment_idea', { lab_idea: id });
+  _labFilOpen[id] = true;
+  await loadLab();
+}
+
+async function labDeleteComment(id) {
+  if (isDemo) { toast(pt('labDemoUnavail'), 'info'); return; }
+  if (!confirm(pt('labConfirmDeleteComm'))) return;
+  const { error } = await sb.from('lab_idee_commentaires').delete().eq('id', id);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  await loadLab();
+}
+
+async function labDeleteIdee(id) {
+  if (isDemo) { toast(pt('labDemoUnavail'), 'info'); return; }
+  if (!confirm(pt('labConfirmDeleteIdee'))) return;
+  const { error } = await sb.from('lab_idees').delete().eq('id', id);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  await loadLab();
+}
+
+async function labSetStatut(id) {
+  if (isDemo) { toast(pt('labDemoUnavail'), 'info'); return; }
+  const statut  = document.getElementById('lab-statut-' + id)?.value;
+  const reponse = document.getElementById('lab-reponse-' + id)?.value?.trim() || null;
+  if (!statut) return;
+  const { error } = await sb.from('lab_idees').update({ statut, reponse }).eq('id', id);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  toast(pt('labStatutSaved'), 'success');
+  trackFeature('lab', 'set_idea_status', { lab_idea: id, lab_status: statut });
+  await loadLab();
+}
+
+// ── Depot d'une idee ────────────────────────────────────────────────────
+
+// Le bouton « Proposer une amelioration » d'une carte prefixe le
+// formulaire : on arrive du bon endroit, l'idee arrive deja rangee.
+function labOpenIdee(fonction) {
+  if (isDemo) { toast(pt('labDemoUnavail'), 'info'); return; }
+  const sel = document.getElementById('lab-idee-fonction');
+  if (sel) {
+    sel.innerHTML = `<option value="">${escHtml(pt('labFonctionNone'))}</option>`
+      + labFonctionsActives().map(f => `<option value="${f.key}">${f.icon} ${escHtml(pt('labFn_' + f.key))}</option>`).join('');
+    sel.value = fonction || '';
+  }
+  const type = document.getElementById('lab-idee-type');
+  if (type) type.value = fonction ? 'amelioration' : 'nouveaute';
+  const titre = document.getElementById('lab-idee-titre');
+  const desc  = document.getElementById('lab-idee-desc');
+  if (titre) titre.value = '';
+  if (desc)  desc.value  = '';
+  openModal('modal-lab-idee');
+}
+
+async function labSubmitIdee() {
+  if (isDemo) { toast(pt('labDemoUnavail'), 'info'); return; }
+  const titre = document.getElementById('lab-idee-titre')?.value?.trim();
+  const description = document.getElementById('lab-idee-desc')?.value?.trim();
+  const type = document.getElementById('lab-idee-type')?.value || 'amelioration';
+  const fonction = document.getElementById('lab-idee-fonction')?.value || null;
+
+  if (!titre || titre.length < 3) { toast(pt('labErrTitre'), 'error'); return; }
+  if (!description)              { toast(pt('labErrDesc'), 'error'); return; }
+
+  const { data, error } = await sb.from('lab_idees')
+    .insert({ user_id: currentProfile.id, type, fonction, titre, description, statut: 'nouveau' })
+    .select('id')
+    .single();
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+
+  // L'auteur appuie sa propre idee : sans ca, une idee toute neuve
+  // s'affiche a zero voix, ce qui se lit comme un desaveu.
+  if (data?.id) await sb.from('lab_idee_votes').insert({ idee_id: data.id, user_id: currentProfile.id });
+
+  closeModal('modal-lab-idee');
+  toast(pt('labIdeaPosted'), 'success');
+  trackFeature('lab', 'submit_idea', { lab_type: type, lab_feature: fonction || 'none' });
+  await loadLab();
+  labSwitchTab('idees');
+}
+
 // ==========================================
 // BILLETS (TICKETS)
 // ==========================================
@@ -14905,6 +16118,45 @@ async function _tkRefreshBadge() {
 }
 
 </script>
+
+<!-- Modal nouvelle idee LAB -->
+<div class="modal-overlay" id="modal-lab-idee">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h3 class="modal-title" data-pt="labIdeaModalTitle">Nouvelle idée</h3>
+      <button class="btn-icon btn-secondary" onclick="closeModal('modal-lab-idee')">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group" style="margin:0">
+          <label data-pt="labFieldType">Type</label>
+          <select id="lab-idee-type">
+            <option value="amelioration" data-pt="labTypeAmelioration">Amélioration</option>
+            <option value="nouveaute" data-pt="labTypeNouveaute">Nouvelle fonction</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label data-pt="labFieldFonction">Fonction concernée</label>
+          <select id="lab-idee-fonction">
+            <option value="" data-pt="labFonctionNone">Aucune en particulier</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label data-pt="labFieldTitre">Titre</label>
+        <input type="text" id="lab-idee-titre" maxlength="160" placeholder="Résumez l'idée en une ligne…" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label data-pt="labFieldDesc">Description</label>
+        <textarea id="lab-idee-desc" rows="5" maxlength="4000" placeholder="Quel est le besoin ? Dans quelle situation ? À quoi ressemblerait la solution idéale ?" style="resize:vertical;min-height:110px;"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal('modal-lab-idee')" data-pt="Annuler">Annuler</button>
+        <button class="btn btn-primary" style="flex:1" onclick="labSubmitIdee()" data-pt="labSubmitIdea">Publier</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Modal création billet -->
 <div class="modal-overlay" id="modal-ticket-create">
