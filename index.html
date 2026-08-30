@@ -2936,18 +2936,42 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
   </div>
 </div>
 
-<!-- Rendre un vehicule : declaration des kilometres -->
+<!-- Prendre un vehicule : confirmation du compteur -->
+<div class="modal-overlay" id="modal-pickup-vehicle">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <h3 id="mob-pickup-title">Prendre le véhicule</h3>
+      <button class="modal-close" onclick="closeModal('modal-pickup-vehicle')">×</button>
+    </div>
+    <p style="font-size:0.88rem;color:var(--text2);line-height:1.6;margin-bottom:14px;" data-pt="mobPickupIntro">Relevez le compteur et confirmez-le. C'est ce relevé qui sert de point de départ à votre facturation, et il confirme celui laissé par la personne précédente.</p>
+    <div class="form-group">
+      <label data-pt="mobOdoLabel">Compteur (km)</label>
+      <input type="number" id="mob-pickup-km" min="0" step="0.1" placeholder="0" autocomplete="off"
+             oninput="mobUpdatePickupEcart()">
+      <small style="color:var(--text3)"><span data-pt="mobOdoExpected">Dernier relevé connu</span> : <span id="mob-pickup-attendu">0.0</span> km</small>
+    </div>
+    <div class="info-box" id="mob-pickup-ecart"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-pickup-vehicle')" data-pt="Annuler">Annuler</button>
+      <button class="btn btn-primary" onclick="mobConfirmPickup()" data-pt="mobPickupConfirm">Confirmer la prise</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rendre un vehicule : le compteur arrete le temps -->
 <div class="modal-overlay" id="modal-return-vehicle">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
       <h3 id="mob-return-title">Rendre le véhicule</h3>
       <button class="modal-close" onclick="closeModal('modal-return-vehicle')">×</button>
     </div>
+    <p style="font-size:0.88rem;color:var(--text2);line-height:1.6;margin-bottom:14px;" data-pt="mobReturnIntro">La saisie du compteur arrête le temps facturé. Rendre le véhicule plus tôt coûte moins cher et le remet à la disposition des voisins.</p>
     <div class="form-group">
-      <label data-pt="mobKmLabel">Kilomètres parcourus</label>
-      <input type="number" id="mob-return-km" min="0" max="5000" step="0.1" placeholder="0" autocomplete="off"
+      <label data-pt="mobOdoLabel">Compteur (km)</label>
+      <input type="number" id="mob-return-km" min="0" step="0.1" placeholder="0" autocomplete="off"
              oninput="mobUpdateReturnPreview()">
-      <small style="color:var(--text3)"><span data-pt="mobKmRate">Tarif</span> : <span id="mob-return-rate">0.00</span> $ / km</small>
+      <small style="color:var(--text3)"><span data-pt="mobOdoStart">Compteur au départ</span> : <span id="mob-return-depart">0.0</span> km ·
+        <span id="mob-return-min">0.00</span> $ / min · <span id="mob-return-rate">0.00</span> $ / km</small>
     </div>
     <div class="info-box" id="mob-return-preview"></div>
     <div class="modal-footer">
@@ -5418,6 +5442,30 @@ const PT = {
     'mobMinShort': 'min',
     'mobVehicle': 'Véhicule',
     'mobDemoBtn': 'Mode démo',
+    'mobFormulaTitle': 'La formule',
+    'mobFormulaMin': 'durée réelle en minutes',
+    'mobFormulaRateMin': 'tarif / min',
+    'mobFormulaKm': 'kilomètres parcourus',
+    'mobFormulaRateKm': 'tarif / km',
+    'mobFormulaNote': "La durée court de la prise du véhicule à son retour — pas jusqu'à la fin du créneau réservé. Les kilomètres sont la différence entre les deux relevés de compteur. Un acompte est prélevé à la réservation sur la base du créneau, puis ajusté au retour.",
+    'mobPickup': 'Prendre le véhicule',
+    'mobPickupIntro': "Relevez le compteur et confirmez-le. C'est ce relevé qui sert de point de départ à votre facturation, et il confirme celui laissé par la personne précédente.",
+    'mobReturnIntro': 'La saisie du compteur arrête le temps facturé. Rendre le véhicule plus tôt coûte moins cher et le remet à la disposition des voisins.',
+    'mobPickupConfirm': 'Confirmer la prise',
+    'mobPickupDone': 'Bonne route ! Le temps court à partir de maintenant.',
+    'mobInProgress': 'En cours',
+    'mobOdoLabel': 'Compteur (km)',
+    'mobOdoExpected': 'Dernier relevé connu',
+    'mobOdoStart': 'Compteur au départ',
+    'mobOdoMatch': 'Le compteur correspond au dernier relevé.',
+    'mobOdoGap': 'Écart avec le dernier relevé :',
+    'mobOdoGapNote': "il sera signalé à l'administration, votre facturation n'en tient pas compte.",
+    'mobDistanceLabel': 'Distance',
+    'mobDepositLabel': 'Acompte déjà prélevé',
+    'mobToPay': 'Reste à payer',
+    'mobToRefund': 'À vous rembourser',
+    'mobErrOdo': 'Indiquez le relevé du compteur.',
+    'mobErrOdoBack': 'Le compteur ne peut pas être inférieur à celui du départ.',
     'mobFeesTitle': 'Que couvre le tarif ?',
     'mobFeesTimeTitle': 'Le tarif à la minute',
     'mobFeesTime': "Il couvre ce qui court avec le temps, que le véhicule roule ou non : assurance, amortissement du véhicule, stationnement, et l'entretien du réseau de recharge — celui-ci coûte la même chose qu'on l'utilise beaucoup ou peu. Réserver, c'est immobiliser le véhicule pour soi.",
@@ -5698,6 +5746,30 @@ const PT = {
     'mobMinShort': 'min',
     'mobVehicle': 'Vehicle',
     'mobDemoBtn': 'Demo mode',
+    'mobFormulaTitle': 'The formula',
+    'mobFormulaMin': 'actual minutes',
+    'mobFormulaRateMin': 'rate / min',
+    'mobFormulaKm': 'kilometres driven',
+    'mobFormulaRateKm': 'rate / km',
+    'mobFormulaNote': 'Time runs from pickup to return — not to the end of the booked slot. Kilometres are the difference between the two odometer readings. A deposit based on the slot is taken at booking, then adjusted on return.',
+    'mobPickup': 'Pick up the vehicle',
+    'mobPickupIntro': 'Read the odometer and confirm it. That reading is the starting point of your billing, and it confirms the one left by the previous person.',
+    'mobReturnIntro': 'Entering the odometer stops the billed time. Returning the vehicle early costs less and puts it back at your neighbours&#39; disposal.',
+    'mobPickupConfirm': 'Confirm pickup',
+    'mobPickupDone': 'Safe travels! Time starts now.',
+    'mobInProgress': 'In use',
+    'mobOdoLabel': 'Odometer (km)',
+    'mobOdoExpected': 'Last known reading',
+    'mobOdoStart': 'Odometer at pickup',
+    'mobOdoMatch': 'The odometer matches the last reading.',
+    'mobOdoGap': 'Gap with the last reading:',
+    'mobOdoGapNote': 'it will be reported to the administration; your billing is unaffected.',
+    'mobDistanceLabel': 'Distance',
+    'mobDepositLabel': 'Deposit already taken',
+    'mobToPay': 'Left to pay',
+    'mobToRefund': 'To be refunded',
+    'mobErrOdo': 'Enter the odometer reading.',
+    'mobErrOdoBack': 'The odometer cannot be lower than at pickup.',
     'mobFeesTitle': 'What does the rate cover?',
     'mobFeesTimeTitle': 'The per-minute rate',
     'mobFeesTime': 'It covers what runs with time, whether the vehicle moves or not: insurance, vehicle depreciation, parking, and the upkeep of the charging network — which costs the same whether it is used a lot or a little. Booking means holding the vehicle for yourself.',
@@ -6119,6 +6191,30 @@ const PT = {
     'mobMinShort': 'min',
     'mobVehicle': 'Vehículo',
     'mobDemoBtn': 'Modo demo',
+    'mobFormulaTitle': 'La fórmula',
+    'mobFormulaMin': 'minutos reales',
+    'mobFormulaRateMin': 'tarifa / min',
+    'mobFormulaKm': 'kilómetros recorridos',
+    'mobFormulaRateKm': 'tarifa / km',
+    'mobFormulaNote': 'El tiempo corre desde la recogida hasta la devolución — no hasta el final del tramo reservado. Los kilómetros son la diferencia entre las dos lecturas del cuentakilómetros. En la reserva se cobra un anticipo basado en el tramo, ajustado luego a la devolución.',
+    'mobPickup': 'Recoger el vehículo',
+    'mobPickupIntro': 'Lea el cuentakilómetros y confírmelo. Esa lectura es el punto de partida de su facturación, y confirma la que dejó la persona anterior.',
+    'mobReturnIntro': 'Introducir el cuentakilómetros detiene el tiempo facturado. Devolver el vehículo antes cuesta menos y lo pone de nuevo a disposición de los vecinos.',
+    'mobPickupConfirm': 'Confirmar la recogida',
+    'mobPickupDone': '¡Buen viaje! El tiempo empieza ahora.',
+    'mobInProgress': 'En curso',
+    'mobOdoLabel': 'Cuentakilómetros (km)',
+    'mobOdoExpected': 'Última lectura conocida',
+    'mobOdoStart': 'Cuentakilómetros a la salida',
+    'mobOdoMatch': 'El cuentakilómetros coincide con la última lectura.',
+    'mobOdoGap': 'Diferencia con la última lectura:',
+    'mobOdoGapNote': 'se comunicará a la administración; su facturación no se ve afectada.',
+    'mobDistanceLabel': 'Distancia',
+    'mobDepositLabel': 'Anticipo ya cobrado',
+    'mobToPay': 'Queda por pagar',
+    'mobToRefund': 'A reembolsarle',
+    'mobErrOdo': 'Indique la lectura del cuentakilómetros.',
+    'mobErrOdoBack': 'El cuentakilómetros no puede ser inferior al de la salida.',
     'mobFeesTitle': '¿Qué cubre la tarifa?',
     'mobFeesTimeTitle': 'La tarifa por minuto',
     'mobFeesTime': 'Cubre lo que corre con el tiempo, ruede el vehículo o no: seguro, amortización del vehículo, aparcamiento y el mantenimiento de la red de recarga — que cuesta lo mismo se use mucho o poco. Reservar es inmovilizar el vehículo para uno mismo.',
@@ -6572,6 +6668,30 @@ const PT = {
     'mobMinShort': '分钟',
     'mobVehicle': '车辆',
     'mobDemoBtn': '演示模式',
+    'mobFormulaTitle': '计费公式',
+    'mobFormulaMin': '实际分钟数',
+    'mobFormulaRateMin': '每分钟费率',
+    'mobFormulaKm': '行驶公里数',
+    'mobFormulaRateKm': '每公里费率',
+    'mobFormulaNote': '时间从取车开始，到还车结束 —— 而非算到预约时段结束。公里数为两次里程表读数之差。预约时按时段收取押金，还车时据实结算。',
+    'mobPickup': '取车',
+    'mobPickupIntro': '请读取里程表并确认。该读数是您计费的起点，同时也确认了上一位使用者留下的读数。',
+    'mobReturnIntro': '填写里程表即停止计时。提前还车费用更低，也让邻居更早用上这辆车。',
+    'mobPickupConfirm': '确认取车',
+    'mobPickupDone': '一路顺风！计时从现在开始。',
+    'mobInProgress': '使用中',
+    'mobOdoLabel': '里程表（公里）',
+    'mobOdoExpected': '上次记录读数',
+    'mobOdoStart': '取车时读数',
+    'mobOdoMatch': '里程表与上次记录一致。',
+    'mobOdoGap': '与上次记录的差异：',
+    'mobOdoGapNote': '该差异将报送管理方，不影响您的费用。',
+    'mobDistanceLabel': '里程',
+    'mobDepositLabel': '已收押金',
+    'mobToPay': '尚需支付',
+    'mobToRefund': '应退还您',
+    'mobErrOdo': '请填写里程表读数。',
+    'mobErrOdoBack': '里程表读数不得低于取车时的读数。',
     'mobFeesTitle': '费用包含什么？',
     'mobFeesTimeTitle': '按分钟计费的部分',
     'mobFeesTime': '它覆盖与时间相关的开支，无论车辆是否行驶：保险、车辆折旧、停车位，以及充电网络的维护 —— 无论使用多寡，这笔开支都一样。预约意味着把车辆留给自己。',
@@ -10698,6 +10818,14 @@ function mobBlocFrais() {
       <span id="mob-frais-chevron" style="transition:transform .2s;${ouvert ? 'transform:rotate(180deg)' : ''}">▼</span>
     </button>
     <div id="mob-frais-corps" style="display:${ouvert ? '' : 'none'};border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);padding:18px;background:var(--surface2);">
+      <div style="background:var(--surface);border-radius:var(--radius-sm);padding:14px;margin-bottom:12px;">
+        <div style="font-size:.78rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🧮 ${escHtml(pt('mobFormulaTitle'))}</div>
+        <div style="font-family:monospace;font-size:.9rem;color:var(--text);line-height:1.7">
+          (${escHtml(pt('mobFormulaMin'))} × ${escHtml(pt('mobFormulaRateMin'))})<br>
+          + (${escHtml(pt('mobFormulaKm'))} × ${escHtml(pt('mobFormulaRateKm'))})
+        </div>
+        <div style="font-size:.8rem;color:var(--text3);margin-top:8px;line-height:1.6">${escHtml(pt('mobFormulaNote'))}</div>
+      </div>
       <div style="display:grid;gap:12px;">
         ${ligne('⏱ ' + pt('mobFeesTimeTitle'), pt('mobFeesTime'))}
         ${ligne('🛣 ' + pt('mobFeesKmTitle'), pt('mobFeesKm'))}
@@ -10767,22 +10895,23 @@ function mobLigneReservation(r) {
   const type = mobType(r.vehicles);
   const debut = new Date(r.start_time);
   const bientot = debut.getTime() - Date.now() < MOB_REMBOURSEMENT_MS;
-  const rendu = r.status === 'completed';
-  // Le retour se propose des que le creneau a commence, et seulement pour
-  // les vehicules dont le kilometre est facture. Un velomobile n'a rien a
-  // declarer : son cout tient entierement dans le temps.
-  const v = mobFleetCache.find(x => x.id === r.vehicle_id);
-  const aRendre = !rendu && mobFactureKm(v || r.vehicles) && debut.getTime() <= Date.now();
+  const rendu   = r.status === 'completed';
+  const enCours = r.status === 'in_progress';
+  // La prise s'ouvre des que le creneau commence, pour tous les vehicules :
+  // c'est elle qui demarre le temps facture, et c'est la que le residant
+  // confirme le releve laisse par la personne precedente.
+  const aPrendre = !rendu && !enCours && debut.getTime() <= Date.now();
 
-  const detailKm = rendu && r.total_km != null
-    ? ` · ${Number(r.total_km).toFixed(0)} km`
-    : '';
+  const detailKm = rendu && r.total_km != null ? ` · ${Number(r.total_km).toFixed(0)} km` : '';
 
   let actions;
   if (rendu) {
     actions = `<span class="badge badge-green" style="font-size:0.68rem">${escHtml(pt('mobReturned'))}</span>`;
-  } else if (aRendre) {
-    actions = `<button class="btn btn-primary btn-sm" onclick="mobOpenReturn('${r.id}')">${escHtml(pt('mobReturn'))}</button>`
+  } else if (enCours) {
+    actions = `<span class="badge badge-yellow" style="font-size:0.68rem">${escHtml(pt('mobInProgress'))}</span>`
+      + `<button class="btn btn-primary btn-sm" onclick="mobOpenReturn('${r.id}')">${escHtml(pt('mobReturn'))}</button>`;
+  } else if (aPrendre) {
+    actions = `<button class="btn btn-primary btn-sm" onclick="mobOpenPickup('${r.id}')">${escHtml(pt('mobPickup'))}</button>`
       + `<button class="btn btn-danger btn-sm" onclick="cancelVehicleReservation('${r.id}', ${bientot})">${escHtml(pt('Annuler'))}</button>`;
   } else {
     actions = `<button class="btn btn-danger btn-sm" onclick="cancelVehicleReservation('${r.id}', ${bientot})">${escHtml(pt('Annuler'))}</button>`;
@@ -10802,80 +10931,132 @@ function mobLigneReservation(r) {
   </div>`;
 }
 
-// ── Retour du vehicule ───────────────────────────────────────────────
-// Les kilometres ne sont connus qu'ici : le temps a ete facture a la
-// reservation (le creneau est retenu qu'il serve ou non, comme une salle
-// commune), le supplement kilometrique se debite au retour.
-let mobReturnId = null;
+// ── Prise et retour du vehicule ──────────────────────────────────────
+// Le compteur tranche. On le releve deux fois : a la prise, ou le
+// residant confirme celui laisse par la personne precedente, et au
+// retour, ou la saisie arrete le temps facture.
+//
+// Les deux passent par une RPC. Le compteur vit sur `vehicles`, que les
+// residants lisent sans l'ecrire ; et la duree comme la distance ne
+// doivent pas dependre de l'horloge du navigateur. Le client ne regle
+// que l'ecart avec l'acompte pris a la reservation.
+let mobEtapeId = null;
+
+function mobOpenPickup(id) {
+  const r = mobResvCache.find(x => x.id === id);
+  if (!r) return;
+  const v = mobFleetCache.find(x => x.id === r.vehicle_id);
+  mobEtapeId = id;
+  document.getElementById('mob-pickup-title').textContent =
+    `${pt('mobPickup')} — ${r.vehicles?.model || pt('mobVehicle')}`;
+  const attendu = Number(v?.odometer_km) || 0;
+  document.getElementById('mob-pickup-attendu').textContent = attendu.toFixed(1);
+  document.getElementById('mob-pickup-km').value = attendu ? attendu.toFixed(1) : '';
+  document.getElementById('mob-pickup-ecart').innerHTML = '';
+  openModal('modal-pickup-vehicle');
+}
+
+// L'ecart se montre avant de valider : mieux vaut corriger une faute de
+// frappe que decouvrir un signalement apres coup.
+function mobUpdatePickupEcart() {
+  const r = mobResvCache.find(x => x.id === mobEtapeId);
+  const v = r && mobFleetCache.find(x => x.id === r.vehicle_id);
+  const box = document.getElementById('mob-pickup-ecart');
+  if (!box) return;
+  const km = Number(document.getElementById('mob-pickup-km')?.value);
+  const attendu = Number(v?.odometer_km) || 0;
+  if (!Number.isFinite(km) || km < 0) { box.innerHTML = ''; return; }
+  const ecart = Math.round((km - attendu) * 10) / 10;
+  box.innerHTML = ecart === 0
+    ? `<span style="color:var(--accent2)">✓ ${escHtml(pt('mobOdoMatch'))}</span>`
+    : `<span style="color:var(--accent3)">⚠️ ${escHtml(pt('mobOdoGap'))} ${ecart > 0 ? '+' : ''}${ecart.toFixed(1)} km — ${escHtml(pt('mobOdoGapNote'))}</span>`;
+}
+
+async function mobConfirmPickup() {
+  const km = Number(document.getElementById('mob-pickup-km')?.value);
+  if (!Number.isFinite(km) || km < 0) { toast(pt('mobErrOdo'), 'error'); return; }
+
+  const { error } = await sb.rpc('vehicle_pickup', { p_reservation_id: mobEtapeId, p_km: km });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+
+  closeModal('modal-pickup-vehicle');
+  toast(pt('mobPickupDone'), 'success');
+  trackFeature('shared_mobility', 'vehicle_picked_up', { km_start: km });
+  await renderVehicleFleet();
+}
 
 function mobOpenReturn(id) {
   const r = mobResvCache.find(x => x.id === id);
   if (!r) return;
   const v = mobFleetCache.find(x => x.id === r.vehicle_id);
-  mobReturnId = id;
+  mobEtapeId = id;
   document.getElementById('mob-return-title').textContent =
     `${pt('mobReturn')} — ${r.vehicles?.model || pt('mobVehicle')}`;
+  document.getElementById('mob-return-depart').textContent = (Number(r.km_start) || 0).toFixed(1);
   document.getElementById('mob-return-km').value = '';
   document.getElementById('mob-return-rate').textContent = mobPrixKm(v).toFixed(2);
+  document.getElementById('mob-return-min').textContent = mobPrixMin(v).toFixed(2);
   document.getElementById('mob-return-preview').innerHTML = '';
   openModal('modal-return-vehicle');
 }
 
+// Estimation locale, pour que le residant voie ou il en est avant de
+// valider. Le montant qui fait foi est celui calcule par la RPC.
 function mobUpdateReturnPreview() {
   const box = document.getElementById('mob-return-preview');
-  const r = mobResvCache.find(x => x.id === mobReturnId);
+  const r = mobResvCache.find(x => x.id === mobEtapeId);
   if (!box || !r) return;
   const v = mobFleetCache.find(x => x.id === r.vehicle_id);
   const km = Number(document.getElementById('mob-return-km')?.value);
-  if (!Number.isFinite(km) || km < 0) { box.innerHTML = ''; return; }
-  const sup = Math.round(km * mobPrixKm(v) * 100) / 100;
-  const temps = Number(r.time_cost ?? r.total_cost) || 0;
-  box.innerHTML = `<strong>${pt('mobTimeCostLabel')} :</strong> ${temps.toFixed(2)} $ ${escHtml(pt('mobAlreadyCharged'))}`
-    + `<br><strong>${pt('mobKmCostLabel')} :</strong> ${sup.toFixed(2)} $`
+  const depart = Number(r.km_start) || 0;
+  if (!Number.isFinite(km) || km < depart) { box.innerHTML = ''; return; }
+
+  const distance = Math.round((km - depart) * 10) / 10;
+  const minutes  = Math.max(1, Math.ceil((Date.now() - new Date(r.started_at).getTime()) / 60000));
+  const temps    = Math.round(minutes * mobPrixMin(v) * 100) / 100;
+  const sup      = Math.round(distance * mobPrixKm(v) * 100) / 100;
+  const acompte  = Number(r.deposit_cost ?? r.time_cost ?? 0);
+  const delta    = Math.round((temps + sup - acompte) * 100) / 100;
+
+  box.innerHTML = `<strong>${pt('mobDurationLabel')} :</strong> ${mobDuree(minutes)} — ${temps.toFixed(2)} $`
+    + `<br><strong>${pt('mobDistanceLabel')} :</strong> ${distance.toFixed(1)} km — ${sup.toFixed(2)} $`
     + `<br><strong>${pt('mobCostLabel')} :</strong> ${(temps + sup).toFixed(2)} $`
+    + `<br><span style="color:var(--text2)">${escHtml(pt('mobDepositLabel'))} : ${acompte.toFixed(2)} $ — `
+    + (delta >= 0
+        ? `<strong>${escHtml(pt('mobToPay'))} : ${delta.toFixed(2)} $</strong>`
+        : `<strong style="color:var(--accent2)">${escHtml(pt('mobToRefund'))} : ${Math.abs(delta).toFixed(2)} $</strong>`)
+    + `</span>`
     + `<div style="margin-top:8px;font-size:0.8rem;color:var(--text3)">${escHtml(pt('mobFeesShort'))}</div>`;
 }
 
 async function mobConfirmReturn() {
-  const r = mobResvCache.find(x => x.id === mobReturnId);
+  const r = mobResvCache.find(x => x.id === mobEtapeId);
   if (!r) return;
-  const v = mobFleetCache.find(x => x.id === r.vehicle_id);
   const km = Number(document.getElementById('mob-return-km')?.value);
-  if (!Number.isFinite(km) || km < 0)  { toast(pt('mobErrKm'), 'error'); return; }
-  if (km > 5000)                       { toast(pt('mobErrKmMax'), 'error'); return; }
+  const depart = Number(r.km_start) || 0;
+  if (!Number.isFinite(km) || km < depart) { toast(pt('mobErrOdoBack'), 'error'); return; }
+  if (km - depart > 5000)                  { toast(pt('mobErrKmMax'), 'error'); return; }
 
-  const temps = Number(r.time_cost ?? r.total_cost) || 0;
-  const sup   = Math.round(km * mobPrixKm(v) * 100) / 100;
-
-  if (!isDemo && sup > 0 && currentProfile.virtual_balance < sup) {
-    toast(pt('mobErrFunds'), 'error'); return;
-  }
-
-  const { error } = await sb.from('vehicle_reservations').update({
-    status: 'completed',
-    returned_at: new Date().toISOString(),
-    total_km: km,
-    km_cost: sup,
-    total_cost: Math.round((temps + sup) * 100) / 100
-  }).eq('id', r.id);
+  const { data, error } = await sb.rpc('vehicle_return', { p_reservation_id: r.id, p_km: km });
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  const bilan = data || {};
+  const delta = Math.round((Number(bilan.delta) || 0) * 100) / 100;
 
-  // Le supplement est un debit de reservation de plus, avec sa propre cle
-  // d'idempotence : aucun nouveau type a faire accepter par la centrale.
-  if (sup > 0) {
-    const debit = isDemo
-      ? { ok: true, virtual_balance: Math.round((currentProfile.virtual_balance - sup) * 100) / 100 }
+  // Le solde ne bouge que de l'ecart : l'acompte est deja passe.
+  if (delta !== 0) {
+    const reglement = isDemo
+      ? { ok: true, virtual_balance: Math.round((currentProfile.virtual_balance - delta) * 100) / 100 }
       : await mobAjusterSolde({
-          amount: -sup,
-          type: 'vehicle_reservation',
-          description: `Kilometres ${v?.model || ''}`.trim(),
+          amount: -delta,
+          type: delta > 0 ? 'vehicle_reservation' : 'vehicle_reservation_refund',
+          description: `Retour ${r.vehicles?.model || ''}`.trim(),
           reference_id: r.id,
-          idempotency_key: `vehicle-resv-km:${r.id}`
+          idempotency_key: `vehicle-resv-final:${r.id}`
         });
-    if (!debit.ok && !debit.queued) {
-      toast(`Erreur debit central (${debit.error || 'inconnue'})`, 'error');
-    } else if (typeof debit.virtual_balance === 'number') {
-      currentProfile.virtual_balance = debit.virtual_balance;
+    if (!reglement.ok && !reglement.queued) {
+      toast(`Erreur debit central (${reglement.error || 'inconnue'})`, 'error');
+    } else if (typeof reglement.virtual_balance === 'number') {
+      currentProfile.virtual_balance = reglement.virtual_balance;
       const pastille = document.getElementById('nav-balance');
       if (pastille) pastille.textContent = `${currentProfile.virtual_balance.toFixed(2)} $ CAD`;
     }
@@ -10883,7 +11064,9 @@ async function mobConfirmReturn() {
 
   closeModal('modal-return-vehicle');
   toast(pt('mobReturnDone'), 'success');
-  trackFeature('shared_mobility', 'vehicle_returned', { km, km_cost: sup });
+  trackFeature('shared_mobility', 'vehicle_returned', {
+    km: Number(bilan.distance) || 0, minutes: Number(bilan.minutes) || 0, delta
+  });
   await renderVehicleFleet();
 }
 
@@ -10986,6 +11169,7 @@ async function confirmBookVehicle() {
     end_time: finISO,
     total_minutes: c.minutes,
     time_cost: c.cout,
+    deposit_cost: c.cout,
     total_cost: c.cout,
     purpose: document.getElementById('mob-purpose')?.value?.trim() || null,
     status: 'confirmed'

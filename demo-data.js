@@ -122,19 +122,19 @@
     // ── Véhicules et trajets ─────────────────────────────────
     vehicles: [
       { id: 'vh-1', model: 'Minivan électrique 1', license_plate: 'MV-01', seat_count: 7, seats: 7,
-        vehicle_type: 'auto', is_reservable: true, is_available: true, color: 'Blanc',
+        vehicle_type: 'auto', is_reservable: true, odometer_km: 18432.5, is_available: true, color: 'Blanc',
         cargo_capacity_m3: 1.2, cargo_slots: 3, notes: 'Recharge au sous-sol, câble dans le coffre.',
         vehicle_pricing: [{ price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00 }] },
       { id: 'vh-2', model: 'Vélomobile 1', license_plate: 'VM-01', seat_count: 1, seats: 1,
-        vehicle_type: 'velomobile', is_reservable: true, is_available: true, color: 'Jaune',
+        vehicle_type: 'velomobile', is_reservable: true, odometer_km: 1204.0, is_available: true, color: 'Jaune',
         cargo_capacity_m3: 0.15, cargo_slots: 1, notes: 'Vélomobile caréné. Casque fourni au local à vélos.',
         vehicle_pricing: [{ price_per_minute: 0.02, price_per_km: 0, price_per_cargo_slot: 0 }] },
       { id: 'vh-3', model: 'Vélomobile 2', license_plate: 'VM-02', seat_count: 1, seats: 1,
-        vehicle_type: 'velomobile', is_reservable: true, is_available: true, color: 'Bleu',
+        vehicle_type: 'velomobile', is_reservable: true, odometer_km: 967.5, is_available: true, color: 'Bleu',
         cargo_capacity_m3: 0.15, cargo_slots: 1, notes: 'Vélomobile caréné, coffre arrière un peu plus grand.',
         vehicle_pricing: [{ price_per_minute: 0.02, price_per_km: 0, price_per_cargo_slot: 0 }] },
       { id: 'vh-4', model: 'Minivan électrique 2', license_plate: 'MV-02', seat_count: 7, seats: 7,
-        vehicle_type: 'auto', is_reservable: true, is_available: true, color: 'Gris',
+        vehicle_type: 'auto', is_reservable: true, odometer_km: 9871.0, is_available: true, color: 'Gris',
         cargo_capacity_m3: 1.2, cargo_slots: 3, notes: 'Attelage pour la remorque du jardin.',
         vehicle_pricing: [{ price_per_minute: 0.20, price_per_km: 0.35, price_per_cargo_slot: 2.00 }] },
     ],
@@ -162,9 +162,16 @@
       // ne le propose pas — son kilometre est gratuit, le temps suffit a
       // le facturer.
       { id: 'vr-3', vehicle_id: 'vh-1', tenant_id: MOI, start_time: heures(-1), end_time: heures(0.5),
-        total_minutes: 90, time_cost: 18.00, total_cost: 18.00, purpose: 'Épicerie et quincaillerie',
-        status: 'confirmed', created_at: jours(-1),
+        total_minutes: 90, time_cost: 18.00, deposit_cost: 18.00, total_cost: 18.00,
+        purpose: 'Épicerie et quincaillerie', status: 'in_progress',
+        started_at: minutes(-38), km_start: 18432.5, created_at: jours(-1),
         vehicles: { model: 'Minivan électrique 1', vehicle_type: 'auto', license_plate: 'MV-01' } },
+      // Creneau commence, vehicule pas encore pris : c'est celle-ci qui
+      // fait jouer la confirmation du compteur.
+      { id: 'vr-4', vehicle_id: 'vh-4', tenant_id: MOI, start_time: minutes(-10), end_time: heures(2),
+        total_minutes: 130, time_cost: 26.00, deposit_cost: 26.00, total_cost: 26.00,
+        purpose: 'Aller chercher un meuble', status: 'confirmed', created_at: jours(-1),
+        vehicles: { model: 'Minivan électrique 2', vehicle_type: 'auto', license_plate: 'MV-02' } },
     ],
 
     // Les colonnes suivent celles de la table `trips` et de la vue
@@ -506,6 +513,44 @@
     // qui accepte un creneau deja pris n'apprend rien a personne. Meme
     // regle que la fonction SQL — reservations ET trajets publies, deux
     // heures par trajet sans heure d'arrivee.
+    vehicle_pickup: function (a) {
+      var r = (DEMO.vehicle_reservations || []).find(function (x) { return x.id === a.p_reservation_id; });
+      if (!r) return null;
+      var v = (DEMO.vehicles || []).find(function (x) { return x.id === r.vehicle_id; });
+      var attendu = (v && Number(v.odometer_km)) || 0;
+      var ecart = Math.round((a.p_km - attendu) * 10) / 10;
+      r.km_start = a.p_km;
+      r.km_ecart = ecart || null;
+      r.started_at = new Date().toISOString();
+      r.status = 'in_progress';
+      if (v) v.odometer_km = a.p_km;
+      return { km_attendu: attendu, ecart: ecart };
+    },
+    vehicle_return: function (a) {
+      var r = (DEMO.vehicle_reservations || []).find(function (x) { return x.id === a.p_reservation_id; });
+      if (!r) return null;
+      var v = (DEMO.vehicles || []).find(function (x) { return x.id === r.vehicle_id; });
+      var tarifs = (v && v.vehicle_pricing && v.vehicle_pricing[0]) || {};
+      var minutes = Math.max(1, Math.ceil((Date.now() - new Date(r.started_at).getTime()) / 60000));
+      var distance = Math.round((a.p_km - (Number(r.km_start) || 0)) * 10) / 10;
+      var temps = Math.round(minutes * (Number(tarifs.price_per_minute) || 0) * 100) / 100;
+      var km = Math.round(distance * (Number(tarifs.price_per_km) || 0) * 100) / 100;
+      var total = Math.round((temps + km) * 100) / 100;
+      var acompte = Number(r.deposit_cost) || 0;
+      r.km_end = a.p_km;
+      r.total_km = distance;
+      r.total_minutes = minutes;
+      r.time_cost = temps;
+      r.km_cost = km;
+      r.total_cost = total;
+      r.returned_at = new Date().toISOString();
+      r.status = 'completed';
+      if (v) v.odometer_km = a.p_km;
+      return {
+        minutes: minutes, distance: distance, time_cost: temps, km_cost: km,
+        total: total, deposit: acompte, delta: Math.round((total - acompte) * 100) / 100
+      };
+    },
     check_vehicle_availability: function (a) {
       if (!a || !a.p_vehicle_id) return true;
       var deb = new Date(a.p_start).getTime();
@@ -513,7 +558,7 @@
       var pris = (DEMO.vehicle_reservations || [])
         .filter(function (r) {
           return r.vehicle_id === a.p_vehicle_id
-            && (r.status === 'confirmed' || r.status === 'pending');
+            && (r.status === 'confirmed' || r.status === 'pending' || r.status === 'in_progress');
         })
         .map(function (r) { return [new Date(r.start_time).getTime(), new Date(r.end_time).getTime()]; });
       (DEMO.trips || [])
@@ -526,7 +571,9 @@
     },
     vehicle_busy_slots: function () {
       return (DEMO.vehicle_reservations || [])
-        .filter(function (r) { return r.status === 'confirmed' || r.status === 'pending'; })
+        .filter(function (r) {
+          return r.status === 'confirmed' || r.status === 'pending' || r.status === 'in_progress';
+        })
         .map(function (r) {
           return { vehicle_id: r.vehicle_id, debut: r.start_time, fin: r.end_time, source: 'reservation' };
         })
