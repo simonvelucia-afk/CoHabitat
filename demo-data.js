@@ -487,6 +487,26 @@
       { key: 'building_name', value: 'Immeuble de démonstration' },
     ],
 
+    // Frais d'exploitation du parc, cote administration.
+    vehicle_couts: [
+      { id: 'vc-1', vehicle_id: null,   date_cout: jourCourt(-80), categorie: 'assurance',
+        nature: 'fixe', montant: 1150.00, description: 'Assurance flotte, trimestre' },
+      { id: 'vc-2', vehicle_id: null,   date_cout: jourCourt(-74), categorie: 'reseau_recharge',
+        nature: 'fixe', montant: 300.00, description: 'Entretien des bornes du sous-sol' },
+      { id: 'vc-3', vehicle_id: 'vh-1', date_cout: jourCourt(-60), categorie: 'amortissement',
+        nature: 'fixe', montant: 1575.00, description: 'Amortissement trimestriel' },
+      { id: 'vc-4', vehicle_id: 'vh-4', date_cout: jourCourt(-60), categorie: 'amortissement',
+        nature: 'fixe', montant: 1575.00, description: 'Amortissement trimestriel' },
+      { id: 'vc-5', vehicle_id: null,   date_cout: jourCourt(-45), categorie: 'recharge',
+        nature: 'variable', montant: 480.00, description: 'Électricité, relevé Hydro' },
+      { id: 'vc-6', vehicle_id: 'vh-1', date_cout: jourCourt(-30), categorie: 'entretien',
+        nature: 'variable', montant: 280.00, description: 'Entretien 20 000 km' },
+      { id: 'vc-7', vehicle_id: 'vh-4', date_cout: jourCourt(-12), categorie: 'pneus',
+        nature: 'variable', montant: 680.00, description: 'Pneus quatre saisons' },
+      { id: 'vc-8', vehicle_id: 'vh-2', date_cout: jourCourt(-20), categorie: 'entretien',
+        nature: 'variable', montant: 60.00, description: 'Révision vélomobile' },
+    ],
+
     resource_access: [
       { id: 'ra-1', user_id: MOI, resource_type: 'space', resource_id: 'sp-1' },
       { id: 'ra-2', user_id: MOI, resource_type: 'space', resource_id: 'sp-2' },
@@ -513,6 +533,32 @@
     // qui accepte un creneau deja pris n'apprend rien a personne. Meme
     // regle que la fonction SQL — reservations ET trajets publies, deux
     // heures par trajet sans heure d'arrivee.
+    vehicle_marge: function (a) {
+      var dans = function (d) { return d >= a.p_debut && d <= a.p_fin; };
+      var res = (DEMO.vehicle_reservations || []).filter(function (r) {
+        return r.status === 'completed' && r.returned_at && dans(r.returned_at.slice(0, 10));
+      });
+      var somme = function (t, f) { return t.reduce(function (n, x) { return n + (Number(f(x)) || 0); }, 0); };
+      var revenus = somme(res, function (r) { return r.total_cost; });
+      var minutes = somme(res, function (r) { return r.total_minutes; });
+      var km      = somme(res, function (r) { return r.total_km; });
+      var couts   = (DEMO.vehicle_couts || []).filter(function (c) { return dans(c.date_cout); });
+      var fixes   = somme(couts.filter(function (c) { return c.nature === 'fixe'; }),     function (c) { return c.montant; });
+      var vari    = somme(couts.filter(function (c) { return c.nature === 'variable'; }), function (c) { return c.montant; });
+      var marge   = revenus - (fixes + vari);
+      var cible   = Number(a.p_marge_cible) || 0.15;
+      var r2 = function (x) { return Math.round(x * 100) / 100; };
+      var r4 = function (x) { return Math.round(x * 10000) / 10000; };
+      return {
+        revenus: r2(revenus), couts_fixes: r2(fixes), couts_variables: r2(vari),
+        couts: r2(fixes + vari), marge: r2(marge),
+        taux: revenus > 0 ? r4(marge / revenus) : null,
+        minutes: minutes, km: Math.round(km * 10) / 10,
+        tarif_min_cible: minutes > 0 ? r4(fixes / minutes / (1 - cible)) : null,
+        tarif_km_cible:  km > 0      ? r4(vari / km / (1 - cible))      : null,
+        marge_cible: cible
+      };
+    },
     vehicle_pickup: function (a) {
       var r = (DEMO.vehicle_reservations || []).find(function (x) { return x.id === a.p_reservation_id; });
       if (!r) return null;
@@ -839,6 +885,78 @@
     }
     return Promise.resolve([]);
   }
+
+  // ── Historique du parc ───────────────────────────────────────────
+  // Le panneau d'administration rapproche les frais des revenus. Sans
+  // reservations rendues, il comparerait un trimestre de frais a une
+  // sortie de quarante minutes et afficherait des tarifs cibles absurdes
+  // — de quoi croire le calcul casse.
+  //
+  // On seme donc un trimestre plausible : deux minivans qui roulent
+  // presque tous les jours, deux velomobiles pris plus souvent mais plus
+  // brievement. Rien d'aleatoire — la demonstration doit donner les memes
+  // chiffres a chaque ouverture.
+  (function semerHistorique() {
+    var flotte = [
+      { id: 'vh-1', modele: 'Minivan électrique 1', plaque: 'MV-01', type: 'auto',
+        min: 0.20, km: 0.35, dureeBase: 95,  kmBase: 34, cadence: 1 },
+      { id: 'vh-4', modele: 'Minivan électrique 2', plaque: 'MV-02', type: 'auto',
+        min: 0.20, km: 0.35, dureeBase: 130, kmBase: 47, cadence: 1 },
+      { id: 'vh-2', modele: 'Vélomobile 1', plaque: 'VM-01', type: 'velomobile',
+        min: 0.02, km: 0, dureeBase: 70, kmBase: 12, cadence: 1 },
+      { id: 'vh-3', modele: 'Vélomobile 2', plaque: 'VM-02', type: 'velomobile',
+        min: 0.02, km: 0, dureeBase: 55, kmBase: 9, cadence: 2 },
+    ];
+    var gens = [MOI, 'p-2', 'p-3'];
+    var compteur = { 'vh-1': 14200, 'vh-2': 900, 'vh-3': 700, 'vh-4': 6800 };
+    var lignes = [];
+    var n = 0;
+
+    for (var j = 90; j >= 2; j--) {
+      for (var i = 0; i < flotte.length; i++) {
+        var f = flotte[i];
+        // Cadence deterministe : la minivan 1 sort tous les jours, la
+        // velomobile 2 un jour sur deux, etc.
+        if ((j + i) % f.cadence !== 0) continue;
+        n++;
+        // Variation reguliere autour de la base, pour que les durees et
+        // les distances ne soient pas toutes identiques.
+        var ecart   = ((j * 7 + i * 13) % 11) - 5;          // -5 a +5
+        var minutes = Math.max(20, f.dureeBase + ecart * 6);
+        var km      = f.kmBase ? Math.max(3, f.kmBase + ecart * 3) : 0;
+        var debut   = new Date(Date.now() - j * 86400000);
+        debut.setHours(8 + (i * 3 + j) % 10, 0, 0, 0);
+        var fin     = new Date(debut.getTime() + minutes * 60000);
+        var temps   = Math.round(minutes * f.min * 100) / 100;
+        var coutKm  = Math.round(km * f.km * 100) / 100;
+        var depart  = compteur[f.id];
+        compteur[f.id] = Math.round((depart + km) * 10) / 10;
+
+        lignes.push({
+          id: 'vrh-' + n, vehicle_id: f.id, tenant_id: gens[n % gens.length],
+          start_time: debut.toISOString(), end_time: fin.toISOString(),
+          started_at: debut.toISOString(), returned_at: fin.toISOString(),
+          total_minutes: minutes, total_km: km,
+          km_start: depart, km_end: compteur[f.id],
+          time_cost: temps, km_cost: coutKm,
+          deposit_cost: temps, total_cost: Math.round((temps + coutKm) * 100) / 100,
+          purpose: null, status: 'completed', created_at: debut.toISOString(),
+          vehicles: { model: f.modele, vehicle_type: f.type, license_plate: f.plaque },
+        });
+      }
+    }
+
+    // Les compteurs de la flotte suivent l'historique : le releve propose
+    // a la prise doit etre celui que le dernier retour a laisse.
+    DEMO.vehicles.forEach(function (v) {
+      if (compteur[v.id] != null) v.odometer_km = compteur[v.id];
+    });
+    (DEMO.vehicle_reservations || []).forEach(function (r) {
+      if (r.id === 'vr-3') r.km_start = compteur['vh-1'];
+      if (r.id === 'vr-4') r.km_start = null;
+    });
+    DEMO.vehicle_reservations = lignes.concat(DEMO.vehicle_reservations || []);
+  })();
 
   global.COHABITAT_DEMO = DEMO;
   global.createDemoClient = createDemoClient;

@@ -2472,6 +2472,50 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
             <tbody id="admin-vehicles-tbody"></tbody>
           </table>
         </div>
+
+        <!-- Frais d'exploitation et marge. Reserve a l'administration :
+             le residant voit ce que son tarif couvre, jamais la marge. -->
+        <h3 style="font-size:1rem;color:var(--text);margin:30px 0 12px;padding-top:20px;border-top:1px solid var(--border);">
+          💰 Frais d'exploitation et marge
+        </h3>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">
+          <div class="form-group" style="margin:0"><label>Du</label><input type="date" id="vc-debut" onchange="loadVehicleMarge()"></div>
+          <div class="form-group" style="margin:0"><label>Au</label><input type="date" id="vc-fin" onchange="loadVehicleMarge()"></div>
+          <div class="form-group" style="margin:0"><label>Marge visée (%)</label><input type="number" id="vc-cible" min="0" max="90" step="1" value="15" onchange="loadVehicleMarge()"></div>
+          <button class="btn btn-secondary btn-sm" onclick="loadVehicleMarge()">Recalculer</button>
+        </div>
+        <div id="vc-marge"></div>
+
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-top:16px;">
+          <div style="font-size:0.9rem;font-weight:600;color:var(--accent);margin-bottom:12px;">+ Ajouter un frais</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+            <div class="form-group" style="margin:0"><label>Date</label><input type="date" id="vc-date"></div>
+            <div class="form-group" style="margin:0;min-width:170px"><label>Véhicule</label><select id="vc-vehicule"></select></div>
+            <div class="form-group" style="margin:0;min-width:190px"><label>Catégorie</label>
+              <select id="vc-cat" onchange="vcSyncNature()">
+                <option value="recharge" data-nature="variable">Électricité de recharge</option>
+                <option value="entretien" data-nature="variable">Entretien mécanique</option>
+                <option value="pneus" data-nature="variable">Pneus et freins</option>
+                <option value="reseau_recharge" data-nature="fixe">Entretien du réseau de recharge</option>
+                <option value="assurance" data-nature="fixe">Assurance</option>
+                <option value="immatriculation" data-nature="fixe">Immatriculation</option>
+                <option value="stationnement" data-nature="fixe">Stationnement</option>
+                <option value="amortissement" data-nature="fixe">Amortissement</option>
+                <option value="autre" data-nature="fixe">Autre</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;min-width:150px"><label>Nature</label>
+              <select id="vc-nature">
+                <option value="fixe">Fixe — court avec le temps</option>
+                <option value="variable">Variable — suit les km</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;max-width:120px"><label>Montant ($)</label><input type="number" id="vc-montant" min="0" step="0.01" placeholder="0.00"></div>
+            <div class="form-group" style="margin:0;flex:1;min-width:160px"><label>Description</label><input type="text" id="vc-desc" placeholder="Facture, fournisseur…"></div>
+            <button class="btn btn-primary btn-sm" style="width:auto" onclick="addVehicleCout()">Ajouter</button>
+          </div>
+        </div>
+        <div id="vc-liste" style="margin-top:16px;"></div>
       </div>
 
       <!-- Serre admin : attribution des zones + frais d'exploitation -->
@@ -15950,6 +15994,7 @@ async function toggleSpace(id, val) {
 
 // --- Admin Vehicles ---
 async function loadAdminVehicles() {
+  loadVehicleCouts();
   const { data } = await sb.from('vehicles').select('*, vehicle_pricing(price_per_minute, price_per_km, price_per_cargo_slot)').order('model');
   document.getElementById('admin-vehicles-tbody').innerHTML = (data || []).map(v => `
     <tr>
@@ -16073,6 +16118,136 @@ async function saveVehicle() {
   toast('Véhicule enregistré', 'success');
   closeModal('modal-add-vehicle');
   loadAdminVehicles();
+}
+
+// ── Frais d'exploitation du parc et marge ────────────────────────────
+// Cote administration uniquement. Le residant sait ce que son tarif
+// couvre — l'accordeon de la page Mobilite le lui dit — mais la marge et
+// la politique de prix ne le regardent pas.
+let _vcVehicules = [];
+
+// La categorie porte sa nature habituelle : l'electricite suit les
+// kilometres, l'assurance court avec le temps. L'admin peut corriger,
+// certains frais sont hybrides selon les contrats.
+function vcSyncNature() {
+  const opt = document.getElementById('vc-cat')?.selectedOptions?.[0];
+  const nature = opt?.dataset?.nature;
+  if (nature) document.getElementById('vc-nature').value = nature;
+}
+
+async function loadVehicleCouts() {
+  const debut = document.getElementById('vc-debut');
+  const fin   = document.getElementById('vc-fin');
+  // Par defaut, l'annee courante : assez long pour que l'amortissement et
+  // l'assurance aient du sens, assez court pour rester lisible.
+  if (debut && !debut.value) debut.value = new Date().getFullYear() + '-01-01';
+  if (fin && !fin.value)     fin.value   = new Date().toISOString().split('T')[0];
+  const dateCout = document.getElementById('vc-date');
+  if (dateCout && !dateCout.value) dateCout.value = new Date().toISOString().split('T')[0];
+
+  const { data: vehicules } = await sb.from('vehicles').select('id, model').order('model');
+  _vcVehicules = vehicules || [];
+  const sel = document.getElementById('vc-vehicule');
+  if (sel) {
+    sel.innerHTML = '<option value="">Toute la flotte</option>'
+      + _vcVehicules.map(v => `<option value="${v.id}">${escHtml(v.model)}</option>`).join('');
+  }
+
+  await Promise.all([loadVehicleMarge(), renderVehicleCoutsList()]);
+}
+
+async function renderVehicleCoutsList() {
+  const box = document.getElementById('vc-liste');
+  if (!box) return;
+  const { data, error } = await sb.from('vehicle_couts')
+    .select('*').order('date_cout', { ascending: false }).limit(100);
+  if (error) {
+    box.innerHTML = `<div style="color:var(--text3);font-size:0.85rem">Frais indisponibles — migration <code>sql/034_mobilite_couts.sql</code> non jouée ?</div>`;
+    return;
+  }
+  if (!data.length) { box.innerHTML = '<div style="color:var(--text3);font-size:0.85rem">Aucun frais enregistré.</div>'; return; }
+  const nom = id => _vcVehicules.find(v => v.id === id)?.model || 'Flotte';
+  box.innerHTML = `<div class="table-container"><table>
+    <thead><tr><th>Date</th><th>Véhicule</th><th>Catégorie</th><th>Nature</th><th>Montant</th><th>Description</th><th></th></tr></thead>
+    <tbody>${data.map(c => `<tr>
+      <td style="white-space:nowrap">${c.date_cout}</td>
+      <td>${escHtml(nom(c.vehicle_id))}</td>
+      <td>${escHtml(c.categorie)}</td>
+      <td><span class="badge ${c.nature === 'variable' ? 'badge-green' : 'badge-gray'}">${c.nature}</span></td>
+      <td style="white-space:nowrap">${Number(c.montant).toFixed(2)} $</td>
+      <td>${escHtml(c.description || '')}</td>
+      <td class="td-actions"><button class="btn btn-danger btn-sm" onclick="delVehicleCout('${c.id}')">✕</button></td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+async function loadVehicleMarge() {
+  const box = document.getElementById('vc-marge');
+  if (!box) return;
+  const debut = document.getElementById('vc-debut')?.value;
+  const fin   = document.getElementById('vc-fin')?.value;
+  const cible = (Number(document.getElementById('vc-cible')?.value) || 15) / 100;
+  if (!debut || !fin) { box.innerHTML = ''; return; }
+
+  const { data, error } = await sb.rpc('vehicle_marge', { p_debut: debut, p_fin: fin, p_marge_cible: cible });
+  if (error || !data) {
+    box.innerHTML = `<div style="color:var(--text3);font-size:0.85rem">Calcul indisponible — migration <code>sql/034_mobilite_couts.sql</code> non jouée ?</div>`;
+    return;
+  }
+
+  const n = v => Number(v) || 0;
+  const taux = data.taux == null ? null : n(data.taux);
+  const tient = taux != null && taux >= cible;
+  const carte = (etiquette, valeur, couleur) => `
+    <div class="stat-card"><div class="stat-label">${escHtml(etiquette)}</div>
+      <div class="stat-value"${couleur ? ` style="color:${couleur}"` : ''}>${valeur}</div></div>`;
+
+  // Les tarifs cibles ne s'affichent que si l'assiette existe : sans
+  // minutes facturees, aucun tarif a la minute ne couvre quoi que ce soit.
+  const conseil = (data.tarif_min_cible != null || data.tarif_km_cible != null)
+    ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:12px;font-size:0.88rem;line-height:1.7">
+         <strong>Pour tenir ${(cible * 100).toFixed(0)} % sur cette période, il aurait fallu, en moyenne sur la flotte :</strong><br>
+         ${data.tarif_min_cible != null ? `• <strong>${n(data.tarif_min_cible).toFixed(3)} $ / min</strong> — les ${n(data.couts_fixes).toFixed(2)} $ de frais fixes répartis sur ${n(data.minutes).toFixed(0)} minutes facturées<br>` : ''}
+         ${data.tarif_km_cible != null ? `• <strong>${n(data.tarif_km_cible).toFixed(3)} $ / km</strong> — les ${n(data.couts_variables).toFixed(2)} $ de frais variables répartis sur ${n(data.km).toFixed(1)} km` : ''}
+         <div style="color:var(--text3);font-size:0.82rem;margin-top:8px">Chaque nature de frais est rapportée à son assiette : les frais fixes aux minutes, les variables aux kilomètres. Une assiette commune donnerait un tarif juste en moyenne et faux pour chacun.</div>
+         <div style="color:var(--text3);font-size:0.82rem;margin-top:6px">Ce sont des <strong>moyennes de flotte</strong>. Un véhicule tarifé sous la cible — un vélomobile, par exemple — est porté par les autres : c'est un choix d'exploitation légitime, mais il explique qu'on puisse rester sous la marge visée alors que chaque tarif pris isolément paraît suffisant.</div>
+       </div>`
+    : `<div style="color:var(--text3);font-size:0.85rem;margin-top:12px">Aucune réservation rendue sur la période : rien à rapporter aux frais.</div>`;
+
+  box.innerHTML = `<div class="stats-grid">
+      ${carte('Revenus', n(data.revenus).toFixed(2) + ' $')}
+      ${carte('Frais fixes', n(data.couts_fixes).toFixed(2) + ' $')}
+      ${carte('Frais variables', n(data.couts_variables).toFixed(2) + ' $')}
+      ${carte('Marge', n(data.marge).toFixed(2) + ' $', n(data.marge) < 0 ? 'var(--accent3)' : 'var(--accent2)')}
+      ${carte('Taux réalisé', taux == null ? '—' : (taux * 100).toFixed(1) + ' %', taux == null ? null : (tient ? 'var(--accent2)' : 'var(--accent3)'))}
+    </div>${conseil}`;
+}
+
+async function addVehicleCout() {
+  const g = id => document.getElementById(id);
+  const montant = Number(g('vc-montant').value);
+  if (!g('vc-date').value || !Number.isFinite(montant) || montant <= 0) {
+    toast('Date et montant requis', 'error'); return;
+  }
+  const { error } = await sb.from('vehicle_couts').insert({
+    vehicle_id: g('vc-vehicule').value || null,
+    date_cout: g('vc-date').value,
+    categorie: g('vc-cat').value,
+    nature: g('vc-nature').value,
+    montant,
+    description: g('vc-desc').value.trim() || null,
+    created_by: currentProfile.id
+  });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  g('vc-montant').value = ''; g('vc-desc').value = '';
+  toast('Frais ajouté ✓', 'success');
+  await Promise.all([loadVehicleMarge(), renderVehicleCoutsList()]);
+}
+
+async function delVehicleCout(id) {
+  if (!confirm('Supprimer ce frais ?')) return;
+  const { error } = await sb.from('vehicle_couts').delete().eq('id', id);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  await Promise.all([loadVehicleMarge(), renderVehicleCoutsList()]);
 }
 
 async function toggleVehicle(id, val) {
