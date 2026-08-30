@@ -119,12 +119,16 @@ Dans Supabase → **Authentication → URL Configuration**:
 
 L'ancien module « Auto-partage » devient **Mobilité partagée** — *MaaS, Mobility as a Service* : les véhicules du bâtiment, les vélomobiles et le covoiturage entre résidents sont réunis dans une seule offre, sous le même onglet.
 
-- **Réservation directe d'un véhicule** (onglet 🚲 *Réserver un véhicule*, affiché en premier) : un véhicule, un créneau, un coût calculé au **temps d'utilisation** (`vehicle_pricing.price_per_minute`) et débité du solde virtuel. C'est ce qui rend les **vélomobiles du bâtiment** réservables : on en prend un pour une heure, seul, sans annoncer où l'on va — ce que le covoiturage, qui suppose un chauffeur approuvé et des passagers, ne permettait pas
+- **Réservation directe d'un véhicule** (onglet 🚲 *Réserver un véhicule*, affiché en premier) : un véhicule, un créneau, un coût **en deux temps** — la durée du créneau (`price_per_minute`) débitée à la réservation, puis les **kilomètres déclarés au retour** (`price_per_km`). Le créneau est retenu qu'il serve ou non, comme une salle commune ; les kilomètres, eux, ne sont connus qu'au retour. Ce partage n'est pas cosmétique : les frais d'exploitation d'un véhicule (énergie, entretien, pneus, amortissement) suivent les kilomètres bien plus que les heures, et facturer le temps seul ferait fondre la marge précisément sur les longs trajets C'est ce qui rend les **vélomobiles du bâtiment** réservables : on en prend un pour une heure, seul, sans annoncer où l'on va — ce que le covoiturage, qui suppose un chauffeur approuvé et des passagers, ne permettait pas
 - **Flotte multimodale** : chaque véhicule porte un type (`vehicle_type` : automobile, vélomobile, vélo, autre) et un drapeau `is_reservable`. Décoché, le véhicule reste dans la flotte mais n'est accessible que par un trajet publié. La liste est groupée par mode, avec une pastille de disponibilité (libre / occupé jusqu'à…)
 - **Les deux usages se voient l'un l'autre** : `check_vehicle_availability()` regarde les réservations **et** les trajets publiés, si bien qu'un vélomobile engagé sur un covoiturage n'apparaît pas libre sur ce créneau. Un trajet sans heure d'arrivée estimée réserve le véhicule deux heures
 - **Créneaux déjà pris** affichés dans la fenêtre de réservation (`vehicle_busy_slots()`), bornes seulement — jamais qui a réservé
-- **Annulation** : remboursement intégral si elle a lieu plus de 2 h avant le début du créneau, comme pour les espaces communs ; passé ce délai le créneau reste facturé, et l'écran le dit avant de confirmer
-- Migration : `sql/031_mobilite_partagee.sql`
+- **Ce que le tarif couvre, dit aux résidents** : un accordéon « 💡 Que couvre le tarif ? » en tête de l'onglet explique les deux natures de frais — le tarif à la minute pour ce qui court avec le temps (assurance, amortissement, stationnement, entretien du réseau de recharge, qui coûte la même chose qu'on l'utilise ou non), le tarif au kilomètre pour ce qui court avec la distance (électricité consommée à la recharge, pneus, freins, entretien mécanique). Un rappel d'une ligne accompagne le montant dans les deux fenêtres, réservation et retour
+- **Prise et retour, au compteur** : le résident relève le compteur deux fois. **À la prise**, il confirme le relevé laissé par la personne précédente — un écart est conservé en base (`km_ecart`) et signalé à l'administration, sans affecter sa facturation. **Au retour**, la saisie du compteur **arrête le temps facturé** : la durée court de la prise au retour, pas jusqu'à la fin du créneau, et la distance est la différence des deux relevés. Rendre tôt coûte moins cher et libère le véhicule
+- **Réconciliation** : un acompte calculé sur le créneau est débité à la réservation ; le retour ajuste — complément à payer ou différence remboursée. Les deux étapes passent par les RPC `vehicle_pickup()` et `vehicle_return()` : le compteur vit sur `vehicles`, que les résidents lisent sans l'écrire, et la durée comme la distance ne doivent pas dépendre de l'horloge du navigateur
+- **Annulation** : remboursement de la part temps si elle a lieu plus de 2 h avant le début du créneau, comme pour les espaces communs ; passé ce délai le créneau reste facturé, et l'écran le dit avant de confirmer
+- **Frais d'exploitation et marge (administration seulement)** : onglet ⚙️ Admin → Véhicules. On y saisit les frais du parc en distinguant leur nature — **fixe**, ce qui court avec le temps (assurance, amortissement, stationnement, entretien du réseau de recharge), et **variable**, ce qui suit les kilomètres (électricité de recharge, pneus, freins, entretien mécanique). La fonction `vehicle_marge()` rapproche revenus et frais sur une période et calcule **les tarifs qui auraient tenu la marge visée**, chaque nature rapportée à son assiette : les frais fixes aux minutes facturées, les variables aux kilomètres. Ce sont des moyennes de flotte — un véhicule tarifé sous la cible est porté par les autres, et l'écran le dit. **Rien de tout cela n'est visible côté résident** : il voit ce que son tarif couvre, jamais la marge ni la politique de prix
+- Migrations : `sql/031_mobilite_partagee.sql`, `sql/032_mobilite_km.sql`, `sql/033_mobilite_compteur.sql`, `sql/034_mobilite_couts.sql`
 - ⚠️ **Sur une installation branchée à la centrale Modulimo**, ajoutez `vehicle_reservation` et `vehicle_reservation_refund` à la liste blanche de types de `finance-bridge` (elle vit dans le projet central, hors de ce dépôt). Sans cela le débit est refusé et la réservation s'annule d'elle-même. Une instance autonome n'est pas concernée : elle passe par `adjust_balance()`, que la migration suffit à débloquer
 
 ### Chauffeurs approuvés
@@ -204,6 +208,7 @@ Deux choses ne sont volontairement pas mesurées, faute d'écran correspondant :
 ### Mode démo
 - Accès sans compte via bouton "Démo"
 - Consultation complète sans restriction
+- **Réservation de véhicule jouable de bout en bout** : choix du créneau, refus si le véhicule est déjà pris (par une réservation ou par un covoiturage), débit du solde, apparition dans « Mes réservations », annulation avec remboursement. Tout vit dans le jeu de données local — rien ne sort du navigateur, rien n'est facturé, et un rechargement de la page remet tout à zéro. Les lignes créées portent la mention « fictive »
 - Toutes les actions sont loggées pour analyse
 - Aucune réservation réelle n'est créée
 
@@ -219,7 +224,8 @@ Deux choses ne sont volontairement pas mesurées, faute d'écran correspondant :
 | `space_reservations` | Réservations d'espaces |
 | `vehicles` | Véhicules |
 | `vehicle_pricing` | Tarification des véhicules |
-| `vehicle_reservations` | Réservation directe d'un véhicule sur un créneau (libre-service) |
+| `vehicle_reservations` | Réservation directe d'un véhicule, relevés de compteur à la prise et au retour |
+| `vehicle_couts` | Frais d'exploitation du parc, séparés en fixes et variables (admin) |
 | `trips` | Trajets publiés par chauffeurs |
 | `trip_stops` | Arrêts intermédiaires |
 | `trip_bookings` | Demandes passagers |
