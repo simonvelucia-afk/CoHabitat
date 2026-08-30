@@ -6669,7 +6669,12 @@ async function openKiosk(machineId, _ignoredPreOpenedTab) {
       'Aucune adresse de kiosque configurée — voir les réglages', 'error');
     return;
   }
-  const url = base + '?machine=' + machineId + '&chsession=' + sessionId;
+  // La langue voyage avec l'adresse : le kiosque est servi depuis un autre
+  // domaine, son localStorage lui est donc propre, et sans ce parametre il
+  // ouvrait dans la langue du dernier passant plutot que dans celle du
+  // resident qui vient de cliquer.
+  const url = base + '?machine=' + machineId + '&chsession=' + sessionId
+    + '&lang=' + encodeURIComponent(appLang);
   console.log('[openKiosk] user:', currentProfile.full_name, 'machine:', machineId, 'chsession:', sessionId);
 
   // INSERT d'abord pendant que l'onglet a encore le focus (auth IndexedDB
