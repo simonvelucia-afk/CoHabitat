@@ -152,11 +152,19 @@
     // ne sert qu'a alimenter vehicle_busy_slots.
     vehicle_reservations: [
       { id: 'vr-1', vehicle_id: 'vh-2', tenant_id: MOI, start_time: heures(26), end_time: heures(28),
-        total_minutes: 120, total_cost: 2.40, purpose: 'Aller au marché', status: 'confirmed',
+        total_minutes: 120, time_cost: 2.40, total_cost: 2.40, purpose: 'Aller au marché', status: 'confirmed',
         created_at: jours(-1), vehicles: { model: 'Vélomobile 1', vehicle_type: 'velomobile', license_plate: 'VM-01' } },
       { id: 'vr-2', vehicle_id: 'vh-3', tenant_id: 'p-2', start_time: heures(-1), end_time: heures(2),
-        total_minutes: 180, total_cost: 3.60, purpose: null, status: 'confirmed',
+        total_minutes: 180, time_cost: 3.60, total_cost: 3.60, purpose: null, status: 'confirmed',
         created_at: jours(-2), vehicles: { model: 'Vélomobile 2', vehicle_type: 'velomobile', license_plate: 'VM-02' } },
+      // Une minivan en cours d'utilisation : c'est celle-ci qui permet de
+      // jouer le retour et la declaration des kilometres. Le velomobile
+      // ne le propose pas — son kilometre est gratuit, le temps suffit a
+      // le facturer.
+      { id: 'vr-3', vehicle_id: 'vh-1', tenant_id: MOI, start_time: heures(-1), end_time: heures(0.5),
+        total_minutes: 90, time_cost: 18.00, total_cost: 18.00, purpose: 'Épicerie et quincaillerie',
+        status: 'confirmed', created_at: jours(-1),
+        vehicles: { model: 'Minivan électrique 1', vehicle_type: 'auto', license_plate: 'MV-01' } },
     ],
 
     // Les colonnes suivent celles de la table `trips` et de la vue
@@ -503,7 +511,10 @@
       var deb = new Date(a.p_start).getTime();
       var fin = new Date(a.p_end).getTime();
       var pris = (DEMO.vehicle_reservations || [])
-        .filter(function (r) { return r.vehicle_id === a.p_vehicle_id && r.status !== 'cancelled'; })
+        .filter(function (r) {
+          return r.vehicle_id === a.p_vehicle_id
+            && (r.status === 'confirmed' || r.status === 'pending');
+        })
         .map(function (r) { return [new Date(r.start_time).getTime(), new Date(r.end_time).getTime()]; });
       (DEMO.trips || [])
         .filter(function (t) { return t.vehicle_id === a.p_vehicle_id && t.status === 'published'; })
@@ -515,7 +526,7 @@
     },
     vehicle_busy_slots: function () {
       return (DEMO.vehicle_reservations || [])
-        .filter(function (r) { return r.status !== 'cancelled'; })
+        .filter(function (r) { return r.status === 'confirmed' || r.status === 'pending'; })
         .map(function (r) {
           return { vehicle_id: r.vehicle_id, debut: r.start_time, fin: r.end_time, source: 'reservation' };
         })

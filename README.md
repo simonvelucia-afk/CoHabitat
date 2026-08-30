@@ -119,12 +119,13 @@ Dans Supabase → **Authentication → URL Configuration**:
 
 L'ancien module « Auto-partage » devient **Mobilité partagée** — *MaaS, Mobility as a Service* : les véhicules du bâtiment, les vélomobiles et le covoiturage entre résidents sont réunis dans une seule offre, sous le même onglet.
 
-- **Réservation directe d'un véhicule** (onglet 🚲 *Réserver un véhicule*, affiché en premier) : un véhicule, un créneau, un coût calculé au **temps d'utilisation** (`vehicle_pricing.price_per_minute`) et débité du solde virtuel. C'est ce qui rend les **vélomobiles du bâtiment** réservables : on en prend un pour une heure, seul, sans annoncer où l'on va — ce que le covoiturage, qui suppose un chauffeur approuvé et des passagers, ne permettait pas
+- **Réservation directe d'un véhicule** (onglet 🚲 *Réserver un véhicule*, affiché en premier) : un véhicule, un créneau, un coût **en deux temps** — la durée du créneau (`price_per_minute`) débitée à la réservation, puis les **kilomètres déclarés au retour** (`price_per_km`). Le créneau est retenu qu'il serve ou non, comme une salle commune ; les kilomètres, eux, ne sont connus qu'au retour. Ce partage n'est pas cosmétique : les frais d'exploitation d'un véhicule (énergie, entretien, pneus, amortissement) suivent les kilomètres bien plus que les heures, et facturer le temps seul ferait fondre la marge précisément sur les longs trajets C'est ce qui rend les **vélomobiles du bâtiment** réservables : on en prend un pour une heure, seul, sans annoncer où l'on va — ce que le covoiturage, qui suppose un chauffeur approuvé et des passagers, ne permettait pas
 - **Flotte multimodale** : chaque véhicule porte un type (`vehicle_type` : automobile, vélomobile, vélo, autre) et un drapeau `is_reservable`. Décoché, le véhicule reste dans la flotte mais n'est accessible que par un trajet publié. La liste est groupée par mode, avec une pastille de disponibilité (libre / occupé jusqu'à…)
 - **Les deux usages se voient l'un l'autre** : `check_vehicle_availability()` regarde les réservations **et** les trajets publiés, si bien qu'un vélomobile engagé sur un covoiturage n'apparaît pas libre sur ce créneau. Un trajet sans heure d'arrivée estimée réserve le véhicule deux heures
 - **Créneaux déjà pris** affichés dans la fenêtre de réservation (`vehicle_busy_slots()`), bornes seulement — jamais qui a réservé
-- **Annulation** : remboursement intégral si elle a lieu plus de 2 h avant le début du créneau, comme pour les espaces communs ; passé ce délai le créneau reste facturé, et l'écran le dit avant de confirmer
-- Migration : `sql/031_mobilite_partagee.sql`
+- **Retour du véhicule** : pour les véhicules dont le kilomètre est facturé, le résident déclare les km parcourus ; le supplément est débité et la réservation passe à `completed`, ce qui **libère le créneau restant**. Les vélomobiles n'ont pas cette étape — leur kilomètre est gratuit, le temps suffit à les facturer
+- **Annulation** : remboursement de la part temps si elle a lieu plus de 2 h avant le début du créneau, comme pour les espaces communs ; passé ce délai le créneau reste facturé, et l'écran le dit avant de confirmer
+- Migrations : `sql/031_mobilite_partagee.sql`, `sql/032_mobilite_km.sql`
 - ⚠️ **Sur une installation branchée à la centrale Modulimo**, ajoutez `vehicle_reservation` et `vehicle_reservation_refund` à la liste blanche de types de `finance-bridge` (elle vit dans le projet central, hors de ce dépôt). Sans cela le débit est refusé et la réservation s'annule d'elle-même. Une instance autonome n'est pas concernée : elle passe par `adjust_balance()`, que la migration suffit à débloquer
 
 ### Chauffeurs approuvés
@@ -220,7 +221,7 @@ Deux choses ne sont volontairement pas mesurées, faute d'écran correspondant :
 | `space_reservations` | Réservations d'espaces |
 | `vehicles` | Véhicules |
 | `vehicle_pricing` | Tarification des véhicules |
-| `vehicle_reservations` | Réservation directe d'un véhicule sur un créneau (libre-service) |
+| `vehicle_reservations` | Réservation directe d'un véhicule sur un créneau (libre-service), avec km déclarés au retour |
 | `trips` | Trajets publiés par chauffeurs |
 | `trip_stops` | Arrêts intermédiaires |
 | `trip_bookings` | Demandes passagers |
