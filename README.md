@@ -214,6 +214,65 @@ Deux choses ne sont volontairement pas mesurées, faute d'écran correspondant :
 
 ---
 
+## Page de vente et mesure de la promotion
+
+`cohabitat.modulimo.com` sert aussi de vitrine : un visiteur qui ne s'est
+jamais connecté sur l'appareil arrive sur la page de vente (fonctions,
+captures, forfaits, prise de contact) plutôt que sur le formulaire de
+connexion. C'est l'option `vitrine.enabled` de `config.js` ;
+`new-building.mjs` et `render-config.mjs` la désactivent pour les
+immeubles, dont les visiteurs sont des résidants.
+
+| Adresse | Effet |
+|---|---|
+| `/` | Page de vente (visiteur), connexion (résidant déjà venu sur l'appareil) |
+| `/#essai` | Démo ouverte directement — lien public des pages de promotion |
+| `/#demo` | Démo pour une tablette de présentation (panneau des modules) |
+| `/#connexion` | Formulaire de connexion, même pour un nouveau visiteur |
+
+La page présentée en détail, avec le formulaire de demande de
+présentation, vit sur [modulimo.com/cohabitat](https://www.modulimo.com/cohabitat/)
+(dépôt `modulimo-home`). Les demandes arrivent dans la table
+`leads_pointe_est` de la centrale, `source_page` = `/cohabitat/`, et par
+courriel à info@modulimo.com.
+
+### Mesurer
+
+Les événements de la page de vente sont écrits dans `usage_logs` (module
+`landing`), avec ou sans consentement à Google Analytics : ce sont des
+compteurs anonymes, sans identifiant de visiteur.
+
+| Action | Quand |
+|---|---|
+| `landing_view` | Page de vente affichée (`metadata.origin` : `accueil` ou `login`) |
+| `demo_click` | Entrée en démo (`metadata.place` : `hero`, `apercu`, `lien_essai`) |
+| `contact_click` | Clic vers le formulaire de présentation |
+| `email_click` | Clic sur info@modulimo.com |
+| `plan_hover` | Survol d'un forfait plus d'une seconde |
+
+Entonnoir des 30 derniers jours, dans le SQL Editor de la base de l'instance :
+
+```sql
+select action,
+       metadata->>'place' as endroit,
+       count(*) as nombre
+  from usage_logs
+ where module = 'landing'
+   and created_at > now() - interval '30 days'
+ group by 1, 2
+ order by 1, 3 desc;
+```
+
+À rapprocher des demandes reçues :
+
+```sql
+-- base centrale
+select date_trunc('week', created_at) as semaine, count(*)
+  from leads_pointe_est
+ where source_page like '%/cohabitat/%'
+ group by 1 order by 1 desc;
+```
+
 ## Architecture de la base de données
 
 | Table | Description |

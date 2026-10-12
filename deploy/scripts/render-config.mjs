@@ -69,6 +69,8 @@ const config = {
     label:       env.CAMERA_LABEL || 'Caméra',
     description: env.CAMERA_DESCRIPTION || 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.',
   },
+  // Pas de page de vente sur une instance d'immeuble.
+  vitrine: { enabled: false },
   analytics: { enabled: false, gaId: '' },
   assets: offline
     ? {
