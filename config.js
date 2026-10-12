@@ -120,7 +120,11 @@
     // de prospects a accueillir, ses visiteurs sont ses residants.
     // new-building.mjs et render-config.mjs la desactivent.
     vitrine: {
-      enabled: true
+      enabled: true,
+      // Page de reservation d'une presentation (agenda de rendez-vous
+      // Google : 15 minutes, lien Google Meet envoye a la confirmation).
+      // Vide = les boutons menent au formulaire de modulimo.com/cohabitat.
+      rendezVous: 'https://calendar.app.google/yqELaEthBMPkEhbk7'
     },
 
     // Analytique. Coupee automatiquement en reseau ferme : le script

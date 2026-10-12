@@ -246,6 +246,7 @@ compteurs anonymes, sans identifiant de visiteur.
 |---|---|
 | `landing_view` | Page de vente affichée (`metadata.origin` : `accueil` ou `login`) |
 | `demo_click` | Entrée en démo (`metadata.place` : `hero`, `apercu`, `lien_essai`) |
+| `booking_click` | Clic vers la réservation d'un créneau (agenda de rendez-vous Google) |
 | `contact_click` | Clic vers le formulaire de présentation |
 | `email_click` | Clic sur info@modulimo.com |
 | `plan_hover` | Survol d'un forfait plus d'une seconde |
