@@ -539,6 +539,7 @@ body { padding-bottom: var(--haut-bandeau, 0px); }
   text-align: center;
 }
 
+.demo-sortie { background:none; border:none; color:var(--text); font-size:0.78rem; font-weight:600; text-decoration:underline; cursor:pointer; padding:0; font-family:var(--font-sans); }
 .demo-badge {
   background: rgba(224,112,96,0.15);
   border: 1px solid rgba(224,112,96,0.3);
@@ -2099,7 +2100,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
      de tout le reste et collante, donc visible sur toutes les pages. Elle
      s'efface d'elle-meme quand elle n'a rien a dire. -->
 <div id="bandeau-statut" style="display:none">
-  <div class="demo-badge" id="demo-badge" style="display:none">MODE DÉMO</div>
+  <div class="demo-badge" id="demo-badge" style="display:none;align-items:center;gap:10px;">MODE DÉMO <button type="button" class="demo-sortie" onclick="quitterDemoPourConnexion()">Se connecter →</button></div>
 </div>
 
 <div id="app" style="display:none">
@@ -4122,7 +4123,7 @@ const LANDING_TXT = {
     plansNote: 'Prix en dollars canadiens, taxes en sus.',
     planCustom: 'Sur mesure', planQuote: 'Sur devis', planCustomUnits: 'Selon le nombre de logements et les modules choisis',
     planCustomF: ['Tous les modules, activables un à un', 'Hébergé ou autonome', 'Accompagnement au démarrage'],
-    planMonth: '/ mois', planUpTo: (n) => "Jusqu'à " + n + ' logements', planUnlimited: 'Logements illimités · réseau multi-immeubles',
+    planMonth: '/ mois', planUpTo: (n) => "Jusqu'à " + n + ' logements',
     planPopular: 'Le plus populaire', planCta: 'Nous contacter', planCtaQuote: 'Demander une soumission',
     contactTitle: 'Parlons de votre immeuble.',
     contactSub: 'Une présentation de 15 minutes en visioconférence, gratuite et sans engagement. Choisissez votre créneau : le lien Google Meet arrive avec la confirmation.',
@@ -4164,7 +4165,7 @@ const LANDING_TXT = {
     plansNote: 'Prices in Canadian dollars, taxes extra.',
     planCustom: 'Tailored', planQuote: 'On quote', planCustomUnits: 'Based on the number of units and the modules chosen',
     planCustomF: ['All modules, switchable one by one', 'Hosted or standalone', 'Onboarding support'],
-    planMonth: '/ month', planUpTo: (n) => 'Up to ' + n + ' units', planUnlimited: 'Unlimited units · multi-building network',
+    planMonth: '/ month', planUpTo: (n) => 'Up to ' + n + ' units',
     planPopular: 'Most popular', planCta: 'Contact us', planCtaQuote: 'Request a quote',
     contactTitle: "Let's talk about your building.",
     contactSub: 'A free, no-commitment 15-minute video walkthrough. Pick your slot: the Google Meet link comes with the confirmation.',
@@ -4206,7 +4207,7 @@ const LANDING_TXT = {
     plansNote: 'Precios en dólares canadienses, impuestos no incluidos.',
     planCustom: 'A medida', planQuote: 'Bajo presupuesto', planCustomUnits: 'Según el número de viviendas y los módulos elegidos',
     planCustomF: ['Todos los módulos, activables uno a uno', 'Alojado o autónomo', 'Acompañamiento en el arranque'],
-    planMonth: '/ mes', planUpTo: (n) => 'Hasta ' + n + ' viviendas', planUnlimited: 'Viviendas ilimitadas · red multiedificio',
+    planMonth: '/ mes', planUpTo: (n) => 'Hasta ' + n + ' viviendas',
     planPopular: 'El más popular', planCta: 'Contáctenos', planCtaQuote: 'Solicitar un presupuesto',
     contactTitle: 'Hablemos de su edificio.',
     contactSub: 'Una presentación de 15 minutos por videoconferencia, gratuita y sin compromiso. Elija su horario: el enlace de Google Meet llega con la confirmación.',
@@ -4248,7 +4249,7 @@ const LANDING_TXT = {
     plansNote: '价格以加元计，不含税。',
     planCustom: '定制', planQuote: '按报价', planCustomUnits: '根据住户数量与所选模块而定',
     planCustomF: ['全部模块，可逐一启用', '托管或独立部署', '启动阶段全程协助'],
-    planMonth: '/ 月', planUpTo: (n) => '最多 ' + n + ' 户', planUnlimited: '户数不限 · 多楼宇网络',
+    planMonth: '/ 月', planUpTo: (n) => '最多 ' + n + ' 户',
     planPopular: '最受欢迎', planCta: '联系我们', planCtaQuote: '索取报价',
     contactTitle: '聊聊您的楼宇。',
     contactSub: '免费且无任何义务的 15 分钟视频讲解。请选择时间：确认邮件中会附上 Google Meet 链接。',
@@ -4357,13 +4358,15 @@ function rendreForfaits(plans) {
   grid.innerHTML = plans.map(function (p) {
     const feats = (p.plan_features || []).slice().sort(function (a, b) { return a.sort_order - b.sort_order; });
     const prix = p.price_monthly ? esc(p.price_monthly) + ' $<span> ' + esc(lt('planMonth')) + '</span>' : '<span style="font-size:1.1rem">' + esc(lt('planQuote')) + '</span>';
-    const unites = p.max_units ? lt('planUpTo')(esc(p.max_units)) : lt('planUnlimited');
+    // Rien quand le forfait n'a pas de plafond : « logements illimites » ne
+    // veut rien dire sur un forfait facture par residant.
+    const unites = p.max_units ? lt('planUpTo')(esc(p.max_units)) : '';
     const code = p.code || '';
     return '<div class="plan-card ' + (p.featured ? 'featured' : '') + '" onmouseenter="trackPlanHover(\'' + esc(code) + '\',\'' + esc((p.name || '').replace(/'/g, '')) + '\')">'
       + (p.featured ? '<div class="plan-badge">' + esc(lt('planPopular')) + '</div>' : '')
       + '<div class="plan-name">' + esc(p.name) + '</div>'
       + '<div class="plan-price">' + prix + '</div>'
-      + '<div class="plan-units">' + unites + '</div>'
+      + (unites ? '<div class="plan-units">' + unites + '</div>' : '')
       + '<ul class="plan-features">' + feats.map(function (f) { return '<li class="' + (f.included ? '' : 'off') + '">' + esc(f.label) + '</li>'; }).join('') + '</ul>'
       + cta(lt('planCta'), p.featured, code)
       + '</div>';
@@ -4956,6 +4959,20 @@ async function loginDemo() {
   toast('Mode démo activé — consultation uniquement', 'info');
   if (window._gaConsent === 'granted') gtag('set', 'user_properties', { user_type: 'demo' });
   trackFeature('platform', 'demo_login');
+}
+
+// Sortir de la demonstration vers le formulaire de connexion : un
+// residant arrive par un lien d'essai ne doit pas avoir a chercher le
+// menu du profil pour se connecter. #connexion dans l'adresse : un
+// rechargement ne relance pas la demo.
+async function quitterDemoPourConnexion() {
+  try { history.replaceState(null, '', window.location.pathname + window.location.search + '#connexion'); } catch (e) {}
+  await logout();
+  const badge = document.getElementById('demo-badge');
+  if (badge) badge.style.display = 'none';
+  const page = document.getElementById('landing');
+  if (page) page.style.display = 'none';
+  window.scrollTo(0, 0);
 }
 
 async function logout() {
@@ -18424,6 +18441,10 @@ window.setConsent = function setConsent(choix) {
       setTimeout(function () {
         if (typeof loginDemo !== 'function' || window._demoMode) return;
         try { trackFeature('landing', 'demo_click', { place: 'lien_essai', referrer: document.referrer ? new URL(document.referrer).hostname : '' }); } catch (e) {}
+        // Le fragment est retire aussitot : sinon un rechargement, un
+        // favori ou l'application installee relancerait la demo, et un
+        // residant venu par ce lien ne pourrait plus se connecter.
+        try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) {}
         loginDemo();
       }, 150);
     });
