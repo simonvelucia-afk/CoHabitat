@@ -63,6 +63,8 @@ remplace(/name:\s*'[^']*'/, `name: '${a.nom.replace(/'/g, "\\'")}'`, 'instance.n
 remplace(/supabaseUrl:\s*'[^']*'/, `supabaseUrl:     '${a.supabase.replace(/\/$/, '')}'`, 'supabaseUrl');
 remplace(/supabaseAnonKey:\s*'[^']*'/, `supabaseAnonKey: '${a.cle}'`, 'supabaseAnonKey');
 remplace(/siteUrl:\s*'[^']*'/, `siteUrl: '${site}'`, 'siteUrl');
+// Un immeuble n'est pas une vitrine : ses visiteurs sont ses residants.
+remplace(/(vitrine:\s*\{\s*enabled:\s*)true/, '$1false', 'vitrine.enabled');
 
 process.stdout.write(src);
 

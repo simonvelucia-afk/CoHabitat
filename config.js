@@ -113,6 +113,16 @@
       description: 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.'
     },
 
+    // Page de vente. enabled:true = un visiteur qui ne s'est jamais
+    // connecte sur l'appareil arrive sur la presentation de CoHabitat
+    // plutot que sur le formulaire de connexion. Reserve a l'instance qui
+    // sert aussi de vitrine (cohabitat.modulimo.com) : un immeuble n'a pas
+    // de prospects a accueillir, ses visiteurs sont ses residants.
+    // new-building.mjs et render-config.mjs la desactivent.
+    vitrine: {
+      enabled: true
+    },
+
     // Analytique. Coupee automatiquement en reseau ferme : le script
     // Google ne serait de toute facon pas joignable.
     analytics: {
