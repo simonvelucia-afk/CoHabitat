@@ -15309,10 +15309,44 @@ async function serreAdminSavePrice() {
 }
 
 // --- Demandes de location (candidatures) ---
-// Lit/decide via les RPC publiques exposees par modulimo central
-// (sql/024_candidatures_building_management.sql). Le scoping est fait
-// par building_id (cle "building_id" de system_settings) — chaque
-// CoHabitat ne voit et ne decide que pour son propre immeuble.
+// Lit/decide via finance-bridge (/candidatures-list, /candidatures-decide)
+// avec le jeton de l'admin connecte. La centrale verifie ce jeton et le
+// role d'admin, et tire l'immeuble du jeton : un autre immeuble est hors
+// d'atteinte. Les RPC de sql/024 ne sont plus appelables avec la cle anon
+// publique (modulimo-admin sql/029) — leur seule garde etait un
+// building_id qui figure dans la page publique /postuler/.
+//
+// building_id (system_settings) ne sert plus qu'a savoir si l'immeuble
+// recoit des candidatures, pour afficher l'aide de configuration.
+
+// Appel authentifie a un endpoint candidatures de finance-bridge. Rend
+// un message lisible pour les refus attendus plutot qu'un code HTTP brut.
+async function _candidaturesFetch(endpoint, body) {
+  const token = window._cachedAccessToken;
+  if (!token) throw new Error('Session expirée — reconnectez-vous.');
+  const res = await fetch(`${FINANCE_BRIDGE_URL}/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'apikey': CENTRAL_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body || {})
+  });
+  let data = null;
+  try { data = await res.json(); } catch (_) { data = null; }
+  if (!res.ok) {
+    const code = data && data.error;
+    const msg = {
+      NOT_ADMIN: "Réservé aux administrateurs de l'immeuble.",
+      CANDIDATURE_NOT_FOUND: 'Candidature introuvable.',
+      UNKNOWN_ISSUER: "Immeuble non enregistré à la centrale Modulimo.",
+      BUILDING_INACTIVE: "Immeuble inactif à la centrale Modulimo.",
+    }[code];
+    throw new Error(msg || ('HTTP ' + res.status + (code ? ' — ' + code : '')));
+  }
+  return data;
+}
 let buildingDemandesCache = [];
 let buildingIdCache = null;
 
@@ -15340,20 +15374,8 @@ async function loadBuildingDemandes() {
   }
 
   try {
-    const res = await fetch(`${CENTRAL_URL}/rest/v1/rpc/list_candidatures_for_building`, {
-      method: 'POST',
-      headers: {
-        'apikey': CENTRAL_KEY,
-        'Authorization': 'Bearer ' + CENTRAL_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ p_building_id: buildingId })
-    });
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error('HTTP ' + res.status + ' — ' + txt);
-    }
-    buildingDemandesCache = await res.json();
+    const data = await _candidaturesFetch('candidatures-list');
+    buildingDemandesCache = (data && data.candidatures) || [];
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--accent3);padding:18px;">Erreur de chargement : ${escHtml(e.message)}</td></tr>`;
     return;
@@ -15453,26 +15475,8 @@ async function rejectBuildingDemande(id) {
 }
 
 async function _decideBuildingDemande(id, decision, successMsg) {
-  const buildingId = await _getBuildingId();
-  if (!buildingId) { toast('building_id manquant dans system_settings', 'error'); return; }
   try {
-    const res = await fetch(`${CENTRAL_URL}/rest/v1/rpc/decide_candidature_for_building`, {
-      method: 'POST',
-      headers: {
-        'apikey': CENTRAL_KEY,
-        'Authorization': 'Bearer ' + CENTRAL_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        p_candidature_id: id,
-        p_decision: decision,
-        p_building_id: buildingId
-      })
-    });
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error('HTTP ' + res.status + ' — ' + txt);
-    }
+    await _candidaturesFetch('candidatures-decide', { candidature_id: id, decision: decision });
   } catch (e) {
     toast('Erreur: ' + e.message, 'error');
     return;
