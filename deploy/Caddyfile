@@ -34,12 +34,35 @@
 		reverse_proxy federation:8080
 	}
 
-	# Flux video, servi sous la meme origine pour eviter le blocage du
-	# contenu mixte en https. Decommenter et pointer vers le serveur
-	# camera du batiment (go2rtc ecoute sur 1984 par defaut).
-	# handle /stream/* {
+	# Flux video, servis sous la meme origine pour eviter le blocage du
+	# contenu mixte en https. Ne relayer QUE les cameras ouvertes aux
+	# residants, jamais tout go2rtc : son API (/api/config, /api/streams)
+	# donnerait toutes les cameras et sa configuration a quiconque ouvre
+	# CoHabitat, et le relais ne sait pas qui est connecte. Le PTZ et les
+	# cameras de la gestion restent dans l'outil camera, sur le reseau de
+	# l'immeuble ou par le tunnel prive.
+	#
+	# Decommenter, remplacer l'adresse du serveur camera, et repeter le
+	# bloc @camera_cam1 pour chaque autre camera « tenants ». La ligne
+	# `uri query src ...` force le nom du flux : un second src= ajoute a
+	# l'adresse est ignore.
+	#
+	# @camera_cam1 {
+	# 	path /stream/stream.html /stream/api/ws /stream/api/frame.jpeg
+	# 	query src=cam1
+	# }
+	# handle @camera_cam1 {
+	# 	uri strip_prefix /stream
+	# 	uri query src cam1
+	# 	reverse_proxy 192.168.0.118:1984
+	# }
+	# @camera_scripts path /stream/video-stream.js /stream/video-rtc.js
+	# handle @camera_scripts {
 	# 	uri strip_prefix /stream
 	# 	reverse_proxy 192.168.0.118:1984
+	# }
+	# handle /stream/* {
+	# 	respond 404
 	# }
 
 	handle {

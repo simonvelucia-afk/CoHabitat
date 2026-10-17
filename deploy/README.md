@@ -260,14 +260,58 @@ fonctionne tant que CoHabitat est lui aussi en `http`, mais le navigateur
 la bloquera dès le passage en `https` — contenu mixte, sans message
 clair, juste un cadre noir.
 
-Dans le `Caddyfile`, en supposant go2rtc sur 1984 :
+**Ne relayer que les caméras ouvertes aux résidants.** Faire suivre tout
+`/stream/*` vers go2rtc exposerait son API (`/api/config`,
+`/api/streams`) : toutes les caméras, et la configuration du serveur, à
+quiconque ouvre CoHabitat. Le relais ne sait pas qui est connecté — le
+jeton de session vit dans le navigateur, pas dans un témoin — il ne peut
+donc pas réserver une caméra aux administrateurs. Il laisse passer
+exactement les flux « tenants », rien d'autre.
+
+Exemple avec go2rtc sur le serveur caméra (`192.168.0.118:1984`) et
+`cam1` filmant l'entrée — le bloc complet, commenté, est dans
+`deploy/Caddyfile` :
 
 ```
-handle /stream/* {
+@camera_cam1 {
+	path /stream/stream.html /stream/api/ws /stream/api/frame.jpeg
+	query src=cam1
+}
+handle @camera_cam1 {
+	uri strip_prefix /stream
+	uri query src cam1          # force le flux : un second src= est ignoré
+	reverse_proxy 192.168.0.118:1984
+}
+@camera_scripts path /stream/video-stream.js /stream/video-rtc.js
+handle @camera_scripts {
 	uri strip_prefix /stream
 	reverse_proxy 192.168.0.118:1984
 }
+handle /stream/* {
+	respond 404
+}
 ```
+
+Une autre caméra « tenants » = un autre bloc `@camera_…`. Les caméras
+« admin » ne passent pas par le relais : leur carte dans CoHabitat mène à
+l'outil caméra (`CAMERA_OUTIL_URL`, par exemple
+`http://192.168.0.118:5000/`), qui garde le visionnement de toutes les
+caméras et la commande PTZ, sur le réseau de l'immeuble ou par le tunnel
+privé. **Ne jamais relayer `/ptz`.**
+
+Le serveur caméra et CoHabitat peuvent être deux machines : un Raspberry
+Pi 3B+ suffit à go2rtc et à l'outil PTZ, mais pas à la pile CoHabitat
+(4 Go de RAM, voir les prérequis).
+
+### Avant d'ouvrir une caméra aux résidants
+
+- **Cadrage** : une caméra d'entrée ne devrait montrer que l'entrée. Si
+  elle voit la rue, le trottoir ou les voisins, activer le masque de
+  confidentialité de la caméra ou la réorienter.
+- **Horloge** : synchroniser la caméra (NTP). Une image horodatée de
+  travers ne vaut rien comme preuve.
+- **Avis** : affiche à l'entrée, politique de confidentialité à jour,
+  durée de conservation fixée sur l'enregistreur.
 
 ## Se rattacher à une centrale
 

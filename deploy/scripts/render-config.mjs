@@ -86,6 +86,9 @@ const config = {
     baseUrl:     env.CAMERA_BASE_URL || '',
     streamPath:  env.CAMERA_STREAM_PATH || '/stream/stream.html?src=',
     description: env.CAMERA_DESCRIPTION || 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.',
+    // Outil camera des admins (visionnement de toutes les cameras, PTZ),
+    // sur le reseau de l'immeuble : jamais relaye.
+    outilUrl:    env.CAMERA_OUTIL_URL || '',
     // Avis de videosurveillance : exige pour toute camera montree aux
     // residants, sans quoi elle reste aux administrateurs.
     avis: {

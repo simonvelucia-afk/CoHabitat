@@ -65,7 +65,10 @@ self.addEventListener('fetch', (e) => {
       url.pathname.includes('/federation/') ||
       // Un flux video n'a rien a faire dans un cache : hors ligne, mieux
       // vaut un cadre vide qu'un lecteur fige sur une page mise en cache.
-      url.pathname.includes('/stream/')) return;
+      url.pathname.includes('/stream/') ||
+      // Les videos de la demonstration non plus : le navigateur les lit
+      // par morceaux (reponses 206), que le cache refuse.
+      /\.(mp4|webm)$/.test(url.pathname)) return;
 
   const mettreEnCache = (rep) => {
     if (rep && rep.ok && rep.type === 'basic') {
