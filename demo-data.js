@@ -38,6 +38,26 @@
   var minutes = function (n) { return new Date(Date.now() + n * 60000).toISOString(); };
   var heures = function (n) { return new Date(Date.now() + n * 3600000).toISOString(); };
 
+  // Eau chaude : 30 jours pour cinq logements, dont celui d'Alex
+  // (B-204). Valeurs stables d'un chargement a l'autre — une courbe qui
+  // change a chaque rechargement ferait douter de la demonstration — et
+  // le week-end consomme un peu plus.
+  var eauChaude = (function () {
+    var base = { 'B-204': 118, 'A-101': 96, 'A-102': 142, 'C-310': 74, 'C-311': 131 };
+    var lignes = [];
+    Object.keys(base).forEach(function (unit, u) {
+      for (var n = 0; n < 30; n++) {
+        var d = new Date(); d.setDate(d.getDate() - n);
+        var jour = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        var we = (d.getDay() === 0 || d.getDay() === 6) ? 1.18 : 1;
+        var bruit = 0.85 + ((n * 37 + u * 11) % 30) / 100;
+        lignes.push({ id: 'ec-' + unit + '-' + n, jour: jour, unit: unit,
+                      litres: Math.round(base[unit] * we * bruit) });
+      }
+    });
+    return lignes;
+  })();
+
   var DEMO = {
     // ── Personnes ────────────────────────────────────────────
     profiles: [
@@ -351,6 +371,30 @@
         reservoir1_pct: 80, reservoir2_pct: 67, reservoir3_pct: 90 },
     ],
 
+    // ── Energie et confort ───────────────────────────────────
+    immeuble_etat: [
+      { id: 'ie-1', horodatage: heures(-30), mode: 'normal', niveau: 'vert', message: null },
+    ],
+    energie_lectures: [
+      { id: 'el-1', horodatage: minutes(-12), solaire_kw: 3.8, solaire_kwh_jour: 17.6,
+        batterie_pct: 94, reseau_kw: -0.6, reservoir_temp: 62, eau_chaude_couverture_pct: 91 },
+      { id: 'el-2', horodatage: minutes(-27), solaire_kw: 3.5, solaire_kwh_jour: 16.7,
+        batterie_pct: 93, reseau_kw: -0.3, reservoir_temp: 61, eau_chaude_couverture_pct: 90 },
+    ],
+    eau_chaude_compteurs: eauChaude,
+    // La troisieme alerte (A-101) n'est pas celle d'Alex : l'ecran la
+    // filtre comme la RLS le ferait.
+    immeuble_alertes: [
+      { id: 'ia-1', horodatage: heures(-50), type: 'gel', gravite: 'attention', unit: null,
+        titre: 'Température basse au garage', message: 'Le chauffage d’appoint a pris le relais. Fermez bien la porte en sortant.',
+        nb_notifies: 1, resolue_le: null },
+      { id: 'ia-2', horodatage: jours(-12), type: 'fuite', gravite: 'urgence', unit: 'B-204',
+        titre: 'Fuite sous le lave-vaisselle', message: 'La vanne d’eau du logement a été fermée automatiquement. Un plombier est passé le jour même.',
+        nb_notifies: 2, resolue_le: jours(-12) },
+      { id: 'ia-3', horodatage: jours(-3), type: 'panne', gravite: 'info', unit: 'A-101',
+        titre: 'Thermostat de chambre injoignable', message: null, nb_notifies: 1, resolue_le: jours(-2) },
+    ],
+
     // Fiches individuelles. Les portraits sont des SVG embarques :
     // la demonstration doit fonctionner sans reseau, sur la tablette
     // comme ailleurs. Un vrai deploiement y met des adresses web.
@@ -478,6 +522,7 @@
       { key: 'module_trips', value: 'true' },
       { key: 'module_lunch', value: 'true' },
       { key: 'module_serre', value: 'true' },
+      { key: 'module_energie', value: 'true' },
       { key: 'lunch_mode', value: 'demo',
         description: 'Configuration de la Machine Lunch : demo, local ou central' },
       { key: 'lunch_local_url', value: '',
@@ -528,6 +573,18 @@
   // renvoie null sans erreur : l'appelant traite deja ce cas.
   var RPC = {
     check_space_availability: function () { return true; },
+    // Meme regle que la fonction SQL : des moyennes seulement, et rien
+    // sous trois logements mesures.
+    eau_chaude_moyenne: function (a) {
+      var totaux = {};
+      (DEMO.eau_chaude_compteurs || []).forEach(function (c) {
+        if (c.jour >= a.p_debut && c.jour <= a.p_fin) totaux[c.unit] = (totaux[c.unit] || 0) + Number(c.litres);
+      });
+      var valeurs = Object.keys(totaux).map(function (k) { return totaux[k]; });
+      if (valeurs.length < 3) return [];
+      var moy = valeurs.reduce(function (s, v) { return s + v; }, 0) / valeurs.length;
+      return [{ litres_moyens: Math.round(moy * 10) / 10, nb_logements: valeurs.length }];
+    },
     // Repond vraiment, plutot que « oui » systematiquement : en
     // demonstration on peut desormais reserver un vehicule, et un parcours
     // qui accepte un creneau deja pris n'apprend rien a personne. Meme
