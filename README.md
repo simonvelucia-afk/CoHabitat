@@ -158,6 +158,26 @@ L'ancien module « Auto-partage » devient **Mobilité partagée** — *MaaS, Mo
 - Activable/désactivable par l'admin (module optionnel `module_serre`)
 - Migrations : `sql/009_serre.sql`, `sql/010_serre_reservoir_temps.sql`, `sql/012_serre_couts_module.sql`, `sql/013_serre_frais_base.sql`, `sql/014_serre_lectures_admin_insert.sql`, `sql/015_serre_plan_locataire.sql`, `sql/016_serre_recoltes_stades.sql`
 
+### Énergie et confort — l'écran de l'immotique
+- Sous-menu **⚡ Énergie et confort** du Tableau de bord. Module optionnel `module_energie`, **coupé par défaut** : l'admin l'active dans les réglages quand l'immeuble publie ses mesures
+- **État de l'immeuble** : normal, panne Hydro (sur batterie, délestage), panne internet (mode local) ou exercice, avec son niveau **vert / bleu / orange** et un message. Les admins le publient depuis l'écran ; le compte appareil de l'immeuble peut aussi le faire
+- **Mon eau chaude** : la consommation du logement aujourd'hui, sur 7 et sur 30 jours, comparée à la **moyenne de l'immeuble**. Un résident ne voit jamais les compteurs d'un voisin (RLS) ; la moyenne vient de la fonction `eau_chaude_moyenne()`, qui ne renvoie que des agrégats et **rien sous trois logements mesurés**
+- **Énergie de l'immeuble** : production solaire du jour et part d'eau chaude couverte pour tous ; production instantanée, batterie, réseau et réservoir en plus pour les admins (et en démonstration)
+- **Alertes** (fuite, gel, panne) : le résident voit celles de son logement et de l'immeuble, l'admin toutes, avec le nombre de personnes prévenues, et peut les marquer résolues. À l'insertion, un déclencheur écrit une **notification** aux résidents du logement concerné, ou aux admins pour une alerte d'immeuble — la bonne personne, pas tout l'immeuble
+- **L'application affiche, elle ne pilote rien** : aucune table ne commande un équipement
+- **Alimentation** : les mesures arrivent par le **compte appareil** de l'immeuble (e-mail en `@device.local`, même convention que la serre), qui peut écrire dans les quatre tables mais pas les effacer. Le pont MQTT de l'immotique viendra avec le matériel ; d'ici là, n'importe quel script peut publier par l'API REST :
+
+  ```bash
+  curl -X POST "$SUPABASE_URL/rest/v1/eau_chaude_compteurs" \
+    -H "apikey: $ANON_KEY" -H "Authorization: Bearer $JETON_APPAREIL" \
+    -H "Content-Type: application/json" -H "Prefer: resolution=merge-duplicates" \
+    -d '{"jour":"2026-10-17","unit":"B-204","litres":118}'
+  ```
+
+  Le logement est désigné comme dans `profiles.unit`. Un compteur se republie sans doublon (`UNIQUE (jour, unit)`)
+- Traduit en français, anglais, espagnol et chinois ; consultable en mode démo (données fictives, aucune écriture)
+- Migration : `sql/035_energie.sql` — test des règles d'accès : `sql/tests/energie_test.sql`
+
 ### LAB — amélioration continue
 - Sous-menu **🧪 LAB** du Babillard : le babillard sert à la vie de l'immeuble, le LAB à celle de l'application
 - **Qualifier les fonctions** : une note de 1 à 5 par fonction (babillard, tableau de bord, espaces, serre, mobilité partagée, Machine Lunch, billets, transactions, profil, multilingue, usage mobile, et le LAB lui-même) avec un commentaire libre. Moyenne communautaire, répartition des notes et commentaires reçus s'affichent sur chaque carte ; on peut revenir modifier sa note à tout moment. Les fonctions des modules désactivés n'apparaissent pas
@@ -306,6 +326,10 @@ select date_trunc('week', created_at) as semaine, count(*)
 | `serre_lectures` | Lectures de capteurs (températures, niveaux) |
 | `elevage_historique` | Historique poulailler / sablonponie (événements) |
 | `elevage_couts` | Coûts d'exploitation serre / poulailler / sablonponie |
+| `immeuble_etat` | Énergie et confort : état de l'immeuble (mode + niveau), la ligne la plus récente fait foi |
+| `energie_lectures` | Énergie et confort : mesures de l'immeuble (solaire, batterie, réseau, réservoir) |
+| `eau_chaude_compteurs` | Énergie et confort : eau chaude par logement et par jour (lisible par son logement et les admins) |
+| `immeuble_alertes` | Énergie et confort : fuite, gel, panne — d'un logement ou de l'immeuble |
 | `lab_evaluations` | LAB : note 1-5 + commentaire d'un résident sur une fonction |
 | `lab_idees` | LAB : améliorations et nouvelles fonctions proposées |
 | `lab_idee_votes` | LAB : appuis à une idée (un par personne) |

@@ -835,6 +835,64 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .stat-value { font-size: 1.8rem; font-family: var(--font-serif); color: var(--text); margin-top: 4px; }
 .stat-value small { font-family: var(--font-sans); font-size: 0.9rem; color: var(--text2); }
 
+/* ===== ÉNERGIE ET CONFORT ===== */
+.en-grille { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; margin:16px 0; }
+.en-carte:hover { border-color: var(--border); box-shadow:none; }
+.en-kicker { font-size:0.72rem; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; }
+.en-etat { display:flex; gap:16px; align-items:flex-start; border-left:4px solid var(--en-niv, var(--accent2)); }
+.en-etat:hover { border-color: var(--border); border-left-color: var(--en-niv, var(--accent2)); box-shadow:none; }
+.en-niv-vert   { --en-niv: var(--accent2); }
+.en-niv-bleu   { --en-niv: #6fa8dc; }
+.en-niv-orange { --en-niv: #e8a33d; }
+.en-etat-ico { font-size:1.8rem; line-height:1; }
+.en-etat-corps { flex:1; min-width:0; }
+.en-etat-titre { font-family:var(--font-serif); font-size:1.4rem; color:var(--text); margin:2px 0 4px; }
+.en-etat-texte { color:var(--text2); font-size:0.9rem; }
+.en-etat-msg { margin-top:10px; padding:10px 12px; background:var(--surface2); border-radius:var(--radius-sm); font-size:0.9rem; color:var(--text); }
+.en-etat-pied { display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:12px; font-size:0.8rem; color:var(--text3); }
+.en-niveau { display:inline-flex; align-items:center; gap:6px; color:var(--text2); font-weight:500; }
+.en-pastille { width:10px; height:10px; border-radius:50%; background:var(--en-niv, var(--accent2)); }
+.en-ligne { padding:10px 0; border-bottom:1px solid var(--border); }
+.en-ligne:last-of-type { border-bottom:none; }
+.en-ligne-tete { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+.en-periode { font-size:0.85rem; color:var(--text2); }
+.en-valeur { font-family:var(--font-serif); font-size:1.25rem; color:var(--text); }
+.en-piste { position:relative; height:10px; margin:8px 0 6px; background:var(--surface3); border-radius:4px; }
+.en-barre { position:absolute; left:0; top:0; bottom:0; background:var(--accent2); border-radius:4px; }
+.en-repere { position:absolute; top:-4px; bottom:-4px; width:2px; margin-left:-1px; background:var(--text); border-radius:1px; }
+.en-ligne-pied { font-size:0.78rem; color:var(--text3); }
+.en-ligne-pied strong { color:var(--text2); font-weight:500; }
+.en-legende { display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:12px; font-size:0.78rem; color:var(--text2); }
+.en-legende > span { display:inline-flex; align-items:center; gap:6px; }
+.en-leg-barre { width:16px; height:8px; border-radius:2px; background:var(--accent2); }
+.en-leg-repere { width:2px; height:14px; background:var(--text); }
+.en-note { margin-top:12px; font-size:0.78rem; color:var(--text3); line-height:1.5; }
+.en-vide { color:var(--text2); font-size:0.9rem; }
+.en-tuiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px; }
+.en-tuile { background:var(--surface2); border-radius:var(--radius-sm); padding:12px; }
+.en-tuile-val { font-family:var(--font-serif); font-size:1.5rem; color:var(--text); margin-top:4px; }
+.en-tuile-val small { font-family:var(--font-sans); font-size:0.8rem; color:var(--text2); }
+.en-alertes { margin-bottom:16px; }
+.en-liste { list-style:none; margin-top:10px; }
+.en-alerte { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-bottom:1px solid var(--border); }
+.en-alerte:last-child { border-bottom:none; }
+.en-alerte-resolue { opacity:0.7; }
+.en-alerte-ico { font-size:1.2rem; line-height:1.4; }
+.en-alerte-corps { flex:1; min-width:0; }
+.en-alerte-titre { color:var(--text); font-weight:500; }
+.en-alerte-msg { color:var(--text2); font-size:0.88rem; margin-top:2px; }
+.en-alerte-meta { display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:6px; font-size:0.78rem; color:var(--text3); }
+.en-alerte-droite { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+.en-form { display:flex; flex-wrap:wrap; gap:0 12px; align-items:flex-end; margin-top:14px; }
+.en-form .form-group { min-width:150px; }
+.en-form-msg { flex:1; min-width:220px; }
+.en-form .btn { margin-bottom:16px; width:auto; }
+@media (max-width: 520px) {
+  .en-grille { grid-template-columns:1fr; }
+  .en-alerte { flex-wrap:wrap; }
+  .en-alerte-droite { flex-direction:row; align-items:center; width:100%; padding-left:32px; }
+}
+
 /* ===== CALENDAR / SLOTS ===== */
 .time-slots {
   display: flex;
@@ -2171,6 +2229,10 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         </div>
       </div>
       <div id="conditions-content"></div>
+    </div>
+
+    <div id="page-energie" class="page">
+      <div id="energie-content"></div>
     </div>
 
         <div id="page-babillard" class="page">
@@ -4054,7 +4116,7 @@ let vehiclesCache = [];
 let tripsCache = [];
 let tenantsCache = [];
 let settingsCache = {};
-window.appModules = { trips: true, lunch: true, serre: true }; // chargé depuis system_settings
+window.appModules = { trips: true, lunch: true, serre: true, energie: false }; // chargé depuis system_settings
 window.networkData = { network: null, members: [], sharedSpaces: [], sharedTrips: [] };
 let currentBookingSpaceId = null;
 let currentBookingTripId = null;
@@ -5457,23 +5519,27 @@ async function loadAppModules() {
     // immeuble sans serre ou sans mobilite partagee selon l'interlocuteur.
     const { data: reglages } = await sb.from('system_settings')
       .select('key, value')
-      .in('key', ['module_trips', 'module_lunch', 'module_serre',
+      .in('key', ['module_trips', 'module_lunch', 'module_serre', 'module_energie',
                   'lunch_mode', 'lunch_local_url']);
     const actif = (k) => (reglages || []).find(r => r.key === k)?.value !== 'false';
     window.appModules.trips = actif('module_trips');
     window.appModules.lunch = actif('module_lunch');
     window.appModules.serre = actif('module_serre');
+    // Coupé tant qu'il n'est pas explicitement activé, comme en production.
+    window.appModules.energie = (reglages || []).find(r => r.key === 'module_energie')?.value === 'true';
     lireReglagesLunch(reglages);
     return;
   }
   // 1. Lire les préférences locales (admin local peut désactiver dans son enveloppe)
   const { data: localSettings } = await sb.from('system_settings')
     .select('key, value')
-    .in('key', ['module_trips', 'module_lunch', 'module_serre', 'finance_central_enabled',
+    .in('key', ['module_trips', 'module_lunch', 'module_serre', 'module_energie', 'finance_central_enabled',
                 'lunch_mode', 'lunch_local_url']);
   const localTrips = localSettings?.find(s => s.key === 'module_trips')?.value !== 'false';
   const localLunch = localSettings?.find(s => s.key === 'module_lunch')?.value !== 'false';
   const localSerre = localSettings?.find(s => s.key === 'module_serre')?.value !== 'false';
+  // Énergie et confort : coupé par défaut (migration 035), il faut l'activer.
+  const localEnergie = localSettings?.find(s => s.key === 'module_energie')?.value === 'true';
   // Phase 3C : si finance_central_enabled=true, l'UI lit le solde depuis
   // la centrale Modulimo via finance-bridge au lieu de profiles.virtual_balance.
   window._financeCentralEnabled = localSettings?.find(s => s.key === 'finance_central_enabled')?.value === 'true';
@@ -5486,6 +5552,7 @@ async function loadAppModules() {
   window.appModules.trips = (licence?.modules?.trips !== false) && localTrips;
   window.appModules.lunch = (licence?.modules?.lunch !== false) && localLunch;
   window.appModules.serre = (licence?.modules?.serre !== false) && localSerre;
+  window.appModules.energie = (licence?.modules?.energie !== false) && localEnergie;
 
   // 4. Si licence invalide ou expirée — bloquer l'app
   if (licence === null) {
@@ -7547,6 +7614,7 @@ function ptApply() {
   if (activePage && typeof navigateTo === 'function') {
     const map = {
       'page-dashboard': 'dashboard',
+      'page-energie': 'energie',
       'page-lab': 'lab',
       'page-tickets': 'tickets',
       'page-spaces': 'spaces',
@@ -8193,7 +8261,8 @@ function buildNav() {
         { key: 'lab', label: '🧪 ' + t('navLab') }
       ] },
       { key: 'dashboard', label: '🏠 ' + t('navDashboard'), enfants: [
-        { key: 'transactions', label: '💳 ' + t('navTransactions') }
+        { key: 'transactions', label: '💳 ' + t('navTransactions') },
+        ...(window.appModules.energie ? [{ key: 'energie', label: '⚡ ' + t('navEnergie') }] : [])
       ] },
       espaces,
       ...(condense ? [] : trips),
@@ -8321,6 +8390,7 @@ function ajusterNav() {
 function navigateTo(page) {
   if (page === 'trips' && !window.appModules.trips) { toast('Module Mobilité partagée non activé', 'info'); return; }
   if (page === 'lunch' && !window.appModules.lunch) { toast('Module Machine Lunch non activé', 'info'); return; }
+  if (page === 'energie' && !window.appModules.energie) { toast(pt('Module Énergie et confort non activé'), 'info'); return; }
   // Workaround sb wedge state : on ne recree le client que si on quitte
   // la page Lunch (le seul cas qui wedge sb dans l'observe). Recreer a
   // chaque navigation saturait la console avec le warning "Multiple
@@ -8367,6 +8437,7 @@ function navigateTo(page) {
   switch(page) {
     case 'dashboard': loadDashboard(); break;
     case 'conditions': loadConditions(); break;
+    case 'energie': loadEnergie(); break;
     case 'babillard': loadBabillard(); break;
     case 'lab': loadLab(); break;
     case 'tickets': loadTickets(); break;
@@ -8385,7 +8456,7 @@ function navigateTo(page) {
 }
 
 function pageName(page) {
-  const map = { conditions: 'conditions', dashboard: 'tableau', babillard: 'babillard', lab: 'lab', tickets: 'billet', spaces: 'espace', trips: 'auto', transactions: 'transaction', profile: 'profil', admin: 'admin', lunch: 'lunch' };
+  const map = { conditions: 'conditions', energie: 'energie', dashboard: 'tableau', babillard: 'babillard', lab: 'lab', tickets: 'billet', spaces: 'espace', trips: 'auto', transactions: 'transaction', profile: 'profil', admin: 'admin', lunch: 'lunch' };
   return map[page] || page;
 }
 
@@ -16830,17 +16901,18 @@ async function loadSettings() {
   if (!form) return;
 
   // Modules activables — affichés en premier avec des toggles
-  const moduleKeys = ['module_trips', 'module_lunch', 'module_serre'];
+  const moduleKeys = ['module_trips', 'module_lunch', 'module_serre', 'module_energie'];
   const moduleLabels = {
     module_trips: '🚗 Module Mobilité partagée (véhicules, vélomobiles, covoiturage)',
     module_lunch: '🍱 Module Machine Lunch (kiosque + commandes)',
-    module_serre: '🌱 Module Serre (zones de culture louables au mois)'
+    module_serre: '🌱 Module Serre (zones de culture louables au mois)',
+    module_energie: '⚡ Module Énergie et confort (état de l’immeuble, eau chaude, alertes)'
   };
   // Valeurs par defaut identiques a la migration 019 : une base qui n'a
   // pas encore la ligne affiche quand meme son interrupteur, et la ligne
   // est creee au premier basculement. Sans cela, un module absent de
   // system_settings restait actif sans aucun moyen de le couper.
-  const moduleDefauts = { module_trips: 'true', module_lunch: 'false', module_serre: 'true' };
+  const moduleDefauts = { module_trips: 'true', module_lunch: 'false', module_serre: 'true', module_energie: 'false' };
   const moduleData = moduleKeys.map(k => {
     const existante = (data || []).find(s => s.key === k);
     return existante || { key: k, value: moduleDefauts[k], description: moduleLabels[k] };
@@ -16900,7 +16972,8 @@ async function loadSettings() {
 const MODULE_DESCRIPTIONS = {
   module_trips: 'Module Mobilité partagée : réservation de véhicules, covoiturage et demandes de passagers',
   module_lunch: 'Module Machine Lunch : kiosque et commandes (nécessite la centrale Modulimo)',
-  module_serre: 'Module Serre : zones de culture louées au mois et capteurs'
+  module_serre: 'Module Serre : zones de culture louées au mois et capteurs',
+  module_energie: 'Module Énergie et confort : état de l’immeuble, eau chaude par logement et alertes'
 };
 
 async function saveModuleSetting(key, enabled) {
@@ -16952,6 +17025,7 @@ async function saveModuleSetting(key, enabled) {
   // Mettre à jour appModules en temps réel
   if (key === 'module_trips') window.appModules.trips = enabled;
   if (key === 'module_lunch') window.appModules.lunch = enabled;
+  if (key === 'module_energie') window.appModules.energie = enabled;
   if (key === 'module_serre') {
     window.appModules.serre = enabled;
     // Rafraîchir la section Serre si on est sur la page Espaces
@@ -18460,6 +18534,507 @@ window.setConsent = function setConsent(choix) {
 </script>
 <script>
 /* ============================================================
+ * Énergie et confort — l'écran de l'immotique
+ * ============================================================
+ * Ce que mesure l'immeuble, montré à ceux que ça concerne :
+ *
+ *   · l'état de l'immeuble (normal, panne Hydro, panne internet,
+ *     exercice) et son niveau vert / bleu / orange ;
+ *   · l'eau chaude du logement, comparée à la moyenne de
+ *     l'immeuble — jamais aux chiffres d'un voisin ;
+ *   · les mesures de l'immeuble : un résumé pour le résidant, le
+ *     détail pour les admins ;
+ *   · les alertes (fuite, gel, panne) du logement, ou de tout
+ *     l'immeuble pour les admins.
+ *
+ * L'application affiche, elle ne pilote rien. Les mesures arrivent
+ * par le compte appareil de l'immeuble, comme celles de la serre ;
+ * les règles d'accès sont dans sql/035_energie.sql.
+ * ============================================================ */
+
+// Libellés traduits, à côté du code qui s'en sert plutôt que dispersés
+// dans les quatre dictionnaires : la clé reste la phrase française, comme
+// partout ailleurs (pt()).
+Object.assign(LANGS.fr, { navEnergie: 'Énergie et confort' });
+Object.assign(LANGS.en, { navEnergie: 'Energy and comfort' });
+Object.assign(LANGS.es, { navEnergie: 'Energía y confort' });
+Object.assign(LANGS.zh, { navEnergie: '能源与舒适' });
+
+Object.assign(PT.en, {
+  'Énergie et confort': 'Energy and comfort',
+  'Ce que mesure l’immeuble, pour vous et pour lui.': 'What the building measures, for you and for itself.',
+  'Module Énergie et confort non activé': 'Energy and comfort module not enabled',
+  'État de l’immeuble': 'Building status',
+  'Aucun état publié pour le moment.': 'No status published yet.',
+  'Fonctionnement normal': 'Normal operation',
+  'L’immeuble fonctionne normalement.': 'The building is running normally.',
+  'Panne d’électricité': 'Power outage',
+  'La batterie alimente les fonctions essentielles : informatique, caméras et contrôle d’accès. Le reste est délesté.': 'The battery powers essential functions: IT, cameras and access control. Everything else is shed.',
+  'Panne d’internet': 'Internet outage',
+  'L’immeuble fonctionne en local. Les échanges avec les autres immeubles reprendront au retour du lien.': 'The building runs locally. Exchanges with other buildings will resume when the link returns.',
+  'Exercice en cours': 'Drill in progress',
+  'Suivez les consignes annoncées. Les voyants d’étage clignotent pendant un exercice.': 'Follow the announced instructions. Floor indicators flash during a drill.',
+  'Niveau vert — Quotidien': 'Green level — Daily',
+  'Niveau bleu — Préparation': 'Blue level — Preparedness',
+  'Niveau orange — Mise à l’abri': 'Orange level — Shelter in place',
+  'Mis à jour': 'Updated',
+  'Mon eau chaude': 'My hot water',
+  'Logement': 'Unit',
+  'Votre compte n’est rattaché à aucun logement : demandez à l’administration d’indiquer votre unité.': 'Your account is not linked to a unit: ask the administration to set your unit.',
+  'Aujourd’hui': 'Today',
+  '7 derniers jours': 'Last 7 days',
+  '30 derniers jours': 'Last 30 days',
+  'Mon logement': 'My unit',
+  'Moyenne de l’immeuble': 'Building average',
+  'de moins que la moyenne': 'below average',
+  'de plus que la moyenne': 'above average',
+  'Dans la moyenne': 'In line with the average',
+  'Moyenne indisponible : il faut au moins trois logements mesurés.': 'Average unavailable: at least three units must be metered.',
+  'Comparaison avec la moyenne des logements de l’immeuble. Vos voisins ne voient jamais vos chiffres, et vous ne voyez jamais les leurs.': 'Compared with the average of the building’s units. Your neighbours never see your figures, and you never see theirs.',
+  'Aucune mesure de votre logement pour le moment.': 'No reading for your unit yet.',
+  'Énergie de l’immeuble': 'Building energy',
+  'Vue gestionnaire': 'Manager view',
+  'Production solaire aujourd’hui': 'Solar output today',
+  'Eau chaude couverte': 'Hot water covered',
+  'Production solaire': 'Solar output',
+  'Batterie': 'Battery',
+  'Tirée du réseau': 'Drawn from the grid',
+  'Injectée au réseau': 'Fed into the grid',
+  'Réservoir d’eau chaude': 'Hot water tank',
+  'Dernière mesure': 'Last reading',
+  'Aucune mesure reçue. Les capteurs de l’immeuble publient ici dès leur installation.': 'No reading received. The building’s sensors publish here once installed.',
+  'Valeurs mesurées par l’immeuble. L’application affiche, elle ne pilote aucun équipement.': 'Values measured by the building. The app displays them; it controls no equipment.',
+  'Mes alertes': 'My alerts',
+  'Alertes de l’immeuble': 'Building alerts',
+  'Aucune alerte. Le silence est le fonctionnement normal.': 'No alerts. Silence is normal operation.',
+  'Immeuble': 'Building',
+  'Fuite': 'Leak', 'Gel': 'Freezing', 'Panne': 'Outage', 'Autre': 'Other',
+  'Urgence': 'Urgent', 'Attention': 'Warning', 'Information': 'Information',
+  'Résolue': 'Resolved',
+  'personne(s) prévenue(s)': 'person(s) notified',
+  'Marquer résolue': 'Mark resolved',
+  'Alerte marquée résolue': 'Alert marked resolved',
+  'Publier l’état de l’immeuble': 'Publish the building status',
+  'Visible par tous les résidants, dans l’application.': 'Visible to all residents, in the app.',
+  'État': 'Status', 'Niveau': 'Level',
+  'Message (facultatif)': 'Message (optional)',
+  'Publier': 'Publish',
+  'État publié': 'Status published',
+  'Indisponible en démonstration': 'Not available in the demo',
+  'Normal': 'Normal', 'Panne Hydro': 'Hydro outage', 'Exercice': 'Drill',
+  'Vert': 'Green', 'Bleu': 'Blue', 'Orange': 'Orange',
+});
+
+Object.assign(PT.es, {
+  'Énergie et confort': 'Energía y confort',
+  'Ce que mesure l’immeuble, pour vous et pour lui.': 'Lo que mide el edificio, para usted y para él.',
+  'Module Énergie et confort non activé': 'Módulo Energía y confort no activado',
+  'État de l’immeuble': 'Estado del edificio',
+  'Aucun état publié pour le moment.': 'Aún no se ha publicado ningún estado.',
+  'Fonctionnement normal': 'Funcionamiento normal',
+  'L’immeuble fonctionne normalement.': 'El edificio funciona con normalidad.',
+  'Panne d’électricité': 'Corte de electricidad',
+  'La batterie alimente les fonctions essentielles : informatique, caméras et contrôle d’accès. Le reste est délesté.': 'La batería alimenta las funciones esenciales: informática, cámaras y control de acceso. El resto se desconecta.',
+  'Panne d’internet': 'Corte de internet',
+  'L’immeuble fonctionne en local. Les échanges avec les autres immeubles reprendront au retour du lien.': 'El edificio funciona en local. Los intercambios con los demás edificios se reanudarán al volver el enlace.',
+  'Exercice en cours': 'Simulacro en curso',
+  'Suivez les consignes annoncées. Les voyants d’étage clignotent pendant un exercice.': 'Siga las consignas anunciadas. Los indicadores de planta parpadean durante un simulacro.',
+  'Niveau vert — Quotidien': 'Nivel verde — Cotidiano',
+  'Niveau bleu — Préparation': 'Nivel azul — Preparación',
+  'Niveau orange — Mise à l’abri': 'Nivel naranja — Refugio',
+  'Mis à jour': 'Actualizado',
+  'Mon eau chaude': 'Mi agua caliente',
+  'Logement': 'Vivienda',
+  'Votre compte n’est rattaché à aucun logement : demandez à l’administration d’indiquer votre unité.': 'Su cuenta no está vinculada a ninguna vivienda: pida a la administración que indique su unidad.',
+  'Aujourd’hui': 'Hoy',
+  '7 derniers jours': 'Últimos 7 días',
+  '30 derniers jours': 'Últimos 30 días',
+  'Mon logement': 'Mi vivienda',
+  'Moyenne de l’immeuble': 'Media del edificio',
+  'de moins que la moyenne': 'menos que la media',
+  'de plus que la moyenne': 'más que la media',
+  'Dans la moyenne': 'En la media',
+  'Moyenne indisponible : il faut au moins trois logements mesurés.': 'Media no disponible: se necesitan al menos tres viviendas medidas.',
+  'Comparaison avec la moyenne des logements de l’immeuble. Vos voisins ne voient jamais vos chiffres, et vous ne voyez jamais les leurs.': 'Comparación con la media de las viviendas del edificio. Sus vecinos nunca ven sus cifras, y usted nunca ve las suyas.',
+  'Aucune mesure de votre logement pour le moment.': 'Aún no hay mediciones de su vivienda.',
+  'Énergie de l’immeuble': 'Energía del edificio',
+  'Vue gestionnaire': 'Vista del gestor',
+  'Production solaire aujourd’hui': 'Producción solar de hoy',
+  'Eau chaude couverte': 'Agua caliente cubierta',
+  'Production solaire': 'Producción solar',
+  'Batterie': 'Batería',
+  'Tirée du réseau': 'Tomada de la red',
+  'Injectée au réseau': 'Inyectada a la red',
+  'Réservoir d’eau chaude': 'Depósito de agua caliente',
+  'Dernière mesure': 'Última medición',
+  'Aucune mesure reçue. Les capteurs de l’immeuble publient ici dès leur installation.': 'No se ha recibido ninguna medición. Los sensores del edificio publicarán aquí en cuanto se instalen.',
+  'Valeurs mesurées par l’immeuble. L’application affiche, elle ne pilote aucun équipement.': 'Valores medidos por el edificio. La aplicación muestra, no controla ningún equipo.',
+  'Mes alertes': 'Mis alertas',
+  'Alertes de l’immeuble': 'Alertas del edificio',
+  'Aucune alerte. Le silence est le fonctionnement normal.': 'Ninguna alerta. El silencio es el funcionamiento normal.',
+  'Immeuble': 'Edificio',
+  'Fuite': 'Fuga', 'Gel': 'Helada', 'Panne': 'Avería', 'Autre': 'Otra',
+  'Urgence': 'Urgencia', 'Attention': 'Atención', 'Information': 'Información',
+  'Résolue': 'Resuelta',
+  'personne(s) prévenue(s)': 'persona(s) avisada(s)',
+  'Marquer résolue': 'Marcar como resuelta',
+  'Alerte marquée résolue': 'Alerta marcada como resuelta',
+  'Publier l’état de l’immeuble': 'Publicar el estado del edificio',
+  'Visible par tous les résidants, dans l’application.': 'Visible para todos los residentes, en la aplicación.',
+  'État': 'Estado', 'Niveau': 'Nivel',
+  'Message (facultatif)': 'Mensaje (opcional)',
+  'Publier': 'Publicar',
+  'État publié': 'Estado publicado',
+  'Indisponible en démonstration': 'No disponible en la demostración',
+  'Normal': 'Normal', 'Panne Hydro': 'Corte Hydro', 'Exercice': 'Simulacro',
+  'Vert': 'Verde', 'Bleu': 'Azul', 'Orange': 'Naranja',
+});
+
+Object.assign(PT.zh, {
+  'Énergie et confort': '能源与舒适',
+  'Ce que mesure l’immeuble, pour vous et pour lui.': '楼宇所测量的一切，为您，也为楼宇本身。',
+  'Module Énergie et confort non activé': '能源与舒适模块未启用',
+  'État de l’immeuble': '楼宇状态',
+  'Aucun état publié pour le moment.': '暂未发布任何状态。',
+  'Fonctionnement normal': '正常运行',
+  'L’immeuble fonctionne normalement.': '楼宇运行正常。',
+  'Panne d’électricité': '停电',
+  'La batterie alimente les fonctions essentielles : informatique, caméras et contrôle d’accès. Le reste est délesté.': '电池为基本功能供电：信息系统、摄像头与门禁。其余负载已切除。',
+  'Panne d’internet': '互联网中断',
+  'L’immeuble fonctionne en local. Les échanges avec les autres immeubles reprendront au retour du lien.': '楼宇在本地运行。与其他楼宇的交换将在链路恢复后继续。',
+  'Exercice en cours': '演练进行中',
+  'Suivez les consignes annoncées. Les voyants d’étage clignotent pendant un exercice.': '请遵循已公布的指示。演练期间楼层指示灯闪烁。',
+  'Niveau vert — Quotidien': '绿色级别 — 日常',
+  'Niveau bleu — Préparation': '蓝色级别 — 准备',
+  'Niveau orange — Mise à l’abri': '橙色级别 — 就地避险',
+  'Mis à jour': '更新于',
+  'Mon eau chaude': '我的热水',
+  'Logement': '住户',
+  'Votre compte n’est rattaché à aucun logement : demandez à l’administration d’indiquer votre unité.': '您的账户尚未关联任何住户：请联系管理处填写您的单元。',
+  'Aujourd’hui': '今天',
+  '7 derniers jours': '最近 7 天',
+  '30 derniers jours': '最近 30 天',
+  'Mon logement': '我的住户',
+  'Moyenne de l’immeuble': '楼宇平均值',
+  'de moins que la moyenne': '低于平均值',
+  'de plus que la moyenne': '高于平均值',
+  'Dans la moyenne': '与平均值持平',
+  'Moyenne indisponible : il faut au moins trois logements mesurés.': '平均值不可用：至少需要三户有计量数据。',
+  'Comparaison avec la moyenne des logements de l’immeuble. Vos voisins ne voient jamais vos chiffres, et vous ne voyez jamais les leurs.': '与楼内各户的平均值对比。邻居永远看不到您的数据，您也看不到他们的。',
+  'Aucune mesure de votre logement pour le moment.': '您的住户暂无计量数据。',
+  'Énergie de l’immeuble': '楼宇能源',
+  'Vue gestionnaire': '管理视图',
+  'Production solaire aujourd’hui': '今日太阳能发电',
+  'Eau chaude couverte': '热水覆盖率',
+  'Production solaire': '太阳能发电',
+  'Batterie': '电池',
+  'Tirée du réseau': '取自电网',
+  'Injectée au réseau': '送入电网',
+  'Réservoir d’eau chaude': '热水箱',
+  'Dernière mesure': '最近一次测量',
+  'Aucune mesure reçue. Les capteurs de l’immeuble publient ici dès leur installation.': '尚未收到任何测量。楼宇传感器安装后将在此发布数据。',
+  'Valeurs mesurées par l’immeuble. L’application affiche, elle ne pilote aucun équipement.': '数值由楼宇测量。应用仅作显示，不操控任何设备。',
+  'Mes alertes': '我的警报',
+  'Alertes de l’immeuble': '楼宇警报',
+  'Aucune alerte. Le silence est le fonctionnement normal.': '没有警报。安静就是正常运行。',
+  'Immeuble': '楼宇',
+  'Fuite': '渗漏', 'Gel': '结冰', 'Panne': '故障', 'Autre': '其他',
+  'Urgence': '紧急', 'Attention': '注意', 'Information': '信息',
+  'Résolue': '已解决',
+  'personne(s) prévenue(s)': '人已收到通知',
+  'Marquer résolue': '标记为已解决',
+  'Alerte marquée résolue': '警报已标记为已解决',
+  'Publier l’état de l’immeuble': '发布楼宇状态',
+  'Visible par tous les résidants, dans l’application.': '所有住户均可在应用中看到。',
+  'État': '状态', 'Niveau': '级别',
+  'Message (facultatif)': '消息（可选）',
+  'Publier': '发布',
+  'État publié': '状态已发布',
+  'Indisponible en démonstration': '演示模式中不可用',
+  'Normal': '正常', 'Panne Hydro': 'Hydro 停电', 'Exercice': '演练',
+  'Vert': '绿色', 'Bleu': '蓝色', 'Orange': '橙色',
+});
+
+// Modes et niveaux. Chaque état porte une icône et un libellé : la
+// couleur seule ne dit jamais rien.
+const ENERGIE_MODES = {
+  normal:         { ico: '✅', titre: 'Fonctionnement normal', texte: 'L’immeuble fonctionne normalement.', court: 'Normal' },
+  panne_hydro:    { ico: '🔋', titre: 'Panne d’électricité', texte: 'La batterie alimente les fonctions essentielles : informatique, caméras et contrôle d’accès. Le reste est délesté.', court: 'Panne Hydro' },
+  panne_internet: { ico: '📡', titre: 'Panne d’internet', texte: 'L’immeuble fonctionne en local. Les échanges avec les autres immeubles reprendront au retour du lien.', court: 'Panne d’internet' },
+  exercice:       { ico: '🧪', titre: 'Exercice en cours', texte: 'Suivez les consignes annoncées. Les voyants d’étage clignotent pendant un exercice.', court: 'Exercice' },
+};
+const ENERGIE_NIVEAUX = {
+  vert:   { titre: 'Niveau vert — Quotidien',        court: 'Vert' },
+  bleu:   { titre: 'Niveau bleu — Préparation',      court: 'Bleu' },
+  orange: { titre: 'Niveau orange — Mise à l’abri', court: 'Orange' },
+};
+const ENERGIE_ALERTE_TYPES = { fuite: ['💧', 'Fuite'], gel: ['❄️', 'Gel'], panne: ['⚡', 'Panne'], autre: ['ℹ️', 'Autre'] };
+const ENERGIE_GRAVITES = { urgence: ['badge-red', 'Urgence'], attention: ['badge-yellow', 'Attention'], info: ['badge-gray', 'Information'] };
+
+// Date locale AAAA-MM-JJ, n jours avant aujourd'hui. Pas toISOString() :
+// le soir, l'heure UTC est déjà au lendemain et décalerait les périodes.
+function energieJour(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Date et heure courtes : « 17 oct. 2026, 12 h 25 » plutôt que la forme
+// longue, avec les secondes, que donne toLocaleString().
+function energieDate(iso) {
+  return new Date(iso).toLocaleString(appLocale(), { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function energieNombre(v, dec) {
+  if (v === null || v === undefined || v === '' || isNaN(Number(v))) return '—';
+  return Number(v).toLocaleString(appLocale(), { maximumFractionDigits: dec ?? 0, minimumFractionDigits: dec ?? 0 });
+}
+
+async function loadEnergie() {
+  const box = document.getElementById('energie-content');
+  if (!box) return;
+  const tete = `
+    <div class="section-header"><div class="section-title">
+      <h2>⚡ ${pt('Énergie et confort')}</h2>
+      <p>${pt('Ce que mesure l’immeuble, pour vous et pour lui.')}</p>
+    </div></div>`;
+  if (!window.appModules.energie) {
+    box.innerHTML = tete + `<div class="empty-state"><div class="empty-icon">⚡</div><p>${pt('Module Énergie et confort non activé')}</p></div>`;
+    return;
+  }
+  box.innerHTML = tete + '<div class="loading"><div class="spinner"></div></div>';
+
+  const role = currentProfile?.role;
+  const isAdmin = role === 'admin' || role === 'principal_admin';
+  // La démonstration s'adresse aux gestionnaires : elle montre aussi le
+  // détail de l'immeuble, en lecture seule.
+  const voitDetail = isAdmin || isDemo;
+  const logement = (currentProfile?.unit || '').trim() || null;
+
+  const periodes = [
+    { cle: 'Aujourd’hui',       debut: energieJour(0) },
+    { cle: '7 derniers jours',  debut: energieJour(6) },
+    { cle: '30 derniers jours', debut: energieJour(29) },
+  ];
+  const fin = energieJour(0);
+
+  const [etatR, lectR, compteursR, alertesR, ...moyennesR] = await Promise.all([
+    sb.from('immeuble_etat').select('*').order('horodatage', { ascending: false }).limit(1),
+    sb.from('energie_lectures').select('*').order('horodatage', { ascending: false }).limit(1),
+    logement
+      ? sb.from('eau_chaude_compteurs').select('jour, litres').eq('unit', logement).gte('jour', periodes[2].debut).lte('jour', fin)
+      : Promise.resolve({ data: [] }),
+    sb.from('immeuble_alertes').select('*').order('horodatage', { ascending: false }).limit(isAdmin ? 50 : 20),
+    ...periodes.map(p => sb.rpc('eau_chaude_moyenne', { p_debut: p.debut, p_fin: fin })),
+  ]);
+
+  const etat = (etatR.data || [])[0] || null;
+  const lecture = (lectR.data || [])[0] || null;
+  const compteurs = compteursR.data || [];
+  // La base filtre déjà par logement ; la démonstration n'a pas de RLS,
+  // le filtre est donc rejoué ici.
+  const alertes = (alertesR.data || []).filter(a => isAdmin || !a.unit || a.unit === logement);
+  const moyennes = moyennesR.map(r => {
+    const ligne = Array.isArray(r.data) ? r.data[0] : r.data;
+    return ligne && ligne.litres_moyens != null ? Number(ligne.litres_moyens) : null;
+  });
+  const miens = periodes.map(p => compteurs
+    .filter(c => c.jour >= p.debut && c.jour <= fin)
+    .reduce((s, c) => s + Number(c.litres || 0), 0));
+
+  box.innerHTML = tete
+    + energieBlocEtat(etat)
+    + `<div class="en-grille">`
+    + energieBlocEau(logement, periodes, miens, moyennes, compteurs.length > 0)
+    + energieBlocImmeuble(lecture, voitDetail)
+    + `</div>`
+    + energieBlocAlertes(alertes, isAdmin)
+    + (isAdmin ? energieBlocPublier(etat) : '');
+}
+
+function energieBlocEtat(etat) {
+  const mode = ENERGIE_MODES[etat?.mode] || ENERGIE_MODES.normal;
+  const cleNiveau = ENERGIE_NIVEAUX[etat?.niveau] ? etat.niveau : 'vert';
+  const niveau = ENERGIE_NIVEAUX[cleNiveau];
+  const quand = etat?.horodatage
+    ? `${pt('Mis à jour')} : ${energieDate(etat.horodatage)}`
+    : pt('Aucun état publié pour le moment.');
+  return `
+    <div class="card en-etat en-niv-${cleNiveau}" role="status">
+      <div class="en-etat-ico" aria-hidden="true">${mode.ico}</div>
+      <div class="en-etat-corps">
+        <div class="en-kicker">${pt('État de l’immeuble')}</div>
+        <div class="en-etat-titre">${pt(mode.titre)}</div>
+        <div class="en-etat-texte">${pt(mode.texte)}</div>
+        ${etat?.message ? `<div class="en-etat-msg">${escHtml(etat.message)}</div>` : ''}
+        <div class="en-etat-pied">
+          <span class="en-niveau"><span class="en-pastille" aria-hidden="true"></span>${pt(niveau.titre)}</span>
+          <span>${quand}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+// Comparaison en « bullet » : la barre est le logement, le trait vertical
+// la moyenne de l'immeuble. Les deux se distinguent par la forme, pas par
+// une seconde couleur, et chaque valeur est écrite en toutes lettres.
+function energieBlocEau(logement, periodes, miens, moyennes, aDesMesures) {
+  const titre = `<div class="card-header"><div>
+      <div class="card-title">💧 ${pt('Mon eau chaude')}</div>
+      ${logement ? `<div class="card-subtitle">${pt('Logement')} ${escHtml(logement)}</div>` : ''}
+    </div></div>`;
+  if (!logement) {
+    return `<div class="card en-carte">${titre}<p class="en-vide">${pt('Votre compte n’est rattaché à aucun logement : demandez à l’administration d’indiquer votre unité.')}</p></div>`;
+  }
+  if (!aDesMesures) {
+    return `<div class="card en-carte">${titre}<p class="en-vide">${pt('Aucune mesure de votre logement pour le moment.')}</p></div>`;
+  }
+  const lignes = periodes.map((p, i) => {
+    const moi = miens[i], moy = moyennes[i];
+    const echelle = Math.max(moi, moy || 0) * 1.15 || 1;
+    const pctMoi = Math.max(moi / echelle * 100, moi > 0 ? 1.5 : 0);
+    let ecart = '';
+    if (moy) {
+      const d = Math.round((moi - moy) / moy * 100);
+      ecart = Math.abs(d) < 3 ? pt('Dans la moyenne')
+        : `${Math.abs(d)} % ${pt(d < 0 ? 'de moins que la moyenne' : 'de plus que la moyenne')}`;
+    }
+    const resume = `${pt(p.cle)} — ${pt('Mon logement')} : ${energieNombre(moi)} L`
+      + (moy ? ` · ${pt('Moyenne de l’immeuble')} : ${energieNombre(moy)} L` : '');
+    return `
+      <div class="en-ligne" title="${escHtml(resume)}">
+        <div class="en-ligne-tete">
+          <span class="en-periode">${pt(p.cle)}</span>
+          <span class="en-valeur">${energieNombre(moi)} L</span>
+        </div>
+        <div class="en-piste" role="img" aria-label="${escHtml(resume)}">
+          <div class="en-barre" style="width:${pctMoi}%"></div>
+          ${moy ? `<div class="en-repere" style="left:${moy / echelle * 100}%"></div>` : ''}
+        </div>
+        <div class="en-ligne-pied">${moy
+          ? `${pt('Moyenne de l’immeuble')} : ${energieNombre(moy)} L · <strong>${ecart}</strong>`
+          : pt('Moyenne indisponible : il faut au moins trois logements mesurés.')}</div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="card en-carte">${titre}
+      ${lignes}
+      <div class="en-legende" aria-hidden="true">
+        <span><span class="en-leg-barre"></span>${pt('Mon logement')}</span>
+        <span><span class="en-leg-repere"></span>${pt('Moyenne de l’immeuble')}</span>
+      </div>
+      <p class="en-note">${pt('Comparaison avec la moyenne des logements de l’immeuble. Vos voisins ne voient jamais vos chiffres, et vous ne voyez jamais les leurs.')}</p>
+    </div>`;
+}
+
+function energieBlocImmeuble(lecture, voitDetail) {
+  const titre = `<div class="card-header"><div>
+      <div class="card-title">☀️ ${pt('Énergie de l’immeuble')}</div>
+      ${voitDetail ? `<div class="card-subtitle">${pt('Vue gestionnaire')}</div>` : ''}
+    </div></div>`;
+  if (!lecture) {
+    return `<div class="card en-carte">${titre}<p class="en-vide">${pt('Aucune mesure reçue. Les capteurs de l’immeuble publient ici dès leur installation.')}</p></div>`;
+  }
+  const tuile = (lib, val, unite) => `
+    <div class="en-tuile"><div class="stat-label">${pt(lib)}</div>
+      <div class="en-tuile-val">${val}${val !== '—' && unite ? ` <small>${unite}</small>` : ''}</div></div>`;
+  const reseau = lecture.reseau_kw == null ? null : Number(lecture.reseau_kw);
+  const tuiles = [
+    tuile('Production solaire aujourd’hui', energieNombre(lecture.solaire_kwh_jour, 1), 'kWh'),
+    tuile('Eau chaude couverte', energieNombre(lecture.eau_chaude_couverture_pct), '%'),
+  ];
+  if (voitDetail) {
+    tuiles.push(
+      tuile('Production solaire', energieNombre(lecture.solaire_kw, 1), 'kW'),
+      tuile('Batterie', energieNombre(lecture.batterie_pct), '%'),
+      tuile(reseau !== null && reseau < 0 ? 'Injectée au réseau' : 'Tirée du réseau',
+            reseau === null ? '—' : energieNombre(Math.abs(reseau), 1), 'kW'),
+      tuile('Réservoir d’eau chaude', energieNombre(lecture.reservoir_temp), '°C'),
+    );
+  }
+  return `
+    <div class="card en-carte">${titre}
+      <div class="en-tuiles">${tuiles.join('')}</div>
+      <p class="en-note">${pt('Dernière mesure')} : ${energieDate(lecture.horodatage)}<br>
+        ${pt('Valeurs mesurées par l’immeuble. L’application affiche, elle ne pilote aucun équipement.')}</p>
+    </div>`;
+}
+
+function energieBlocAlertes(alertes, isAdmin) {
+  const titre = `<div class="card-title">🔔 ${pt(isAdmin ? 'Alertes de l’immeuble' : 'Mes alertes')}</div>`;
+  if (!alertes.length) {
+    return `<div class="card en-carte en-alertes">${titre}<p class="en-vide">${pt('Aucune alerte. Le silence est le fonctionnement normal.')}</p></div>`;
+  }
+  const items = alertes.map(a => {
+    const [ico, lib] = ENERGIE_ALERTE_TYPES[a.type] || ENERGIE_ALERTE_TYPES.autre;
+    const [classe, grav] = ENERGIE_GRAVITES[a.gravite] || ENERGIE_GRAVITES.info;
+    const portee = a.unit ? `${pt('Logement')} ${escHtml(a.unit)}` : pt('Immeuble');
+    const resolue = a.resolue_le
+      ? `<span class="badge badge-green">✓ ${pt('Résolue')} · ${new Date(a.resolue_le).toLocaleDateString(appLocale())}</span>`
+      : `<span class="badge ${classe}">${pt(grav)}</span>`;
+    const actions = isAdmin && !a.resolue_le && !isDemo
+      ? `<button class="btn btn-secondary btn-sm" onclick="energieResoudre('${a.id}')">${pt('Marquer résolue')}</button>` : '';
+    return `
+      <li class="en-alerte${a.resolue_le ? ' en-alerte-resolue' : ''}">
+        <span class="en-alerte-ico" aria-hidden="true">${ico}</span>
+        <div class="en-alerte-corps">
+          <div class="en-alerte-titre">${escHtml(a.titre)}</div>
+          ${a.message ? `<div class="en-alerte-msg">${escHtml(a.message)}</div>` : ''}
+          <div class="en-alerte-meta">
+            <span>${pt(lib)}</span><span>${portee}</span>
+            <span>${energieDate(a.horodatage)}</span>
+            ${isAdmin ? `<span>${a.nb_notifies ?? 0} ${pt('personne(s) prévenue(s)')}</span>` : ''}
+          </div>
+        </div>
+        <div class="en-alerte-droite">${resolue}${actions}</div>
+      </li>`;
+  }).join('');
+  return `<div class="card en-carte en-alertes">${titre}<ul class="en-liste">${items}</ul></div>`;
+}
+
+function energieBlocPublier(etat) {
+  const opt = (obj, cle, actuel) => Object.keys(obj).map(k =>
+    `<option value="${k}"${k === actuel ? ' selected' : ''}>${pt(obj[k].court)}</option>`).join('');
+  return `
+    <div class="card en-carte">
+      <div class="card-title">📣 ${pt('Publier l’état de l’immeuble')}</div>
+      <div class="card-subtitle">${pt('Visible par tous les résidants, dans l’application.')}</div>
+      <div class="en-form">
+        <div class="form-group"><label for="en-mode">${pt('État')}</label>
+          <select id="en-mode">${opt(ENERGIE_MODES, 'mode', etat?.mode || 'normal')}</select></div>
+        <div class="form-group"><label for="en-niveau">${pt('Niveau')}</label>
+          <select id="en-niveau">${opt(ENERGIE_NIVEAUX, 'niveau', etat?.niveau || 'vert')}</select></div>
+        <div class="form-group en-form-msg"><label for="en-message">${pt('Message (facultatif)')}</label>
+          <input type="text" id="en-message" maxlength="280"></div>
+        <button class="btn btn-primary btn-sm" onclick="energiePublierEtat()">${pt('Publier')}</button>
+      </div>
+    </div>`;
+}
+
+async function energiePublierEtat() {
+  if (isDemo) { toast(pt('Indisponible en démonstration'), 'info'); return; }
+  const message = (document.getElementById('en-message')?.value || '').trim();
+  const { error } = await sb.from('immeuble_etat').insert({
+    mode: document.getElementById('en-mode').value,
+    niveau: document.getElementById('en-niveau').value,
+    message: message || null,
+    created_by: currentProfile?.id || null,
+  });
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast(pt('État publié'), 'success');
+  loadEnergie();
+}
+
+async function energieResoudre(id) {
+  if (isDemo) { toast(pt('Indisponible en démonstration'), 'info'); return; }
+  const { error } = await sb.from('immeuble_alertes').update({ resolue_le: new Date().toISOString() }).eq('id', id);
+  if (error) { toast('Erreur: ' + error.message, 'error'); return; }
+  toast(pt('Alerte marquée résolue'), 'success');
+  loadEnergie();
+}
+</script>
+<script>
+/* ============================================================
  * Panneau de configuration de la demonstration
  * ============================================================
  * Visible uniquement en mode demonstration. Permet d'activer ou
@@ -18501,6 +19076,7 @@ window.setConsent = function setConsent(choix) {
     { cle: 'module_trips', titre: '🚗 Mobilité partagée', detail: 'Véhicules et vélomobiles réservables, covoiturage' },
     { cle: 'module_lunch', titre: '🍱 Machine Lunch', detail: 'Kiosque et commandes — nécessite la centrale' },
     { cle: 'module_serre', titre: '🌱 Serre',        detail: 'Zones de culture louées au mois, capteurs' },
+    { cle: 'module_energie', titre: '⚡ Énergie et confort', detail: 'État de l’immeuble, eau chaude par logement, alertes' },
   ];
 
   function valeur(cle) {
