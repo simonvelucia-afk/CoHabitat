@@ -93,8 +93,9 @@
     // section n'apparait pas.
     //
     // baseUrl vide = meme origine que l'application. C'est le montage
-    // recommande : faire servir le serveur camera sous /stream et /ptz
-    // par le meme reverse proxy. Une URL http:// explicite fonctionne
+    // recommande : faire relayer les flux sous /stream par le meme
+    // reverse proxy, en ne laissant passer que les cameras ouvertes aux
+    // residants (voir deploy/Caddyfile). Jamais l'API ni le PTZ. Une URL http:// explicite fonctionne
     // tant que CoHabitat est lui aussi en http, mais sera bloquee par le
     // navigateur (contenu mixte) des que le site passe en https.
     //
@@ -104,6 +105,11 @@
     // `responsable` et la duree de `conservation` des images. Sans eux,
     // elle reste reservee aux administrateurs. Les textes acceptent une
     // chaine ou un objet { fr, en, es, zh }.
+    //
+    // Une camera reservee aux administrateurs n'est pas relayee : sa
+    // carte mene a l'outil camera (`outilUrl`), joignable sur le reseau
+    // de l'immeuble ou par le tunnel prive. `relayee: true` garde l'image
+    // pour une instance qui relaie aussi ces cameras.
     //
     // Une configuration sans `liste` (camera, label, visibility a la
     // racine) reste lue comme une seule camera.
@@ -115,6 +121,7 @@
       baseUrl:     '',
       streamPath:  '/stream/stream.html?src=',
       description: 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.',
+      outilUrl:    '',  // outil camera des admins, ex. 'http://192.168.0.118:5000/'
       avis: {
         responsable:  '',   // ex. 'Gestion de l’immeuble'
         contact:      '',   // ex. 'gestion@immeuble.ca'

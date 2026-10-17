@@ -375,8 +375,10 @@
     // Meme forme que CohabitatConfig.cameras. L'exemple que montre la
     // demonstration : l'entree visible par tous les residants, avec son
     // avis de videosurveillance ; le garage et le local technique
-    // reserves aux administrateurs. Les images sont dessinees par
-    // l'application (aucun serveur camera sur la tablette).
+    // reserves aux administrateurs. Sans serveur camera sur la tablette,
+    // chaque camera montre une image dessinee par l'application, ou une
+    // sequence en boucle si `demoVideo` pointe vers un fichier (MP4 ou
+    // WebM, sans personne ni plaque identifiable : la demo est publique).
     cameras: {
       enabled: true,
       avis: {
