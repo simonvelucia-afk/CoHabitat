@@ -371,6 +371,40 @@
         reservoir1_pct: 80, reservoir2_pct: 67, reservoir3_pct: 90 },
     ],
 
+    // ── Cameras ──────────────────────────────────────────────
+    // Meme forme que CohabitatConfig.cameras. L'exemple que montre la
+    // demonstration : l'entree visible par tous les residants, avec son
+    // avis de videosurveillance ; le garage et le local technique
+    // reserves aux administrateurs. Les images sont dessinees par
+    // l'application (aucun serveur camera sur la tablette).
+    cameras: {
+      enabled: true,
+      avis: {
+        responsable: { fr: 'Gestion de l’immeuble', en: 'Building management', es: 'Administración del edificio', zh: '楼宇管理处' },
+        contact: 'gestion@immeuble-demo.ca',
+        conservation: { fr: '7 jours', en: '7 days', es: '7 días', zh: '7 天' },
+        politiqueUrl: 'https://www.modulimo.com/confidentialite/'
+      },
+      liste: [
+        { id: 'cam-entree', demoScene: 'entree', visibility: 'tenants',
+          label: { fr: 'Entrée principale', en: 'Main entrance', es: 'Entrada principal', zh: '主入口' },
+          finalite: { fr: 'Sécurité des accès : voir qui se présente à la porte, accueillir une livraison.',
+                      en: 'Access security: see who is at the door, receive a delivery.',
+                      es: 'Seguridad de los accesos: ver quién llega a la puerta, recibir una entrega.',
+                      zh: '出入安全：查看门口来访者，接收快递。' } },
+        { id: 'cam-garage', demoScene: 'garage', visibility: 'admin',
+          label: { fr: 'Garage', en: 'Garage', es: 'Garaje', zh: '车库' },
+          description: { fr: 'Stationnement et bornes de recharge.', en: 'Parking and charging stations.',
+                         es: 'Estacionamiento y cargadores.', zh: '停车位与充电桩。' } },
+        { id: 'cam-technique', demoScene: 'entree', visibility: 'admin',
+          label: { fr: 'Local technique', en: 'Utility room', es: 'Cuarto técnico', zh: '设备间' },
+          description: { fr: 'Serveur de l’immeuble, batterie et réservoir d’eau chaude.',
+                         en: 'Building server, battery and hot water tank.',
+                         es: 'Servidor del edificio, batería y depósito de agua caliente.',
+                         zh: '楼宇服务器、电池与热水箱。' } },
+      ],
+    },
+
     // ── Energie et confort ───────────────────────────────────
     immeuble_etat: [
       { id: 'ie-1', horodatage: heures(-30), mode: 'normal', niveau: 'vert', message: null },

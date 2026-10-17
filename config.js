@@ -88,8 +88,8 @@
       url:     '/federation'
     },
 
-    // Camera des espaces communs, affichee sur la page Espaces entre la
-    // grille et la serre. Desactivee par defaut : sans configuration, la
+    // Cameras de l'immeuble, affichees sur la page Espaces entre la
+    // grille et la serre. Desactivees par defaut : sans configuration, la
     // section n'apparait pas.
     //
     // baseUrl vide = meme origine que l'application. C'est le montage
@@ -97,20 +97,33 @@
     // par le meme reverse proxy. Une URL http:// explicite fonctionne
     // tant que CoHabitat est lui aussi en http, mais sera bloquee par le
     // navigateur (contenu mixte) des que le site passe en https.
-    // visibility : 'admin' (defaut) ou 'tenants'. Une camera d'entree
-    // filme des allees et venues identifiables — la diffuser a tout
-    // l'immeuble se justifie beaucoup moins qu'une salle commune.
+    //
+    // liste : une entree par camera, chacune avec sa visibilite —
+    // 'admin' (defaut) ou 'tenants'. Une camera montree aux residants
+    // exige un avis complet : sa `finalite`, et dans `avis` un
+    // `responsable` et la duree de `conservation` des images. Sans eux,
+    // elle reste reservee aux administrateurs. Les textes acceptent une
+    // chaine ou un objet { fr, en, es, zh }.
+    //
+    // Une configuration sans `liste` (camera, label, visibility a la
+    // racine) reste lue comme une seule camera.
     //
     // Le pilotage PTZ n'est pas dans l'application : il reste dans
     // l'outil dedie du serveur camera.
     cameras: {
       enabled:     false,
-      visibility:  'admin',
       baseUrl:     '',
       streamPath:  '/stream/stream.html?src=',
-      camera:      'cam1',
-      label:       'Caméra — entrée principale',
-      description: 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.'
+      description: 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.',
+      avis: {
+        responsable:  '',   // ex. 'Gestion de l’immeuble'
+        contact:      '',   // ex. 'gestion@immeuble.ca'
+        conservation: '',   // ex. '7 jours'
+        politiqueUrl: ''    // vide = politique de confidentialite de Modulimo
+      },
+      liste: [
+        { id: 'cam1', label: 'Caméra — entrée principale', visibility: 'admin', finalite: '' }
+      ]
     },
 
     // Page de vente. enabled:true = un visiteur qui ne s'est jamais
