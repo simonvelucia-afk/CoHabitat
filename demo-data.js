@@ -388,17 +388,19 @@
         politiqueUrl: 'https://www.modulimo.com/confidentialite/'
       },
       liste: [
-        { id: 'cam-entree', demoScene: 'entree', visibility: 'tenants',
+        // Video en boucle : deposer le fichier dans img/demo/ (voir son
+        // README). Absent, l'image dessinee reste affichee.
+        { id: 'cam-entree', demoScene: 'entree', visibility: 'tenants', demoVideo: 'img/demo/camera-entree.mp4',
           label: { fr: 'Entrée principale', en: 'Main entrance', es: 'Entrada principal', zh: '主入口' },
           finalite: { fr: 'Sécurité des accès : voir qui se présente à la porte, accueillir une livraison.',
                       en: 'Access security: see who is at the door, receive a delivery.',
                       es: 'Seguridad de los accesos: ver quién llega a la puerta, recibir una entrega.',
                       zh: '出入安全：查看门口来访者，接收快递。' } },
-        { id: 'cam-garage', demoScene: 'garage', visibility: 'admin',
+        { id: 'cam-garage', demoScene: 'garage', visibility: 'admin', demoVideo: 'img/demo/camera-garage.mp4',
           label: { fr: 'Garage', en: 'Garage', es: 'Garaje', zh: '车库' },
           description: { fr: 'Stationnement et bornes de recharge.', en: 'Parking and charging stations.',
                          es: 'Estacionamiento y cargadores.', zh: '停车位与充电桩。' } },
-        { id: 'cam-technique', demoScene: 'entree', visibility: 'admin',
+        { id: 'cam-technique', demoScene: 'entree', visibility: 'admin', demoVideo: 'img/demo/camera-technique.mp4',
           label: { fr: 'Local technique', en: 'Utility room', es: 'Cuarto técnico', zh: '设备间' },
           description: { fr: 'Serveur de l’immeuble, batterie et réservoir d’eau chaude.',
                          en: 'Building server, battery and hot water tank.',
