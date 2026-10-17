@@ -204,13 +204,30 @@ et rien n'est enregistré côté application.
 ```js
 cameras: {
   enabled:    true,
-  visibility: 'admin',       // ou 'tenants'
   baseUrl:    '',            // vide = même origine (recommandé)
   streamPath: '/stream/stream.html?src=',
-  camera:     'cam1',
-  label:      'Caméra — entrée principale'
+  avis: {                    // exigé pour toute caméra montrée aux résidants
+    responsable:  'Gestion de l’immeuble',
+    contact:      'gestion@immeuble.ca',
+    conservation: '7 jours',
+    politiqueUrl: ''         // vide = politique de confidentialité de Modulimo
+  },
+  liste: [
+    { id: 'entree', label: 'Entrée principale', visibility: 'tenants',
+      finalite: 'Sécurité des accès : voir qui se présente à la porte.' },
+    { id: 'garage', label: 'Garage', visibility: 'admin' }
+  ]
 }
 ```
+
+Côté appliance, la liste passe par la variable `CAMERAS` (tableau JSON
+sur une ligne) et l'avis par `CAMERA_RESPONSABLE`, `CAMERA_CONTACT`,
+`CAMERA_CONSERVATION` et `CAMERA_POLITIQUE_URL` — voir `.env.example`.
+Une configuration à une seule caméra (`camera`, `label`, `visibility`, ou
+`CAMERA_ID`, `CAMERA_LABEL`, `CAMERA_VISIBILITY`) reste lue telle quelle.
+
+Les administrateurs voient toutes les caméras et un tableau « Qui voit
+quelle caméra », qui signale tout avis incomplet.
 
 ### Qui voit l'image
 
@@ -228,7 +245,10 @@ l'objectif de sécurité ne l'exige pas.
 
 Si vous ouvrez malgré tout une caméra d'entrée aux locataires : affichage
 réglementaire à l'entrée, mention dans la politique de confidentialité,
-et politique de conservation explicite côté enregistreur. La Commission
+et politique de conservation explicite côté enregistreur. L'application
+l'impose en partie : une caméra `tenants` sans finalité, sans responsable
+ou sans durée de conservation reste réservée aux administrateurs, et les
+résidants voient l'avis complet au-dessus de l'image. La Commission
 d'accès à l'information a publié des orientations sur la vidéosurveillance
 en immeuble résidentiel.
 

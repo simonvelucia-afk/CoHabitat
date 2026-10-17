@@ -893,6 +893,24 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   .en-alerte-droite { flex-direction:row; align-items:center; width:100%; padding-left:32px; }
 }
 
+/* ===== CAMÉRAS ===== */
+.cam-grille { display:grid; gap:20px; max-width:760px; }
+.cam-carte-tete { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+.cam-cadre { background:#000; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; aspect-ratio:16/9; }
+.cam-avis { margin-top:10px; padding:14px 16px; background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:var(--radius-sm); font-size:0.85rem; }
+.cam-avis-titre { font-weight:600; color:var(--text); margin-bottom:8px; }
+.cam-avis-ligne { display:grid; grid-template-columns:minmax(120px, 170px) 1fr; gap:4px 12px; padding:4px 0; color:var(--text2); }
+.cam-avis-ligne > span { color:var(--text3); }
+.cam-avis a { color:var(--accent); }
+.cam-gestion-tete { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text3); padding-top:8px; border-top:1px dashed var(--border); }
+.cam-acces { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px 16px; }
+.cam-acces-titre { font-weight:600; color:var(--text); margin-bottom:8px; font-size:0.9rem; }
+.cam-acces table { width:100%; border-collapse:collapse; font-size:0.84rem; }
+.cam-acces th { text-align:left; color:var(--text3); font-weight:500; padding:6px 8px 6px 0; border-bottom:1px solid var(--border); }
+.cam-acces td { color:var(--text2); padding:8px 8px 8px 0; border-bottom:1px solid var(--border); vertical-align:top; }
+.cam-acces tr:last-child td { border-bottom:none; }
+@media (max-width: 520px) { .cam-avis-ligne { grid-template-columns:1fr; } }
+
 /* ===== CALENDAR / SLOTS ===== */
 .time-slots {
   display: flex;
@@ -19169,10 +19187,12 @@ if ('serviceWorker' in navigator) {
 </script>
 <script>
 /* ============================================================
- * Caméra des espaces communs
+ * Caméras de l'immeuble
  * ============================================================
- * Affiche le flux d'une caméra sur la page Espaces, entre la
- * grille des espaces et la serre.
+ * Affiche les flux des caméras sur la page Espaces, entre la
+ * grille des espaces et la serre. Chaque caméra a sa propre
+ * visibilité ; une caméra montrée aux résidants porte son avis de
+ * vidéosurveillance, sans lequel elle reste aux administrateurs.
  *
  * Affichage seulement : le pilotage PTZ reste dans l'outil dédié
  * du serveur caméra. C'est volontaire — un ordre de mouvement mal
@@ -19195,7 +19215,98 @@ if ('serviceWorker' in navigator) {
 (function () {
   'use strict';
 
+  // Libellés de la section, dans les quatre langues. Les noms et les
+  // finalités des caméras viennent de la configuration : une chaîne, ou un
+  // objet { fr, en, es, zh } quand l'instance les veut traduits.
+  Object.assign(PT.en, {
+    'Caméras': 'Cameras',
+    'Vue en direct. Aucune image n’est enregistrée par CoHabitat.': 'Live view. No image is recorded by CoHabitat.',
+    'Avis de vidéosurveillance': 'Video surveillance notice',
+    'Finalité': 'Purpose',
+    'Responsable': 'Person in charge',
+    'Conservation des images': 'Image retention',
+    'par l’enregistreur de l’immeuble. CoHabitat n’enregistre rien.': 'by the building’s recorder. CoHabitat records nothing.',
+    'Affichage': 'Signage',
+    'Un avis est affiché à l’entrée filmée.': 'A notice is posted at the filmed entrance.',
+    'Vos droits': 'Your rights',
+    'Accès et rectification de vos renseignements, selon la Loi 25 :': 'Access to and correction of your information, under Quebec Law 25:',
+    'politique de confidentialité': 'privacy policy',
+    'Réservé aux administrateurs': 'Administrators only',
+    'Vue gestionnaire — en démonstration seulement': 'Manager view — in the demo only',
+    'Qui voit quelle caméra': 'Who sees which camera',
+    'Caméra': 'Camera',
+    'Visible par': 'Visible to',
+    'Avis': 'Notice',
+    'Tous les résidants': 'All residents',
+    'Administrateurs': 'Administrators',
+    'Complet': 'Complete',
+    'Sans objet': 'Not applicable',
+    'Incomplet : caméra masquée aux résidants': 'Incomplete: camera hidden from residents',
+    'Image de démonstration': 'Demo image',
+    'Flux de la caméra': 'Camera feed',
+  });
+  Object.assign(PT.es, {
+    'Caméras': 'Cámaras',
+    'Vue en direct. Aucune image n’est enregistrée par CoHabitat.': 'Vista en directo. CoHabitat no graba ninguna imagen.',
+    'Avis de vidéosurveillance': 'Aviso de videovigilancia',
+    'Finalité': 'Finalidad',
+    'Responsable': 'Responsable',
+    'Conservation des images': 'Conservación de las imágenes',
+    'par l’enregistreur de l’immeuble. CoHabitat n’enregistre rien.': 'por el grabador del edificio. CoHabitat no graba nada.',
+    'Affichage': 'Señalización',
+    'Un avis est affiché à l’entrée filmée.': 'Hay un aviso colocado en la entrada filmada.',
+    'Vos droits': 'Sus derechos',
+    'Accès et rectification de vos renseignements, selon la Loi 25 :': 'Acceso y rectificación de su información, según la Ley 25 de Quebec:',
+    'politique de confidentialité': 'política de privacidad',
+    'Réservé aux administrateurs': 'Reservado a los administradores',
+    'Vue gestionnaire — en démonstration seulement': 'Vista del gestor — solo en la demostración',
+    'Qui voit quelle caméra': 'Quién ve cada cámara',
+    'Caméra': 'Cámara',
+    'Visible par': 'Visible para',
+    'Avis': 'Aviso',
+    'Tous les résidants': 'Todos los residentes',
+    'Administrateurs': 'Administradores',
+    'Complet': 'Completo',
+    'Sans objet': 'No aplica',
+    'Incomplet : caméra masquée aux résidants': 'Incompleto: cámara oculta a los residentes',
+    'Image de démonstration': 'Imagen de demostración',
+    'Flux de la caméra': 'Señal de la cámara',
+  });
+  Object.assign(PT.zh, {
+    'Caméras': '摄像头',
+    'Vue en direct. Aucune image n’est enregistrée par CoHabitat.': '实时画面。CoHabitat 不录制任何影像。',
+    'Avis de vidéosurveillance': '视频监控告知',
+    'Finalité': '用途',
+    'Responsable': '负责人',
+    'Conservation des images': '影像保存',
+    'par l’enregistreur de l’immeuble. CoHabitat n’enregistre rien.': '由楼宇录像设备保存。CoHabitat 不录制任何内容。',
+    'Affichage': '标识',
+    'Un avis est affiché à l’entrée filmée.': '受监控的入口处张贴有告示。',
+    'Vos droits': '您的权利',
+    'Accès et rectification de vos renseignements, selon la Loi 25 :': '依据魁北克第 25 号法案，您可查阅并更正您的信息：',
+    'politique de confidentialité': '隐私政策',
+    'Réservé aux administrateurs': '仅限管理员',
+    'Vue gestionnaire — en démonstration seulement': '管理视图 — 仅在演示中显示',
+    'Qui voit quelle caméra': '谁能看到哪个摄像头',
+    'Caméra': '摄像头',
+    'Visible par': '可见范围',
+    'Avis': '告知',
+    'Tous les résidants': '全体住户',
+    'Administrateurs': '管理员',
+    'Complet': '完整',
+    'Sans objet': '不适用',
+    'Incomplet : caméra masquée aux résidants': '不完整：对住户隐藏该摄像头',
+    'Image de démonstration': '演示画面',
+    'Flux de la caméra': '摄像头画面',
+  });
+
   function conf() {
+    // En démonstration, le jeu local fournit ses propres caméras : la
+    // tablette n'a pas de serveur caméra, et l'exemple doit fonctionner
+    // hors ligne.
+    if (window._demoMode && window.COHABITAT_DEMO && window.COHABITAT_DEMO.cameras) {
+      return window.COHABITAT_DEMO.cameras;
+    }
     return (window.CohabitatConfig && CohabitatConfig.cameras) || { enabled: false };
   }
 
@@ -19204,31 +19315,144 @@ if ('serviceWorker' in navigator) {
     return r === 'admin' || r === 'principal_admin';
   }
 
+  function txt(v) {
+    if (v && typeof v === 'object') return v[appLang] || v.fr || '';
+    return v || '';
+  }
+
+  // La liste des caméras. Une configuration d'avant les caméras multiples
+  // (camera, label, visibility à la racine) donne une liste d'une seule
+  // caméra, et passe avant la liste par défaut de config.js : la fusion des
+  // configurations garde cette liste, qui masquerait sinon la caméra de
+  // l'instance. Rien à changer sur les instances existantes.
+  function cameras(c) {
+    if (c.camera) return [{ id: c.camera, label: c.label || 'Caméra', visibility: c.visibility, finalite: c.finalite }];
+    return Array.isArray(c.liste) ? c.liste : [];
+  }
+
+  // L'avis qu'exige une caméra montrée aux résidants : sans responsable ni
+  // durée de conservation, elle reste réservée aux administrateurs. Une
+  // caméra d'entrée filme des personnes identifiables ; la montrer sans
+  // dire qui en répond ni combien de temps les images sont gardées n'est
+  // pas une option.
+  function avisComplet(c, cam) {
+    var a = c.avis || {};
+    return !!(txt(cam.finalite) && txt(a.responsable) && txt(a.conservation));
+  }
+
+  // Image fixe de démonstration : une entrée ou un garage stylisés, avec
+  // l'horodatage d'une vraie caméra. Dessinée, pour fonctionner hors ligne.
+  function imageDemo(cam) {
+    // Format d'enregistreur, identique dans toutes les langues.
+    var d = new Date(), z = function (n) { return String(n).padStart(2, '0'); };
+    var heure = d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate())
+      + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()) + ':' + z(d.getSeconds());
+    var scene = cam.demoScene === 'garage'
+      ? '<rect x="120" y="150" width="400" height="190" fill="#23262b"/><path d="M120 150 L320 90 L520 150" fill="none" stroke="#3a3f46" stroke-width="6"/>'
+        + '<rect x="170" y="190" width="300" height="150" fill="#2c3036"/>'
+        + [0, 1, 2, 3, 4].map(function (i) { return '<line x1="170" y1="' + (210 + i * 26) + '" x2="470" y2="' + (210 + i * 26) + '" stroke="#3a3f46" stroke-width="3"/>'; }).join('')
+        + '<rect x="210" y="285" width="120" height="45" rx="10" fill="#4b5563"/><circle cx="235" cy="332" r="11" fill="#111"/><circle cx="305" cy="332" r="11" fill="#111"/>'
+      : '<rect x="80" y="60" width="480" height="280" fill="#23262b"/><rect x="250" y="120" width="140" height="220" fill="#2f343b" stroke="#48505a" stroke-width="5"/>'
+        + '<line x1="320" y1="120" x2="320" y2="340" stroke="#48505a" stroke-width="3"/><circle cx="305" cy="235" r="5" fill="#9aa3ad"/><circle cx="335" cy="235" r="5" fill="#9aa3ad"/>'
+        + '<rect x="408" y="200" width="26" height="40" rx="4" fill="#3b424b"/><circle cx="421" cy="214" r="5" fill="#7eb8a0"/>'
+        + '<rect x="230" y="340" width="180" height="20" fill="#2a2e34"/>';
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">'
+      + '<rect width="640" height="360" fill="#15171a"/>' + scene
+      + '<rect x="0" y="0" width="640" height="34" fill="rgba(0,0,0,.55)"/>'
+      + '<text x="14" y="23" font-family="monospace" font-size="16" fill="#e8e4dc">' + escHtml(cam.id) + '</text>'
+      + '<text x="626" y="23" font-family="monospace" font-size="16" fill="#e8e4dc" text-anchor="end">' + escHtml(heure) + '</text>'
+      + '<circle cx="' + (626 - heure.length * 9.6 - 18) + '" cy="17" r="5" fill="#e07060"/>'
+      + '<text x="320" y="352" font-family="sans-serif" font-size="13" fill="#9a9590" text-anchor="middle">' + escHtml(pt('Image de démonstration')) + '</text>'
+      + '</svg>';
+    return '<img src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) + '" alt="' + escHtml(txt(cam.label) + ' — ' + pt('Image de démonstration')) + '" style="width:100%;height:100%;object-fit:cover;display:block">';
+  }
+
+  function cadre(c, cam) {
+    var contenu;
+    if (window._demoMode) {
+      contenu = imageDemo(cam);
+    } else {
+      // baseUrl vide = même origine que l'application, ce qui suppose que
+      // le serveur caméra est servi par le même reverse proxy. Une URL
+      // http:// explicite est bloquée par le navigateur dès que le site
+      // passe en https (contenu mixte), sans message : juste un cadre noir.
+      var base = (c.baseUrl || '').replace(/\/$/, '');
+      var flux = base + (c.streamPath || '/stream/stream.html?src=') + encodeURIComponent(cam.id || 'cam1');
+      contenu = '<iframe src="' + flux + '" title="' + escHtml(pt('Flux de la caméra') + ' — ' + txt(cam.label)) + '" allow="autoplay" '
+        + 'style="width:100%;height:100%;border:0"></iframe>';
+    }
+    return '<div class="cam-cadre">' + contenu + '</div>';
+  }
+
+  function blocAvis(c, cam) {
+    var a = c.avis || {};
+    var politique = a.politiqueUrl || 'https://www.modulimo.com/confidentialite/';
+    var ligne = function (lib, val) { return '<div class="cam-avis-ligne"><span>' + pt(lib) + '</span><div>' + val + '</div></div>'; };
+    return '<div class="cam-avis" role="note">'
+      + '<div class="cam-avis-titre">📹 ' + pt('Avis de vidéosurveillance') + '</div>'
+      + ligne('Finalité', escHtml(txt(cam.finalite)))
+      + ligne('Responsable', escHtml(txt(a.responsable)) + (a.contact ? ' — ' + escHtml(txt(a.contact)) : ''))
+      + ligne('Conservation des images', escHtml(txt(a.conservation)) + ', ' + pt('par l’enregistreur de l’immeuble. CoHabitat n’enregistre rien.'))
+      + ligne('Affichage', pt('Un avis est affiché à l’entrée filmée.'))
+      + ligne('Vos droits', pt('Accès et rectification de vos renseignements, selon la Loi 25 :')
+        + ' <a href="' + escHtml(politique) + '" target="_blank" rel="noopener">' + pt('politique de confidentialité') + '</a>')
+      + '</div>';
+  }
+
+  function carte(c, cam, pourResidants) {
+    return '<div class="cam-carte">'
+      + '<div class="cam-carte-tete"><div class="card-title">' + escHtml(txt(cam.label)) + '</div>'
+      + (pourResidants ? '' : '<span class="badge badge-gray">🔒 ' + pt('Réservé aux administrateurs') + '</span>') + '</div>'
+      + (txt(cam.description) ? '<div class="card-subtitle" style="margin-bottom:10px">' + escHtml(txt(cam.description)) + '</div>' : '')
+      + cadre(c, cam)
+      + (pourResidants ? blocAvis(c, cam) : '')
+      + '</div>';
+  }
+
+  function tableauAcces(c, liste) {
+    var lignes = liste.map(function (cam) {
+      var pourTous = cam.visibility === 'tenants';
+      var avis = !pourTous ? pt('Sans objet')
+        : avisComplet(c, cam) ? '✓ ' + pt('Complet')
+        : '⚠ ' + pt('Incomplet : caméra masquée aux résidants');
+      return '<tr><td>' + escHtml(txt(cam.label)) + '</td><td>' + pt(pourTous ? 'Tous les résidants' : 'Administrateurs')
+        + '</td><td>' + avis + '</td></tr>';
+    }).join('');
+    return '<div class="cam-acces"><div class="cam-acces-titre">' + pt('Qui voit quelle caméra') + '</div>'
+      + '<table><thead><tr><th>' + pt('Caméra') + '</th><th>' + pt('Visible par') + '</th><th>' + pt('Avis') + '</th></tr></thead>'
+      + '<tbody>' + lignes + '</tbody></table></div>';
+  }
+
   window.renderCameraSection = function () {
     var section = document.getElementById('camera-section');
     if (!section) return;
     var c = conf();
+    if (!c.enabled) { section.style.display = 'none'; section.innerHTML = ''; return; }
 
-    var visible = c.enabled && (c.visibility === 'tenants' || estAdmin());
-    if (!visible) { section.style.display = 'none'; section.innerHTML = ''; return; }
+    var admin = estAdmin();
+    // La démonstration s'adresse aux gestionnaires : elle montre aussi ce
+    // que voit un administrateur, clairement signalé comme tel.
+    var voitGestion = admin || !!window._demoMode;
+    var liste = cameras(c);
+    var pourTous = liste.filter(function (cam) { return cam.visibility === 'tenants' && avisComplet(c, cam); });
+    var reservees = liste.filter(function (cam) { return pourTous.indexOf(cam) === -1; });
 
-    // baseUrl vide = même origine que l'application, ce qui suppose que le
-    // serveur caméra est servi par le même reverse proxy. Une URL http://
-    // explicite est bloquée par le navigateur dès que le site passe en
-    // https (contenu mixte), sans message : juste un cadre noir.
-    var base = (c.baseUrl || '').replace(/\/$/, '');
-    var flux = base + (c.streamPath || '/stream/stream.html?src=') + encodeURIComponent(c.camera || 'cam1');
+    var html = pourTous.map(function (cam) { return carte(c, cam, true); }).join('');
+    if (voitGestion && reservees.length) {
+      html += (window._demoMode && !admin
+        ? '<div class="cam-gestion-tete">' + pt('Vue gestionnaire — en démonstration seulement') + '</div>' : '')
+        + reservees.map(function (cam) { return carte(c, cam, false); }).join('');
+    }
+    if (voitGestion) html += tableauAcces(c, liste);
 
+    if (!html) { section.style.display = 'none'; section.innerHTML = ''; return; }
     section.style.display = '';
     section.innerHTML =
       '<div class="section-header"><div class="section-title">'
-      + '<h2>' + escHtml(c.label || 'Caméra') + '</h2>'
-      + '<p>' + escHtml(c.description || 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.') + '</p>'
+      + '<h2>📹 ' + pt('Caméras') + '</h2>'
+      + '<p>' + escHtml(txt(c.description) || pt('Vue en direct. Aucune image n’est enregistrée par CoHabitat.')) + '</p>'
       + '</div></div>'
-      + '<div style="background:#000;border:1px solid var(--border);border-radius:var(--radius);'
-      + 'overflow:hidden;aspect-ratio:16/9;max-width:760px">'
-      + '<iframe src="' + flux + '" title="Flux de la caméra" allow="autoplay" '
-      + 'style="width:100%;height:100%;border:0"></iframe></div>';
+      + '<div class="cam-grille">' + html + '</div>';
   };
 })();
 </script>

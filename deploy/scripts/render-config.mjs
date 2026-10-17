@@ -37,6 +37,27 @@ const need = (k) => {
 const offline = String(env.OFFLINE_ASSETS || 'true') !== 'false';
 const centralEnabled = String(env.CENTRAL_ENABLED || 'false') === 'true';
 
+// Liste des cameras. CAMERAS porte un tableau JSON
+// ([{"id":"cam1","label":"Entrée","visibility":"tenants","finalite":"…"}]) ;
+// a defaut, les variables CAMERA_ID / CAMERA_LABEL / CAMERA_VISIBILITY /
+// CAMERA_FINALITE decrivent une seule camera, comme avant.
+function camerasDepuisEnv() {
+  if (env.CAMERAS) {
+    let liste;
+    try { liste = JSON.parse(env.CAMERAS); } catch (e) {
+      throw new Error('CAMERAS doit etre un tableau JSON : ' + e.message);
+    }
+    if (!Array.isArray(liste)) throw new Error('CAMERAS doit etre un tableau JSON');
+    return liste.map((c) => ({ ...c, visibility: c.visibility === 'tenants' ? 'tenants' : 'admin' }));
+  }
+  return [{
+    id:         env.CAMERA_ID || 'cam1',
+    label:      env.CAMERA_LABEL || 'Caméra',
+    visibility: env.CAMERA_VISIBILITY === 'tenants' ? 'tenants' : 'admin',
+    finalite:   env.CAMERA_FINALITE || '',
+  }];
+}
+
 const config = {
   instance: { id: need('INSTANCE_ID'), name: env.INSTANCE_NAME || need('INSTANCE_ID') },
   supabaseUrl: need('SITE_URL'),
@@ -58,16 +79,22 @@ const config = {
     centralUrl: centralEnabled ? (env.CENTRAL_URL || '') : '',
   },
   federation: { enabled: String(env.FEDERATION_ENABLED || 'true') !== 'false', url: '/federation/v1' },
-  // Camera : affichage seul sur la page Espaces. baseUrl vide = meme
+  // Cameras : affichage seul sur la page Espaces. baseUrl vide = meme
   // origine, ce qui suppose le proxy /stream dans le Caddyfile.
   cameras: {
     enabled:     String(env.CAMERA_ENABLED || 'false') === 'true',
-    visibility:  env.CAMERA_VISIBILITY === 'tenants' ? 'tenants' : 'admin',
     baseUrl:     env.CAMERA_BASE_URL || '',
     streamPath:  env.CAMERA_STREAM_PATH || '/stream/stream.html?src=',
-    camera:      env.CAMERA_ID || 'cam1',
-    label:       env.CAMERA_LABEL || 'Caméra',
     description: env.CAMERA_DESCRIPTION || 'Vue en direct. Aucune image n’est enregistrée par CoHabitat.',
+    // Avis de videosurveillance : exige pour toute camera montree aux
+    // residants, sans quoi elle reste aux administrateurs.
+    avis: {
+      responsable:  env.CAMERA_RESPONSABLE || '',
+      contact:      env.CAMERA_CONTACT || '',
+      conservation: env.CAMERA_CONSERVATION || '',
+      politiqueUrl: env.CAMERA_POLITIQUE_URL || '',
+    },
+    liste: camerasDepuisEnv(),
   },
   // Pas de page de vente sur une instance d'immeuble.
   vitrine: { enabled: false },
