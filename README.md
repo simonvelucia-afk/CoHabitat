@@ -87,7 +87,7 @@ licence est court-circuité.
 
 **Où vit le solde des résidents.** Dans la base de l'immeuble, par
 défaut, même quand la centrale est branchée : la centrale sert alors aux
-licences, aux contrats, à la Machine Lunch et au réseau entre immeubles,
+licences, aux contrats et au réseau entre immeubles,
 pas au solde. Un seul réglage le change : `finance_central_enabled` =
 `true` dans `system_settings`. Il s'applique à tout le solde à la fois —
 espaces, serre, véhicules, covoiturage, transferts aux dépendants,
@@ -133,6 +133,18 @@ L'immeuble a du travail à confier — la serre, le poulailler, la sabloponie, l
 - **Heures déclarées par la personne embauchée**, depuis son profil, puis approuvées ou refusées par l'admin. Le taux est figé à la déclaration et le montant en découle — le résident ne le saisit jamais
 - **Rémunération** des heures approuvées, par personne : **créditée au solde** de l'application (transaction `emploi_remuneration` au grand livre) ou **payée hors application** (chèque, virement) avec trace. Une même heure ne peut pas être payée deux fois. Avec la finance centralisée, seul le paiement hors application est proposé, pour ne pas créer d'écart avec le solde de la centrale
 - Embaucher quelqu'un au **poulailler** ou à la **sabloponie** lui donne les droits d'opérateur de l'élevage (migration 027), sans le nommer administrateur
+
+### Machine Lunch dans l'immeuble
+
+La machine, ses zones, ses cases, ses menus et le solde des acheteurs vivent dans la base de l'immeuble (migration `sql/037_lunch_immeuble.sql`, test `sql/tests/lunch_test.sql`). La centrale n'est plus requise pour vendre.
+
+- **Achat en une transaction** (`lunch_acheter`) : la case est verrouillée, le prix lu en base — jamais celui envoyé par le kiosque —, le solde vérifié et débité, la case vidée. Deux personnes ne peuvent pas acheter la même case ; une demande renvoyée après une coupure ne débite pas deux fois
+- **Remboursement** (`lunch_rembourser`) si le robot ne livre pas : une seule fois, et la case retrouve son contenu
+- **Administration du kiosque** (cases, menus, réglages) : un administrateur, la personne embauchée au poste Machine Lunch, ou le PIN de la machine. Le PIN n'est plus lisible et se vérifie en base ; dix erreurs en dix minutes bloquent la machine
+- **Paramètres → Machine Lunch** : liste des machines, ajout d'une machine, et **import unique depuis la centrale** (machines, zones, cases, menus)
+- Les anciennes fonctions `lunch_purchase` et `lunch_get_balance`, ouvertes sans connexion, perdent leurs droits
+
+**Ordre de mise en service :** jouer `037`, publier CoHabitat, importer depuis la centrale (Paramètres → Machine Lunch), puis publier le kiosque (dépôt LunchMachine).
 
 ### Mobilité partagée (MaaS)
 

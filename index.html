@@ -4133,11 +4133,11 @@ function renderCentralBanner() {
       banner.id = 'central-offline-banner';
       bande.appendChild(banner);
     }
-    // Avec le solde dans l'immeuble, seuls la Machine Lunch et le reseau
-    // entre immeubles dependent encore de la centrale.
+    // Avec le solde et la Machine Lunch dans l'immeuble, seul le reseau
+    // entre immeubles depend encore de la centrale.
     if (banner) banner.textContent = soldeCentral()
       ? '🔴 CENTRALE HORS-LIGNE — Achats, reservations et transferts indisponibles. Reessayez sous peu.'
-      : '🔴 CENTRALE HORS-LIGNE — Machine Lunch et réservations entre immeubles indisponibles. Le reste fonctionne.';
+      : '🔴 CENTRALE HORS-LIGNE — Réservations entre immeubles indisponibles. Le reste fonctionne.';
   } else if (banner) {
     banner.remove();
   }
@@ -5560,8 +5560,8 @@ async function syncCentralBalanceToProfile() {
 //   centrale l'adresse livree avec l'instance (config.js) sert, et la
 //            connexion a la centrale Modulimo est requise.
 //
-// Dans les deux cas le solde vit sur la centrale : le mode local rend le
-// kiosque joignable sans internet, il ne rend pas les achats autonomes.
+// Dans les deux cas la machine, ses cases et le solde vivent dans la base
+// de l'immeuble (sql/037) : seule l'adresse du kiosque change.
 const MODES_LUNCH = ['demo', 'local', 'central'];
 
 function lireReglagesLunch(reglages) {
@@ -5595,7 +5595,7 @@ function etatLiaisonLunch() {
   const r = window.lunchReglages || { mode: 'central' };
   if (r.mode === 'demo')  return { texte: 'Données fictives — aucune transaction, aucun lien requis.', couleur: 'var(--text3)' };
   if (r.mode === 'local') return r.url
-    ? { texte: 'Machine jointe à ' + r.url + ' — le solde reste géré par la centrale.', couleur: 'var(--text3)' }
+    ? { texte: 'Machine jointe à ' + r.url + '. Machine et solde vivent dans la base de l\'immeuble.', couleur: 'var(--text3)' }
     : { texte: 'Aucune adresse saisie : l\'adresse livrée avec l\'instance sera employée.', couleur: 'var(--accent3, #e07060)' };
   if (window._centralOnline === true)  return { texte: '● Liaison à la centrale établie.', couleur: '#7eb8a0' };
   if (window._centralOnline === false) return { texte: '● Centrale injoignable — les achats seront refusés.', couleur: 'var(--accent3, #e07060)' };
@@ -8760,26 +8760,15 @@ async function onLunchPageShow() {
   container.innerHTML = '<div style="color:var(--text3);font-size:13px;">Chargement…</div>';
 
   try {
-    let buildingFilter = null;
-    try {
-      const { data } = await sb.from('system_settings').select('value').eq('key', 'building_id').maybeSingle();
-      if (data?.value) buildingFilter = data.value;
-    } catch(e) {}
-
     let machines;
     if (window._demoMode && typeof demoRest === 'function') {
-      // Les machines sont declarees sur la centrale Modulimo, hors de
-      // portee en demonstration.
       machines = await demoRest('lunch_machines?active=eq.true&order=name');
     } else {
-      const query = buildingFilter
-        ? `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&building_id=eq.${buildingFilter}&select=id,name,building_id&order=name`
-        : `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&select=id,name,building_id&order=name`;
-
-      const res = await fetch(query, {
-        headers: { 'apikey': CENTRAL_KEY }
-      });
-      machines = await res.json();
+      // Les machines vivent dans la base de l'immeuble (sql/037).
+      const { data, error } = await sb.from('lunch_machines')
+        .select('id, name, building_id').eq('active', true).order('name');
+      if (error) console.warn('[lunch] machines :', error.message);
+      machines = data || [];
     }
 
     if (!machines || !machines.length) {
@@ -9086,10 +9075,8 @@ async function openKiosk(machineId, _ignoredPreOpenedTab) {
     return expliquerKiosqueDemo(machineId);
   }
 
-  // Sans centrale joignable, le kiosque ne pourra pas debiter — on refuse
-  // d'ouvrir l'onglet plutot que de laisser l'usager arriver devant un
-  // bouton "Acheter" qui echouera.
-  if (!ensureCentralOnline('kiosque lunch')) return;
+  // Le kiosque vend dans la base de l'immeuble (sql/037) : la centrale
+  // n'est plus requise pour l'ouvrir.
   if (!currentUser || !currentProfile) {
     console.warn('[openKiosk] pas de currentUser/currentProfile');
     typeof toast === 'function' && toast('Connexion requise', 'error');
@@ -13419,7 +13406,8 @@ function txLabel(type, description) {
     space_cancel_refund: 'Remboursement espace', trip_booking: 'Réservation covoiturage',
     trip_cancel_refund: 'Remboursement trajet', trip_cancel_charge: 'Frais annulation',
     trip_driver_earning: 'Gain chauffeur', trip_driver_charge: 'Frais chauffeur annulation',
-    emploi_remuneration: 'Rémunération — emploi', demo: 'Transaction démo'
+    emploi_remuneration: 'Rémunération — emploi', lunch_purchase: 'Machine Lunch',
+    lunch_cancel_refund: 'Remboursement Machine Lunch', demo: 'Transaction démo'
   };
   return labels[type] || type;
 }
@@ -17138,6 +17126,20 @@ async function loadSettings() {
                placeholder="https://lunch.immeuble.lan/">
       </div>
       <div id="lunch-etat-liaison" style="font-size:12px;color:var(--text3);"></div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Machines de l'immeuble</div>
+        <div id="lunch-machines-admin" style="font-size:13px;color:var(--text3);">Chargement…</div>
+        <div class="form-row" style="margin-top:10px;">
+          <div class="form-group" style="margin:0"><label for="lunch-nouv-id">Identifiant (étiquette)</label><input type="text" id="lunch-nouv-id" placeholder="LM-001" autocomplete="off"></div>
+          <div class="form-group" style="margin:0"><label for="lunch-nouv-nom">Nom</label><input type="text" id="lunch-nouv-nom" placeholder="Machine du hall" autocomplete="off"></div>
+        </div>
+        <div class="form-row" style="margin-top:8px;">
+          <div class="form-group" style="margin:0"><label for="lunch-nouv-pin">PIN administrateur (4 chiffres)</label><input type="text" id="lunch-nouv-pin" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+          <div style="display:flex;align-items:flex-end;"><button class="btn btn-secondary btn-sm" onclick="lunchAjouterMachine()">+ Ajouter la machine</button></div>
+        </div>
+        ${CENTRAL_ENABLED ? `<div style="margin-top:12px;font-size:12px;color:var(--text3);line-height:1.5;">Les machines étaient déclarées à la centrale Modulimo. Importez-les une fois : machine, zones, cases et menus sont copiés dans la base de l'immeuble.</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="lunchImporterCentrale()">⇩ Importer depuis la centrale</button>` : ''}
+      </div>
     </div>` : '';
 
   form.innerHTML = moduleHtml + lunchHtml
@@ -17149,11 +17151,74 @@ async function loadSettings() {
   `).join('');
   settingsCache = Object.fromEntries((data || []).map(s => [s.key, s]));
   afficherEtatLiaisonLunch();
+  if (window.appModules.lunch) lunchMachinesAdmin();
+}
+
+// ── Machines Lunch de l'immeuble (sql/037) ─────────────────────────────
+async function lunchMachinesAdmin() {
+  const el = document.getElementById('lunch-machines-admin');
+  if (!el) return;
+  const { data, error } = await sb.from('lunch_machines').select('id, name, active').order('name');
+  if (error) {
+    el.innerHTML = /does not exist|schema cache/i.test(error.message)
+      ? 'Jouez la migration <code>sql/037_lunch_immeuble.sql</code> pour gérer les machines ici.'
+      : 'Erreur : ' + escHtml(error.message);
+    return;
+  }
+  el.innerHTML = (data || []).length
+    ? data.map(m => `<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;color:var(--text);">
+        <span>🖥 ${escHtml(m.name)} <span style="color:var(--text3)">(${escHtml(m.id)})</span></span>
+        <span class="badge ${m.active ? 'badge-green' : 'badge-gray'}">${m.active ? 'Active' : 'Inactive'}</span></div>`).join('')
+    : 'Aucune machine dans la base de l\'immeuble.';
+}
+
+async function lunchAjouterMachine() {
+  const id = document.getElementById('lunch-nouv-id').value.trim();
+  const name = document.getElementById('lunch-nouv-nom').value.trim();
+  const pin = document.getElementById('lunch-nouv-pin').value.trim();
+  if (!id || !name) { toast('Identifiant et nom requis', 'error'); return; }
+  if (!/^\d{4}$/.test(pin)) { toast('Le PIN doit avoir 4 chiffres', 'error'); return; }
+  const { error } = await sb.from('lunch_machines').insert({ id, name, pin, active: true });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  toast('Machine ajoutée ✓', 'success');
+  ['lunch-nouv-id', 'lunch-nouv-nom', 'lunch-nouv-pin'].forEach(k => { document.getElementById(k).value = ''; });
+  lunchMachinesAdmin();
+}
+
+// Copie unique depuis la centrale : machine(s), zones, cases et menus.
+// Rejouable — lunch_importer() met a jour ce qui existe deja.
+async function lunchImporterCentrale() {
+  if (currentProfile?.role !== 'principal_admin') { toast('Réservé à l\'administrateur principal', 'info'); return; }
+  if (!confirm('Copier les machines Lunch de la centrale dans la base de l\'immeuble ?')) return;
+  const lire = async (chemin) => {
+    const res = await fetch(LM_CENTRAL_URL + '/rest/v1/' + chemin, { headers: { apikey: CENTRAL_KEY } });
+    if (!res.ok) throw new Error(chemin.split('?')[0] + ' : HTTP ' + res.status);
+    return res.json();
+  };
+  try {
+    let filtre = '';
+    const { data: bid } = await sb.from('system_settings').select('value').eq('key', 'building_id').maybeSingle();
+    if (bid?.value) filtre = '&building_id=eq.' + encodeURIComponent(bid.value);
+    const machines = await lire('lunch_machines?select=*' + filtre);
+    if (!machines.length) { toast('Aucune machine à importer pour cet immeuble', 'info'); return; }
+    const ids = machines.map(m => '"' + String(m.id).replace(/"/g, '') + '"').join(',');
+    const [zones, slots, menus] = await Promise.all([
+      lire('lunch_zones?select=*&machine_id=in.(' + ids + ')'),
+      lire('lunch_slots?select=*&machine_id=in.(' + ids + ')'),
+      lire('lunch_menus?select=*&active=eq.true'),
+    ]);
+    const { data, error } = await sb.rpc('lunch_importer', { p_donnees: { machines, zones, slots, menus } });
+    if (error) throw new Error(error.message);
+    toast(`Importé : ${data.machines} machine(s), ${data.cases} case(s), ${data.menus} menu(s) ✓`, 'success');
+    lunchMachinesAdmin();
+  } catch (e) {
+    toast('Import impossible : ' + e.message, 'error');
+  }
 }
 
 const MODULE_DESCRIPTIONS = {
   module_trips: 'Module Mobilité partagée : réservation de véhicules, covoiturage et demandes de passagers',
-  module_lunch: 'Module Machine Lunch : kiosque et commandes (nécessite la centrale Modulimo)',
+  module_lunch: 'Module Machine Lunch : kiosque et commandes',
   module_serre: 'Module Serre : zones de culture louées au mois et capteurs',
   module_energie: 'Module Énergie et confort : état de l’immeuble, eau chaude par logement et alertes'
 };
