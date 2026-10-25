@@ -4026,24 +4026,43 @@ function soldeCentral() {
   return !!(_balanceOps && window._financeCentralEnabled);
 }
 
+// Message lisible pour les refus des fonctions de reservation (sql/041).
+function prixErreur(message, prisTexte) {
+  const m = String(message || '');
+  return /CRENEAU_PRIS/.test(m) ? (prisTexte || 'Ce créneau est déjà réservé')
+       : /INSUFFICIENT_FUNDS/.test(m) ? 'Solde insuffisant'
+       : /CRENEAU_PASSE/.test(m) ? 'Ce créneau est déjà passé'
+       : /CRENEAU_TROP_LONG/.test(m) ? 'Une réservation ne peut dépasser 7 jours'
+       : /CRENEAU_INVALIDE/.test(m) ? 'La fin doit suivre le début'
+       : /INDISPONIBLE/.test(m) ? 'Cette ressource n\'est pas disponible'
+       : 'Erreur : ' + m;
+}
+
 // Ecriture au grand livre de l'immeuble. Meme contrat de retour que
 // balanceOps ({ ok, virtual_balance } ou { ok:false, error }), pour que
 // les appelants n'aient qu'un seul chemin a lire. Pas d'outbox : la base
 // de l'immeuble est celle-la meme qui vient de servir la page.
-async function soldeLocal({ amount, type, description, reference_id, reference_type }) {
+//
+// Le resident ne touche jamais au grand livre directement (sql/040) :
+//   montant < 0 → solde_debiter : il paie, de son propre solde ;
+//   montant > 0 → solde_rembourser : il est rembourse, jamais au-dela de
+//                 ce qu'il a paye pour cette meme reference.
+// La cle d'idempotence suit : une operation rejouee ne debite pas deux fois.
+async function soldeLocal({ amount, type, description, reference_id, reference_type, idempotency_key }) {
   const montant = Math.round(Number(amount) * 100) / 100;
-  if (montant < 0 && (Number(currentProfile?.virtual_balance) || 0) + montant < -0.005) {
-    return { ok: false, error: 'INSUFFICIENT_FUNDS', retryable: false };
-  }
-  const { data, error } = await sb.rpc('adjust_balance', {
-    p_user_id: currentProfile.id,
-    p_amount: montant,
+  if (!montant) return { ok: true, virtual_balance: currentProfile?.virtual_balance ?? null };
+  const { data, error } = await sb.rpc(montant < 0 ? 'solde_debiter' : 'solde_rembourser', {
+    p_montant: Math.abs(montant),
     p_type: type,
     p_reference_id: reference_id || null,
     p_reference_type: reference_type || null,
-    p_description: description || null
+    p_description: description || null,
+    p_cle: idempotency_key || null
   });
-  if (error) return { ok: false, error: error.message, retryable: false };
+  if (error) {
+    const code = /INSUFFICIENT_FUNDS/.test(error.message) ? 'INSUFFICIENT_FUNDS' : error.message;
+    return { ok: false, error: code, retryable: false };
+  }
   return { ok: true, virtual_balance: typeof data === 'number' ? data : null };
 }
 
@@ -10573,44 +10592,21 @@ async function serreRentZone(zoneId, code, frais, dateFinPrevue) {
   const fee = Number(frais) || 0;
   if ((currentProfile.virtual_balance || 0) < fee) { toast('Solde insuffisant pour le premier mois', 'error'); return; }
 
-  const today = new Date();
-  const todayIso = today.toISOString().split('T')[0];
-  const monthIso = todayIso.slice(0, 7) + '-01';
-
-  const { data: loc, error } = await sb.from('serre_locations').insert({
-    zone_id: zoneId, tenant_id: currentProfile.id, date_debut: todayIso,
-    date_fin_prevue: dateFinPrevue || null,
-    frais_mensuel: fee, derniere_facturation: monthIso, statut: 'active'
-  }).select().single();
+  // La base lit le tarif de la zone, verifie qu'elle est libre, cree la
+  // location et ses trois sections, et debite le premier mois, en une
+  // transaction (sql/041, serre_louer). Le frais affiche ne sert qu'a
+  // l'apercu.
+  const { data: loc, error } = await sb.rpc('serre_louer', {
+    p_zone_id: zoneId, p_date_fin_prevue: dateFinPrevue || null
+  });
   if (error) {
-    // 23505 = unique_violation : la zone vient d'être louée par quelqu'un d'autre
-    toast(error.code === '23505' ? 'Cette zone vient d\'être louée par un autre locataire' : 'Erreur : ' + error.message, 'error');
+    const m = error.message || '';
+    toast(/ZONE_DEJA_LOUEE/.test(m) ? 'Cette zone vient d\'être louée par un autre locataire'
+        : /INSUFFICIENT_FUNDS/.test(m) ? 'Solde insuffisant pour le premier mois'
+        : 'Erreur : ' + m, 'error');
     await loadSerre(); serreOpenZone(zoneId); return;
   }
-
-  // Cycles de culture vides : une section par sous-partie (1 à 3)
-  await sb.from('serre_cultures').insert([
-    { zone_id: zoneId, location_id: loc.id, section: 1, statut: 'vide' },
-    { zone_id: zoneId, location_id: loc.id, section: 2, statut: 'vide' },
-    { zone_id: zoneId, location_id: loc.id, section: 3, statut: 'vide' }
-  ]);
-
-  // Débit du premier mois (type whitelisté finance-bridge : space_reservation)
-  if (fee > 0) {
-    const ym = monthIso.slice(0, 7);
-    const debit = await soldeOps.commit({
-      amount: -fee, type: 'space_reservation',
-      description: `Serre — location zone ${code} (frais mensuel ${ym})`,
-      reference_id: loc.id, reference_type: 'serre_location',
-      idempotency_key: `serre-fee:${loc.id}:${ym}`
-    });
-    if (!debit.ok && !debit.queued) {
-      await sb.from('serre_locations').update({ statut: 'annulee', date_fin: todayIso }).eq('id', loc.id);
-      toast(debit.error === 'INSUFFICIENT_FUNDS' ? 'Solde insuffisant — location annulée' : `Débit refusé (${debit.error || 'inconnue'}) — location annulée`, 'error');
-      await loadSerre(); serreOpenZone(zoneId); return;
-    }
-    if (typeof debit.virtual_balance === 'number') currentProfile.virtual_balance = debit.virtual_balance;
-  }
+  if (typeof loc?.virtual_balance === 'number') currentProfile.virtual_balance = loc.virtual_balance;
 
   toast(`Zone ${code} louée ✓`, 'success');
   const nb = document.getElementById('nav-balance');
@@ -10652,47 +10648,18 @@ async function serreSaveLecture() {
 // Facturation mensuelle : débite les mois échus non encore facturés pour MES
 // locations actives. Idempotent via idempotency_key = serre-fee:<loc>:<AAAA-MM>,
 // donc rejouable sans double débit même si la page est rechargée.
+// Facturation mensuelle de MES locations : la base debite les mois echus
+// au tarif fixe a la location, une seule fois chacun, et s'arrete au mois
+// que le solde ne couvre pas (sql/041, serre_facturer). Rejouable sans
+// double debit, meme si la page est rechargee.
 async function serreChargeDueFees(myLocs) {
   if (isDemo || !currentProfile) return;
-  const now = new Date();
-  const curMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  let charged = false;
-
-  for (const loc of myLocs) {
-    if (loc.tenant_id !== currentProfile.id || loc.statut !== 'active') continue;
-    const fee = Number(loc.frais_mensuel) || 0;
-    const last = loc.derniere_facturation ? new Date(loc.derniere_facturation + 'T00:00:00') : null;
-    let cursor = last
-      ? new Date(last.getFullYear(), last.getMonth() + 1, 1)
-      : (() => { const d = new Date(loc.date_debut + 'T00:00:00'); return new Date(d.getFullYear(), d.getMonth(), 1); })();
-    let newLast = last;
-
-    while (cursor <= curMonth) {
-      const ym = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0');
-      if (fee > 0) {
-        if ((currentProfile.virtual_balance || 0) < fee) { toast(`Solde insuffisant pour le frais serre ${ym}`, 'error'); break; }
-        const debit = await soldeOps.commit({
-          amount: -fee, type: 'space_reservation',
-          description: `Serre — frais mensuel ${ym}`,
-          reference_id: loc.id, reference_type: 'serre_location',
-          idempotency_key: `serre-fee:${loc.id}:${ym}`
-        });
-        if (!debit.ok && !debit.queued) { toast(`Frais serre ${ym} non débité (${debit.error || '?'})`, 'error'); break; }
-        if (typeof debit.virtual_balance === 'number') currentProfile.virtual_balance = debit.virtual_balance;
-        charged = true;
-      }
-      newLast = new Date(cursor);
-      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-    }
-
-    if (newLast && (!last || newLast > last)) {
-      const iso = newLast.getFullYear() + '-' + String(newLast.getMonth() + 1).padStart(2, '0') + '-01';
-      await sb.from('serre_locations').update({ derniere_facturation: iso }).eq('id', loc.id);
-      loc.derniere_facturation = iso;
-    }
-  }
-
-  if (charged) {
+  if (!(myLocs || []).some(l => l.tenant_id === currentProfile.id && l.statut === 'active')) return;
+  const { data, error } = await sb.rpc('serre_facturer');
+  if (error) { console.warn('[serre] facturation :', error.message); return; }
+  if (data?.solde_insuffisant) toast('Solde insuffisant pour les frais de serre du mois', 'error');
+  if (data?.mois > 0 && typeof data.virtual_balance === 'number') {
+    currentProfile.virtual_balance = data.virtual_balance;
     const nb = document.getElementById('nav-balance');
     if (nb) nb.textContent = `${(currentProfile.virtual_balance || 0).toFixed(2)} $ CAD`;
     if (typeof buildNav === 'function') buildNav();
@@ -10977,62 +10944,26 @@ async function confirmBookSpace() {
     toast('Solde insuffisant pour cette réservation', 'error'); return;
   }
 
-  // Check availability
-  const { data: avail } = await sb.rpc('check_space_availability', {
-    p_space_id: currentBookingSpaceId, p_start: startDT, p_end: endDT
+  // La base verifie le creneau (toutes reservations confondues, pas
+  // seulement les miennes), lit le tarif en vigueur, calcule le prix,
+  // debite et enregistre, en une transaction (sql/041, espace_reserver).
+  // Le cout calcule ci-dessus ne sert qu'a l'apercu.
+  const { data: resa, error: errResa } = await sb.rpc('espace_reserver', {
+    p_space_id: currentBookingSpaceId,
+    p_debut: new Date(startDT).toISOString(),
+    p_fin: new Date(endDT).toISOString()
   });
-  if (!avail) { toast('Cet espace n\'est pas disponible sur ce créneau', 'error'); return; }
-
-  // Create reservation
-  const { data: res, error } = await sb.from('space_reservations').insert({
-    space_id: currentBookingSpaceId,
-    tenant_id: currentProfile.id,
-    start_time: startDT,
-    end_time: endDT,
-    total_slots: slots,
-    total_cost: cost,
-    status: 'confirmed'
-  }).select().single();
-
-  if (error) { toast('Erreur lors de la réservation: ' + error.message, 'error'); return; }
-
-  // Debit via balanceOps. Source de verite : central. La cle d'idempotence
-  // est deterministe sur l'id de reservation pour que tout retry retombe
-  // sur la meme transaction.
-  const debit = await soldeOps.commit({
-    amount: -cost,
-    type: 'space_reservation',
-    description: `Reservation ${space?.name}`,
-    reference_id: res.id,
-    reference_type: 'space_reservation',
-    idempotency_key: `space-resv:${res.id}`
-  });
-  if (!debit.ok && !debit.queued) {
-    // Erreur metier definitive : annuler la resa pour ne pas garder un trou.
-    // UPDATE et non DELETE : aucune policy RLS DELETE n'existe sur
-    // space_reservations (le delete supprimait 0 ligne en silence et la
-    // resa restait 'confirmed'). check_space_availability ignore les
-    // statuts 'cancelled', le creneau est donc bien libere.
-    await sb.from('space_reservations').update({
-      status: 'cancelled',
-      cancelled_at: new Date().toISOString(),
-      cancel_reason: 'Débit central refusé — annulation automatique'
-    }).eq('id', res.id);
-    if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant', 'error');
-    else toast(`Débit refusé (${debit.error || 'inconnue'}) — reservation annulee`, 'error');
+  if (errResa) {
+    toast(prixErreur(errResa.message, 'Cet espace n\'est pas disponible sur ce créneau'), 'error');
     return;
   }
-  if (debit.queued) {
-    toast('Réservation enregistrée — débit en cours de synchronisation', 'info');
-  } else if (typeof debit.virtual_balance === 'number') {
-    currentProfile.virtual_balance = debit.virtual_balance;
-  }
+  if (typeof resa.virtual_balance === 'number') currentProfile.virtual_balance = resa.virtual_balance;
   document.getElementById('nav-balance').textContent = `${currentProfile.virtual_balance.toFixed(2)}`;
 
   toast('Réservation confirmée !', 'success');
-  trackFeature('shared_spaces', 'space_reserved', { space_name: space?.name || '', cost, slots });
+  trackFeature('shared_spaces', 'space_reserved', { space_name: space?.name || '', cost: resa.cout, slots: resa.tranches });
   closeModal('modal-book-space');
-  await logRequest(currentBookingSpaceId, 'space', 'book', { reservation_id: res.id });
+  await logRequest(currentBookingSpaceId, 'space', 'book', { reservation_id: resa.reservation_id });
 }
 
 // ==========================================
@@ -11287,19 +11218,6 @@ let mobTablesManquantes = false;
 
 // Debiter ou crediter le solde pour une reservation de vehicule.
 //
-// Le solde vit dans l'immeuble (adjust_balance) sauf si l'immeuble a
-// choisi la finance centrale — voir soldeCentral(). Dans ce dernier cas,
-// le type 'vehicle_reservation' doit figurer dans la liste blanche de
-// finance-bridge, sans quoi le debit est refuse et la reservation
-// s'annule d'elle-meme.
-async function mobAjusterSolde({ amount, type, description, reference_id, idempotency_key }) {
-  return await soldeOps.commit({
-    amount, type, description, reference_id,
-    reference_type: 'vehicle_reservation',
-    idempotency_key
-  });
-}
-
 function mobType(v)      { return MOB_TYPES.includes(v?.vehicle_type) ? v.vehicle_type : 'auto'; }
 function mobPrixMin(v)   { return Number(v?.vehicle_pricing?.[0]?.price_per_minute) || 0; }
 function mobPrixKm(v)    { return Number(v?.vehicle_pricing?.[0]?.price_per_km) || 0; }
@@ -11626,30 +11544,20 @@ async function mobConfirmReturn() {
   if (!Number.isFinite(km) || km < depart) { toast(pt('mobErrOdoBack'), 'error'); return; }
   if (km - depart > 5000)                  { toast(pt('mobErrKmMax'), 'error'); return; }
 
-  const { data, error } = await sb.rpc('vehicle_return', { p_reservation_id: r.id, p_km: km });
+  // Le retour et le reglement de l'ecart avec l'acompte se font en base,
+  // en une transaction (sql/041, vehicule_retourner). En demonstration,
+  // le solde bouge dans le navigateur seulement.
+  const { data, error } = await sb.rpc(isDemo ? 'vehicle_return' : 'vehicule_retourner', { p_reservation_id: r.id, p_km: km });
   if (error) { toast('Erreur : ' + error.message, 'error'); return; }
   const bilan = data || {};
   const delta = Math.round((Number(bilan.delta) || 0) * 100) / 100;
-
-  // Le solde ne bouge que de l'ecart : l'acompte est deja passe.
-  if (delta !== 0) {
-    const reglement = isDemo
-      ? { ok: true, virtual_balance: Math.round((currentProfile.virtual_balance - delta) * 100) / 100 }
-      : await mobAjusterSolde({
-          amount: -delta,
-          type: delta > 0 ? 'vehicle_reservation' : 'vehicle_reservation_refund',
-          description: `Retour ${r.vehicles?.model || ''}`.trim(),
-          reference_id: r.id,
-          idempotency_key: `vehicle-resv-final:${r.id}`
-        });
-    if (!reglement.ok && !reglement.queued) {
-      toast(`Débit refusé (${reglement.error || 'inconnue'})`, 'error');
-    } else if (typeof reglement.virtual_balance === 'number') {
-      currentProfile.virtual_balance = reglement.virtual_balance;
-      const pastille = document.getElementById('nav-balance');
-      if (pastille) pastille.textContent = `${currentProfile.virtual_balance.toFixed(2)} $ CAD`;
-    }
+  if (isDemo) {
+    if (delta !== 0) currentProfile.virtual_balance = Math.round((currentProfile.virtual_balance - delta) * 100) / 100;
+  } else if (typeof bilan.virtual_balance === 'number') {
+    currentProfile.virtual_balance = bilan.virtual_balance;
   }
+  const pastilleRetour = document.getElementById('nav-balance');
+  if (pastilleRetour) pastilleRetour.textContent = `${currentProfile.virtual_balance.toFixed(2)} $ CAD`;
 
   closeModal('modal-return-vehicle');
   toast(pt('mobReturnDone'), 'success');
@@ -11744,66 +11652,33 @@ async function confirmBookVehicle() {
 
   const debutISO = c.debut.toISOString();
   const finISO   = c.fin.toISOString();
+  const purpose  = document.getElementById('mob-purpose')?.value?.trim() || null;
 
-  const { data: libre, error: dispoErr } = await sb.rpc('check_vehicle_availability', {
-    p_vehicle_id: mobBookVehicleId, p_start: debutISO, p_end: finISO
-  });
-  if (dispoErr) { toast('Erreur : ' + dispoErr.message, 'error'); return; }
-  if (libre === false) { toast(pt('mobErrTaken'), 'error'); return; }
-
-  const ligne = {
-    vehicle_id: mobBookVehicleId,
-    tenant_id: currentProfile.id,
-    start_time: debutISO,
-    end_time: finISO,
-    total_minutes: c.minutes,
-    time_cost: c.cout,
-    deposit_cost: c.cout,
-    total_cost: c.cout,
-    purpose: document.getElementById('mob-purpose')?.value?.trim() || null,
-    status: 'confirmed'
-  };
-  // Le client de demonstration ne fait pas de jointures : la ligne doit
-  // porter elle-meme le vehicule, sinon « Mes reservations » affiche un
-  // creneau sans nom.
+  let res;
   if (isDemo) {
-    ligne.is_demo = true;
-    ligne.vehicles = { model: v.model, vehicle_type: mobType(v), license_plate: v.license_plate };
-  }
-  const { data: res, error } = await sb.from('vehicle_reservations').insert(ligne).select().single();
-  if (error) { toast('Erreur lors de la réservation : ' + error.message, 'error'); return; }
-
-  // Debit via balanceOps, comme les espaces : la centrale reste la source
-  // de verite et la cle d'idempotence tient sur l'id de la reservation.
-  // En demonstration, le solde bouge dans le navigateur et nulle part
-  // ailleurs : passer par la centrale ne ferait qu'echouer sur l'absence
-  // de session, et annulerait la reservation qu'on vient de montrer.
-  const debit = isDemo
-    ? { ok: true, virtual_balance: Math.round((currentProfile.virtual_balance - c.cout) * 100) / 100 }
-    : await mobAjusterSolde({
-        amount: -c.cout,
-        type: 'vehicle_reservation',
-        description: `Reservation ${v.model}`,
-        reference_id: res.id,
-        idempotency_key: `vehicle-resv:${res.id}`
-      });
-  if (!debit.ok && !debit.queued) {
-    // Meme raison que pour les espaces : on annule par UPDATE, pas par
-    // DELETE — aucune policy DELETE n'existe, et le creneau se libere des
-    // que le statut passe a 'cancelled'.
-    await sb.from('vehicle_reservations').update({
-      status: 'cancelled',
-      cancelled_at: new Date().toISOString(),
-      cancel_reason: 'Débit central refusé — annulation automatique'
-    }).eq('id', res.id);
-    if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant', 'error');
-    else toast(`Débit refusé (${debit.error || 'inconnue'}) — reservation annulee`, 'error');
-    return;
-  }
-  if (debit.queued) {
-    toast('Réservation enregistrée — débit en cours de synchronisation', 'info');
-  } else if (typeof debit.virtual_balance === 'number') {
-    currentProfile.virtual_balance = debit.virtual_balance;
+    // Demonstration : la ligne va dans le jeu local, le solde bouge dans le
+    // navigateur. Le client de demonstration ne fait pas de jointures : la
+    // ligne porte elle-meme le vehicule.
+    const ligne = {
+      vehicle_id: mobBookVehicleId, tenant_id: currentProfile.id,
+      start_time: debutISO, end_time: finISO, total_minutes: c.minutes,
+      time_cost: c.cout, deposit_cost: c.cout, total_cost: c.cout,
+      purpose, status: 'confirmed', is_demo: true,
+      vehicles: { model: v.model, vehicle_type: mobType(v), license_plate: v.license_plate }
+    };
+    const { data, error } = await sb.from('vehicle_reservations').insert(ligne).select().single();
+    if (error) { toast('Erreur lors de la réservation : ' + error.message, 'error'); return; }
+    res = data;
+    currentProfile.virtual_balance = Math.round((currentProfile.virtual_balance - c.cout) * 100) / 100;
+  } else {
+    // La base verifie le creneau, lit le tarif, calcule l'acompte, debite
+    // et enregistre, en une transaction (sql/041, vehicule_reserver).
+    const { data, error } = await sb.rpc('vehicule_reserver', {
+      p_vehicle_id: mobBookVehicleId, p_debut: debutISO, p_fin: finISO, p_purpose: purpose
+    });
+    if (error) { toast(prixErreur(error.message, pt('mobErrTaken')), 'error'); return; }
+    res = { id: data.reservation_id };
+    if (typeof data.virtual_balance === 'number') currentProfile.virtual_balance = data.virtual_balance;
   }
   const pastille = document.getElementById('nav-balance');
   if (pastille) pastille.textContent = `${currentProfile.virtual_balance.toFixed(2)} $ CAD`;
@@ -11820,40 +11695,30 @@ async function confirmBookVehicle() {
 async function cancelVehicleReservation(id, bientot) {
   if (!confirm(pt(bientot ? 'mobConfirmCancelLate' : 'mobConfirmCancel'))) return;
 
-  const r = mobResvCache.find(x => x.id === id);
-  const { error } = await sb.from('vehicle_reservations').update({
-    status: 'cancelled',
-    cancelled_at: new Date().toISOString(),
-    cancel_reason: bientot ? 'Annulation tardive (moins de 2 h)' : 'Annulé par le résident'
-  }).eq('id', id);
-  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
-
   // Remboursement seulement si l'annulation arrive plus de 2 h avant le
   // debut — la meme regle que les espaces communs, ecrite noir sur blanc
-  // dans les conditions d'utilisation.
+  // dans les conditions d'utilisation. La base l'applique (sql/041,
+  // vehicule_annuler) : l'annulation et le remboursement vont ensemble.
   let rembourse = false;
   if (isDemo) {
+    const r = mobResvCache.find(x => x.id === id);
+    const { error } = await sb.from('vehicle_reservations').update({
+      status: 'cancelled', cancelled_at: new Date().toISOString(),
+      cancel_reason: bientot ? 'Annulation tardive (moins de 2 h)' : 'Annulé par le résident'
+    }).eq('id', id);
+    if (error) { toast('Erreur : ' + error.message, 'error'); return; }
     if (!bientot && r && Number(r.total_cost) > 0) {
       currentProfile.virtual_balance = Math.round((currentProfile.virtual_balance + Number(r.total_cost)) * 100) / 100;
-      const pastille = document.getElementById('nav-balance');
-      if (pastille) pastille.textContent = `${currentProfile.virtual_balance.toFixed(2)} $ CAD`;
       rembourse = true;
     }
-  } else if (!bientot && r && Number(r.total_cost) > 0) {
-    const credit = await mobAjusterSolde({
-      amount: Number(r.total_cost),
-      type: 'vehicle_reservation_refund',
-      description: `Annulation ${r.vehicles?.model || ''}`.trim(),
-      reference_id: id,
-      idempotency_key: `vehicle-resv-refund:${id}`
-    });
-    rembourse = !!(credit.ok || credit.queued);
-    if (credit.ok && typeof credit.virtual_balance === 'number') {
-      currentProfile.virtual_balance = credit.virtual_balance;
-      const pastille = document.getElementById('nav-balance');
-      if (pastille) pastille.textContent = `${currentProfile.virtual_balance.toFixed(2)} $ CAD`;
-    }
+  } else {
+    const { data, error } = await sb.rpc('vehicule_annuler', { p_reservation_id: id });
+    if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+    rembourse = !!data?.rembourse;
+    if (typeof data?.virtual_balance === 'number') currentProfile.virtual_balance = data.virtual_balance;
   }
+  const pastille = document.getElementById('nav-balance');
+  if (pastille) pastille.textContent = `${currentProfile.virtual_balance.toFixed(2)} $ CAD`;
 
   toast(pt(rembourse ? 'mobRefunded' : 'mobCancelled'), 'success');
   trackFeature('shared_mobility', 'vehicle_reservation_cancelled', { refunded: rembourse });
@@ -12534,99 +12399,39 @@ async function saveTripData(tripId, andConfirm) {
     if (!vehicleReturned) { toast('Confirmez le retour du véhicule', 'error'); return; }
   }
 
+  // Le statut « termine » n'est plus pose ici : c'est trajet_confirmer
+  // qui le pose, en meme temps qu'il facture (sql/040).
   const updatePayload = {
     actual_km: actualKm,
     vehicle_taken_at: takenAt ? new Date(takenAt).toISOString() : null,
     vehicle_returned_at: returnedAt ? new Date(returnedAt).toISOString() : null,
     vehicle_returned_confirmed: vehicleReturned,
-    driver_note: driverNote,
-    ...(andConfirm ? { status: 'completed', confirmed_at: new Date().toISOString() } : {})
+    driver_note: driverNote
   };
 
   const { error } = await sb.from('trips').update(updatePayload).eq('id', tripId);
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
 
   if (andConfirm && actualKm && takenAt && returnedAt) {
-    const { data: bookings } = await sb.from('trip_bookings')
-      .select('id, passenger_id, seats_requested, actual_km')
-      .eq('trip_id', tripId).neq('status', 'cancelled').gt('seats_requested', 0);
-    const { data: tripRow }  = await sb.from('trips').select('driver_id, vehicle_id').eq('id', tripId).single();
-    const { data: pricing }  = tripRow?.vehicle_id
-      ? await sb.from('vehicle_pricing').select('*').eq('vehicle_id', tripRow.vehicle_id).single()
-      : { data: null };
-    const pMin   = pricing?.price_per_minute || 0;
-    const pKm    = pricing?.price_per_km || 0;
-    const redPct = pricing?.driver_reduction_pct ?? 25;
-    const totalSeats  = (bookings || []).reduce((s, b) => s + (b.seats_requested || 0), 0);
-    const durationMin = (new Date(returnedAt) - new Date(takenAt)) / 60000;
-
-    for (const b of (bookings || [])) {
-      const bKm  = b.actual_km || 0;
-      const dShare = totalSeats > 0 ? (b.seats_requested || 0) / totalSeats : 0;
-      const cost = (bKm * pKm) + (durationMin * pMin * dShare);
-      if (cost > 0) {
-        await sb.from('trip_bookings').update({ total_cost: cost }).eq('id', b.id);
-        // Debit passager, au grand livre de l'immeuble : c'est le
-        // chauffeur qui confirme, et il debite un autre que lui. Avec la
-        // finance centrale, finance-bridge refuserait (claims.client_id
-        // doit valoir la cible) ; la propagation passe alors par
-        // finance-sync (cf modulimo-admin/sql/011).
-        const { error: debErr } = await sb.rpc('adjust_balance', {
-          p_user_id: b.passenger_id, p_amount: -Math.round(cost * 100) / 100,
-          p_description: 'Covoiturage #' + tripId.slice(0,8), p_type: 'trip_booking',
-          p_reference_id: tripId, p_reference_type: 'trip'
-        });
-        if (debErr) {
-          console.warn('[trip] debit passager echoue:', debErr.message);
-          toast(`Débit d'un passager échoué (${debErr.message})`, 'error');
-        }
-      }
+    // La base calcule le prix de chaque passager a partir des tarifs du
+    // vehicule et des kilometres declares, debite les passagers, credite
+    // le chauffeur et termine le trajet — en une transaction, une seule
+    // fois (sql/040, trajet_confirmer). Avant, la page du chauffeur
+    // calculait les montants et debitait les passagers elle-meme.
+    const { data: bilan, error: errFact } = await sb.rpc('trajet_confirmer', { p_trip_id: tripId });
+    if (errFact) {
+      const m = errFact.message || '';
+      toast(/TRAJET_DEJA_FACTURE/.test(m) ? 'Ce trajet est déjà facturé'
+          : /TRAJET_INCOMPLET/.test(m) ? 'Kilomètres et heures requis avant de confirmer'
+          : /HEURES_INVALIDES/.test(m) ? 'L\'heure de retour doit suivre l\'heure de prise'
+          : 'Facturation impossible : ' + m, 'error');
+      return;
     }
-
-    // Credit du chauffeur, par soldeOps : au grand livre de l'immeuble, ou
-    // a la centrale si l'immeuble l'a choisie (le chauffeur agit alors sur
-    // son propre solde, claims.client_id == target, type refund
-    // 'trip_driver_earning' — cf. ALLOWED_REFUND_TYPES de finance-bridge).
-    // Idempotency_key deterministe sur l'id du trip pour que tout retry
-    // converge sur la meme transaction.
-    const grossCost   = (durationMin * pMin) + (actualKm * pKm);
-    const driverShare = totalSeats > 0 ? 1 / (totalSeats + 1) : 1;
-    const driverCredit = grossCost * driverShare * (redPct / 100);
-    if (driverCredit > 0 && tripRow?.driver_id) {
-      const desc = 'Réduction chauffeur #' + tripId.slice(0,8);
-      if (tripRow.driver_id === currentProfile.id) {
-        const credit = await soldeOps.refund({
-          amount: driverCredit,                     // > 0 = refund cote central
-          type: 'trip_driver_earning',
-          description: desc,
-          reference_id: tripId,
-          reference_type: 'trip',
-          idempotency_key: 'trip-driver-earning:' + tripId
-        });
-        if (credit.ok && typeof credit.virtual_balance === 'number') {
-          currentProfile.virtual_balance = credit.virtual_balance;
-        } else if (credit.queued) {
-          toast('Crédit chauffeur en cours de synchronisation', 'info');
-        } else {
-          // Erreur metier definitive : on ne bloque pas la confirmation —
-          // les passagers ont deja ete debites cote local (le cron sync
-          // de Phase 3B propagera). Admin peut re-crediter manuellement.
-          console.warn('[trip] crédit chauffeur echoué:', credit);
-          toast(`Crédit chauffeur échoué (${credit.error || 'inconnue'})`, 'error');
-        }
-      } else {
-        // 'trip_driver_earning' : seul type accepte par transactions_type_check
-        // ('trip_driver_reduction' violait la contrainte et le credit etait
-        // perdu en silence).
-        const { error: redErr } = await sb.rpc('adjust_balance', { p_user_id: tripRow.driver_id, p_amount: driverCredit, p_description: desc, p_type: 'trip_driver_earning' });
-        if (redErr) {
-          console.warn('[trip] crédit chauffeur local échoué:', redErr.message);
-          toast(`Crédit chauffeur échoué (${redErr.message})`, 'error');
-        }
-      }
+    if (bilan && typeof bilan.solde_chauffeur === 'number' && tripId && bilan.credit_chauffeur > 0) {
+      currentProfile.virtual_balance = bilan.solde_chauffeur;
     }
-
-    toast('Trajet confirmé et facturé !', 'success');
+    trackFeature('trips', 'trip_billed', { passengers: bilan?.passagers || 0 });
+    toast(`Trajet confirmé et facturé — ${bilan?.passagers || 0} passager(s), ${(Number(bilan?.total_passagers) || 0).toFixed(2)} $`, 'success');
     closeModal('modal-trip-detail');
     switchTripsTab('history');
   } else {
@@ -16912,13 +16717,11 @@ async function recordPayment() {
       }
       // Miroir local : credite profiles.virtual_balance + insert real_payments
       // pour que la liste "Paiements" et le solde local restent alignes.
-      await sb.rpc('adjust_balance', {
+      await sb.rpc('admin_crediter', {
         p_user_id: tenantId,
-        p_amount: virtual,
-        p_type: 'admin_credit',
-        p_description: `Paiement enregistré par admin — ${method}${notes ? ': ' + notes : ''}`,
-        p_created_by: currentProfile.id
-      }).then(() => {}).catch((e) => console.warn('[recordPayment] miroir local adjust_balance:', e?.message));
+        p_montant: virtual,
+        p_description: `Paiement enregistré par admin — ${method}${notes ? ': ' + notes : ''}`
+      }).then(() => {}).catch((e) => console.warn('[recordPayment] miroir local admin_crediter:', e?.message));
       await sb.from('real_payments').insert({
         tenant_id: tenantId,
         amount_real: real,
@@ -16932,12 +16735,10 @@ async function recordPayment() {
       return;
     }
   } else {
-    const { error: e1 } = await sb.rpc('adjust_balance', {
+    const { error: e1 } = await sb.rpc('admin_crediter', {
       p_user_id: tenantId,
-      p_amount: virtual,
-      p_type: 'admin_credit',
-      p_description: `Paiement enregistré par admin — ${method}${notes ? ': ' + notes : ''}`,
-      p_created_by: currentProfile.id
+      p_montant: virtual,
+      p_description: `Paiement enregistré par admin — ${method}${notes ? ': ' + notes : ''}`
     });
     if (e1) { toast('Erreur crédit: ' + e1.message, 'error'); return; }
     await sb.from('real_payments').insert({
