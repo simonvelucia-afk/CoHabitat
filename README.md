@@ -85,6 +85,14 @@ Mettre `central.enabled` à `false` rend l'instance entièrement autonome :
 plus aucune requête ne sort, la finance reste locale et le contrôle de
 licence est court-circuité.
 
+**Où vit le solde des résidents.** Dans la base de l'immeuble, par
+défaut, même quand la centrale est branchée : la centrale sert alors aux
+licences, aux contrats, à la Machine Lunch et au réseau entre immeubles,
+pas au solde. Un seul réglage le change : `finance_central_enabled` =
+`true` dans `system_settings`. Il s'applique à tout le solde à la fois —
+espaces, serre, véhicules, covoiturage, transferts aux dépendants,
+paiements enregistrés par l'admin, paie des emplois.
+
 ## 3. Héberger sur GitHub Pages
 
 1. Créez un repo GitHub (ex: `cohabitat`)
