@@ -10075,7 +10075,7 @@ function renderSerre() {
     <div class="serre-sec" style="margin-top:0;">${pt('Conditions de la serre')}</div>
     <div class="el-eau" style="margin-bottom:18px">
       <span>🌡 Température de l'air : <strong>${L.temp_air == null ? '—' : L.temp_air + ' °C'}</strong></span>
-      <span style="color:var(--text3)">💧 Les réservoirs se lisent avec la sablonponie — c'est la même eau.</span>
+      <span style="color:var(--text3)">💧 Les réservoirs se lisent avec la sabloponie — c'est la même eau.</span>
     </div>
     ${_serre.isAdmin && !isDemo ? `<div style="font-size:11px;color:var(--text3);margin:-10px 0 18px;">${pt('Saisie manuelle : onglet Admin → 🌱 Serre')}</div>` : ''}
 
@@ -14117,7 +14117,7 @@ const ELEVAGE_META = {
   // les reaffiche plutot que de laisser croire a deux circuits distincts.
   poulailler:  { container: 'admin-poulailler', icon: '🐔', titre: 'Poulailler', animal: 'poule', lieu: 'poulailler', prod: 'ponte', adj1: 'nouvelle', adjN: 'nouvelles',
                  prodLabel: 'Ponte', prodUnite1: 'œuf', prodUniteN: 'œufs', eau: false, genre: 'f' },
-  sablonponie: { container: 'admin-poissons', icon: '🐟', titre: 'Poissons (sablonponie)', animal: 'poisson', lieu: 'bassin de sablonponie', prod: 'recolte', adj1: 'nouveau', adjN: 'nouveaux',
+  sablonponie: { container: 'admin-poissons', icon: '🐟', titre: 'Poissons (sabloponie)', animal: 'poisson', lieu: 'bassin de sabloponie', prod: 'recolte', adj1: 'nouveau', adjN: 'nouveaux',
                  prodLabel: 'Récolte', prodUnite1: 'kg', prodUniteN: 'kg', eau: true, genre: 'm' }
 };
 // Cinq paniers exclusifs dont la somme fait la cueillette. Le calibre
@@ -15249,7 +15249,7 @@ function elevageBabillardText(module, type, qty, desc) {
     return `${m.icon} ${q ? q + ' ' + adj + ' ' + m.animal + plural : 'Un ' + m.adj1 + ' ' + m.animal} au ${m.lieu} !${desc ? ' — ' + desc : ''}`;
   }
   if (type === 'ponte') return `🥚 Belle ponte au poulailler${q ? ' : ' + q + ' œufs' : ''} !${desc ? ' — ' + desc : ''}`;
-  if (type === 'recolte') return `${m.icon} Récolte de la sablonponie${q ? ' : ' + q + ' poissons' : ''} !${desc ? ' — ' + desc : ''}`;
+  if (type === 'recolte') return `${m.icon} Récolte de la sabloponie${q ? ' : ' + q + ' poissons' : ''} !${desc ? ' — ' + desc : ''}`;
   return `${m.icon} ${m.titre} — nouvelle activité.`;
 }
 
@@ -15409,8 +15409,8 @@ function renderSerreAdmin() {
       </div>
     </div>
 
-    <div class="sa-sec">Sablonponie — bassins et poissons</div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Les réservoirs sont les bassins de la sablonponie : la même eau irrigue les planches et fait vivre les poissons.</div>
+    <div class="sa-sec">Sabloponie — bassins et poissons</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Les réservoirs sont les bassins de la sabloponie : la même eau irrigue les planches et fait vivre les poissons.</div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Les conditions sont normalement remplies par les capteurs (Raspberry Pi + MQTT). Cette saisie est un dépannage si un capteur est absent ou hors service ; les locataires voient le résultat en lecture seule sur la page Espaces.</div>
     ${ConditionsSerre(_serreAdmin.lecture, false, SERRE_COND_ADMIN_PREFIX)}
 
@@ -17405,7 +17405,7 @@ async function bbDeletePost(id) {
 const EMPLOI_SECTEURS = {
   serre:       { icon: '🌱', label: 'Serre' },
   poulailler:  { icon: '🐔', label: 'Poulailler' },
-  sablonponie: { icon: '🐟', label: 'Sablonponie' },
+  sabloponie:  { icon: '🐟', label: 'Sabloponie' },
   mobilite:    { icon: '🚗', label: 'Covoiturage / mobilité partagée' },
   lunch:       { icon: '🥪', label: 'Machine Lunch' },
   entretien:   { icon: '🧹', label: 'Entretien' },

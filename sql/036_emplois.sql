@@ -44,15 +44,15 @@ BEGIN;
 -- trait comme dans une vraie offre, et le client les met en liste.
 --
 -- `secteur` rattache l'emploi a une unite d'affaires de l'immeuble :
--- serre, poulailler, sablonponie, mobilite partagee (covoiturage et
+-- serre, poulailler, sabloponie, mobilite partagee (covoiturage et
 -- vehicules), Machine Lunch, entretien. Pour le
--- poulailler et la sablonponie, il ouvre les droits d'operateur de
+-- poulailler et la sabloponie, il ouvre les droits d'operateur de
 -- l'elevage a la personne retenue (voir section 5).
 CREATE TABLE IF NOT EXISTS emplois (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   titre            TEXT NOT NULL,
   secteur          TEXT NOT NULL DEFAULT 'autre'
-                   CHECK (secteur IN ('serre','poulailler','sablonponie','mobilite','lunch',
+                   CHECK (secteur IN ('serre','poulailler','sabloponie','mobilite','lunch',
                                      'entretien','autre')),
   niveau           TEXT NOT NULL DEFAULT 'employe'
                    CHECK (niveau IN ('responsable','employe')),
@@ -255,7 +255,7 @@ CREATE POLICY emploi_heures_admin ON emploi_heures
 -- Quand une candidature devient « retenue » :
 --   * l'offre passe a « pourvu » des que tous ses postes sont occupes —
 --     elle quitte le babillard d'elle-meme ;
---   * pour le poulailler et la sablonponie, la personne devient
+--   * pour le poulailler et la sabloponie, la personne devient
 --     operatrice de l'elevage (027) : un employe du poulailler doit
 --     pouvoir noter les oeufs ramasses sans etre administrateur.
 -- Le droit d'operateur n'est PAS retire automatiquement si la
@@ -286,9 +286,13 @@ BEGIN
     UPDATE emplois SET statut = 'pourvu' WHERE id = NEW.emploi_id;
   END IF;
 
-  IF v_emploi.secteur IN ('poulailler','sablonponie') THEN
+  -- L'elevage garde sa cle historique 'sablonponie' (migrations 011 a
+  -- 028) ; le secteur, lui, porte l'orthographe juste.
+  IF v_emploi.secteur IN ('poulailler','sabloponie') THEN
     INSERT INTO elevage_operateurs (user_id, module, granted_by)
-    VALUES (NEW.user_id, v_emploi.secteur, COALESCE(NEW.decided_by, auth.uid()))
+    VALUES (NEW.user_id,
+            CASE v_emploi.secteur WHEN 'sabloponie' THEN 'sablonponie' ELSE v_emploi.secteur END,
+            COALESCE(NEW.decided_by, auth.uid()))
     ON CONFLICT (user_id, module) DO NOTHING;
   END IF;
 

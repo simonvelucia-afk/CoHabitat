@@ -190,6 +190,23 @@ BEGIN
   END IF;
 END $$;
 
+-- ── 7) Embauche a la sabloponie : operateur de l'elevage 'sablonponie' ─
+SELECT set_config('request.jwt.claims',
+  '{"sub":"f0000000-0000-0000-0000-0000000000ad","role":"authenticated"}', TRUE);
+DO $$
+DECLARE v_emploi UUID; v_c UUID;
+BEGIN
+  INSERT INTO emplois (titre, secteur, niveau, taux_horaire)
+  VALUES ('Employé de la sabloponie', 'sabloponie', 'employe', 17)
+  RETURNING id INTO v_emploi;
+  INSERT INTO emploi_candidatures (emploi_id, user_id, statut)
+  VALUES (v_emploi, 'f0000000-0000-0000-0000-0000000000a2', 'retenue');
+  IF NOT EXISTS (SELECT 1 FROM elevage_operateurs
+                  WHERE user_id = 'f0000000-0000-0000-0000-0000000000a2' AND module = 'sablonponie') THEN
+    RAISE EXCEPTION 'ECHEC : l''employe de la sabloponie n''est pas operateur';
+  END IF;
+END $$;
+
 RESET ROLE;
 DO $$ BEGIN RAISE NOTICE 'emplois_test : OK'; END $$;
 
