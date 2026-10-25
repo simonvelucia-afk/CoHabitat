@@ -115,6 +115,17 @@ Dans Supabase → **Authentication → URL Configuration**:
 - Réservation d'un véhicule ou d'un vélomobile à l'heure, et demande de covoiturage
 - Historique des transactions
 
+### Emplois de l'immeuble
+
+L'immeuble a du travail à confier — la serre, le poulailler, la sablonponie, le covoiturage, la Machine Lunch, l'entretien — et des résidents prêts à le faire. Migration : `sql/036_emplois.sql` (test : `sql/tests/emplois_test.sql`).
+
+- **Offres publiées par l'administration** (Admin → 💼 Emplois) et rédigées comme une offre d'emploi : titre du poste (« Responsable de la serre », « Employé·e du poulailler », « Responsable de l'unité d'affaires covoiturage »…), secteur, niveau (responsable ou employé·e), description, **responsabilités** et **tâches** (une par ligne), taux horaire, heures par semaine, nombre de postes, date d'entrée en fonction
+- **Affichées au babillard** tant qu'elles sont ouvertes ; une offre passe d'elle-même à « pourvu » quand tous ses postes sont occupés
+- **Candidature depuis le profil** (Mon profil → Emplois de l'immeuble), avec un message facultatif ; l'admin embauche ou refuse
+- **Heures déclarées par la personne embauchée**, depuis son profil, puis approuvées ou refusées par l'admin. Le taux est figé à la déclaration et le montant en découle — le résident ne le saisit jamais
+- **Rémunération** des heures approuvées, par personne : **créditée au solde** de l'application (transaction `emploi_remuneration` au grand livre) ou **payée hors application** (chèque, virement) avec trace. Une même heure ne peut pas être payée deux fois. Avec la finance centralisée, seul le paiement hors application est proposé, pour ne pas créer d'écart avec le solde de la centrale
+- Embaucher quelqu'un au **poulailler** ou à la **sablonponie** lui donne les droits d'opérateur de l'élevage (migration 027), sans le nommer administrateur
+
 ### Mobilité partagée (MaaS)
 
 L'ancien module « Auto-partage » devient **Mobilité partagée** — *MaaS, Mobility as a Service* : les véhicules du bâtiment, les vélomobiles et le covoiturage entre résidents sont réunis dans une seule offre, sous le même onglet.
