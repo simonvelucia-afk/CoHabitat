@@ -17170,6 +17170,7 @@ async function lunchMachinesAdmin() {
         <span style="display:flex;gap:6px;align-items:center;">
           ${m.numero_serie ? '' : `<button class="btn btn-secondary btn-sm" onclick="lunchAssocierSerie('${escHtml(m.id).replace(/'/g, '')}')">Associer un n° de série</button>`}
           <span class="badge ${m.active ? 'badge-green' : 'badge-gray'}">${m.active ? 'Active' : 'Inactive'}</span>
+          <button class="btn btn-danger btn-sm" onclick="lunchRetirerMachine('${escHtml(m.id).replace(/'/g, '')}', '${escHtml(m.name).replace(/'/g, '')}')">Retirer</button>
         </span></div>`).join('')
     : 'Aucune machine pour l\'instant. Ajoutez-la avec le numéro de série inscrit sur la machine.';
 }
@@ -17205,7 +17206,25 @@ function lunchErreurSerie(message) {
        : /SERIE_DEJA_AJOUTEE/.test(message) ? 'Cette machine est déjà ajoutée'
        : /PIN_INVALIDE/.test(message) ? 'Le PIN doit avoir 4 chiffres'
        : /FORBIDDEN/.test(message) ? 'Réservé aux administrateurs'
+       : /MACHINE_INTROUVABLE/.test(message) ? 'Cette machine n\'est plus dans l\'immeuble'
        : 'Erreur : ' + message;
+}
+
+// Retirer une machine de l'immeuble (sql/039) : fiche, zones et cases
+// supprimées, numéro de série libéré ; l'historique des achats reste.
+async function lunchRetirerMachine(machineId, nom) {
+  if (!confirm(`Retirer la machine « ${nom} » de l'immeuble ?\n\nElle disparaîtra de l'application et son numéro de série pourra être ajouté de nouveau. L'historique des achats est conservé.`)) return;
+  let { data, error } = await sb.rpc('lunch_machine_retirer', { p_machine_id: machineId, p_forcer: false });
+  if (!error && data && !data.retiree && data.cases_pleines > 0) {
+    if (!confirm(`La machine contient encore ${data.cases_pleines} plat(s).\nRetirez-les physiquement avant de continuer.\n\nRetirer quand même la machine ?`)) return;
+    ({ data, error } = await sb.rpc('lunch_machine_retirer', { p_machine_id: machineId, p_forcer: true }));
+  }
+  if (error) { toast(lunchErreurSerie(error.message), 'error'); return; }
+  if (data?.retiree) {
+    toast('Machine retirée de l\'immeuble', 'success');
+    trackFeature('lunch', 'machine_retiree', {});
+  }
+  lunchMachinesAdmin();
 }
 
 async function lunchAssocierSerie(machineId) {
