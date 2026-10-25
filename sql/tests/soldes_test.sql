@@ -69,30 +69,31 @@ BEGIN
   BEGIN PERFORM admin_crediter('d0000000-0000-0000-0000-0000000000a1', 1000);
         RAISE EXCEPTION 'ECHEC : résident crédité par lui-même';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'FORBIDDEN' THEN RAISE; END IF; END;
-  BEGIN PERFORM solde_debiter(-5, 'space_reservation');
+  -- solde_debiter ne sert plus qu'aux espaces d'un autre immeuble du
+  -- réseau (041) ; les espaces d'ici passent par espace_reserver.
+  BEGIN PERFORM solde_debiter(5, 'space_reservation', NULL, 'space_reservation');
+        RAISE EXCEPTION 'ECHEC : débit hors réseau accepté';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'TYPE_INTERDIT' THEN RAISE; END IF; END;
+  BEGIN PERFORM solde_debiter(-5, 'space_reservation', NULL, 'space_reservation_network');
         RAISE EXCEPTION 'ECHEC : débit négatif accepté';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'MONTANT_INVALIDE' THEN RAISE; END IF; END;
-  BEGIN PERFORM solde_debiter(5, 'admin_credit');
+  BEGIN PERFORM solde_debiter(5, 'admin_credit', NULL, 'space_reservation_network');
         RAISE EXCEPTION 'ECHEC : type interdit accepté';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'TYPE_INTERDIT' THEN RAISE; END IF; END;
-  BEGIN PERFORM solde_debiter(500, 'space_reservation');
+  BEGIN PERFORM solde_debiter(500, 'space_reservation', NULL, 'space_reservation_network');
         RAISE EXCEPTION 'ECHEC : débit sans fonds';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'INSUFFICIENT_FUNDS' THEN RAISE; END IF; END;
 
-  -- Paiement d'une réservation, rejoué : un seul débit.
-  s := solde_debiter(12, 'space_reservation', 'd0000000-0000-0000-0000-0000000000b1', 'space_reservation', 'Salle', 'resv-1');
-  s := solde_debiter(12, 'space_reservation', 'd0000000-0000-0000-0000-0000000000b1', 'space_reservation', 'Salle', 'resv-1');
+  -- Paiement d'un espace du réseau, rejoué : un seul débit.
+  s := solde_debiter(12, 'space_reservation', 'd0000000-0000-0000-0000-0000000000b1', 'space_reservation_network', 'Salle', 'resv-1');
+  s := solde_debiter(12, 'space_reservation', 'd0000000-0000-0000-0000-0000000000b1', 'space_reservation_network', 'Salle', 'resv-1');
   IF s <> 38 THEN RAISE EXCEPTION 'ECHEC : rejeu a redébité (%)', s; END IF;
 
-  -- Remboursement : jamais au-delà de ce qui a été payé pour cette référence.
-  BEGIN PERFORM solde_rembourser(13, 'space_cancel_refund', 'd0000000-0000-0000-0000-0000000000b1');
-        RAISE EXCEPTION 'ECHEC : remboursement excessif';
-  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'REMBOURSEMENT_EXCESSIF' THEN RAISE; END IF; END;
-  s := solde_rembourser(12, 'space_cancel_refund', 'd0000000-0000-0000-0000-0000000000b1', NULL, NULL, 'resv-1-rb');
-  BEGIN PERFORM solde_rembourser(1, 'space_cancel_refund', 'd0000000-0000-0000-0000-0000000000b1');
-        RAISE EXCEPTION 'ECHEC : second remboursement';
-  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'REMBOURSEMENT_EXCESSIF' THEN RAISE; END IF; END;
-  IF s <> 50 THEN RAISE EXCEPTION 'ECHEC : solde après remboursement (%)', s; END IF;
+  -- Plus de remboursement libre : il passe par l'annulation (041).
+  BEGIN PERFORM solde_rembourser(12, 'space_cancel_refund', 'd0000000-0000-0000-0000-0000000000b1');
+        RAISE EXCEPTION 'ECHEC : remboursement libre';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  -- Le passager 1 a donc 38 $ (50 − 12) en abordant le trajet.
 
   -- Un passager ne confirme pas le trajet.
   BEGIN PERFORM trajet_confirmer('d0000000-0000-0000-0000-0000000000f1');
@@ -120,7 +121,7 @@ END $$;
 RESET ROLE;
 DO $$
 BEGIN
-  IF (SELECT virtual_balance FROM profiles WHERE id = 'd0000000-0000-0000-0000-0000000000a1') <> 37
+  IF (SELECT virtual_balance FROM profiles WHERE id = 'd0000000-0000-0000-0000-0000000000a1') <> 25
   OR (SELECT virtual_balance FROM profiles WHERE id = 'd0000000-0000-0000-0000-0000000000a2') <> 42
   OR (SELECT virtual_balance FROM profiles WHERE id = 'd0000000-0000-0000-0000-0000000000c1') <> 51.33 THEN
     RAISE EXCEPTION 'ECHEC : soldes après trajet';
@@ -136,7 +137,7 @@ SELECT set_config('request.jwt.claims',
   '{"sub":"d0000000-0000-0000-0000-0000000000ad","role":"authenticated"}', TRUE);
 DO $$
 BEGIN
-  IF admin_crediter('d0000000-0000-0000-0000-0000000000a1', 20, 'Paiement comptant') <> 57 THEN
+  IF admin_crediter('d0000000-0000-0000-0000-0000000000a1', 20, 'Paiement comptant') <> 45 THEN
     RAISE EXCEPTION 'ECHEC : crédit admin';
   END IF;
 END $$;

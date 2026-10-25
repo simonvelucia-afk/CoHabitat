@@ -108,6 +108,34 @@ ALTER TABLE trip_bookings
 ALTER TABLE vehicle_pricing
   ADD COLUMN IF NOT EXISTS driver_reduction_pct NUMERIC(5,2) DEFAULT 25;
 
+-- Écriture au grand livre AVEC sa clé d'idempotence, en une instruction.
+-- Même effet qu'adjust_balance (schema.sql) — solde mis à jour, ligne de
+-- transaction — mais la clé est posée sur la ligne même. La retrouver
+-- après coup (« la plus récente ») échouait dès que deux écritures
+-- partageaient le même horodatage, c'est-à-dire la même transaction.
+CREATE OR REPLACE FUNCTION _grand_livre(p_uid UUID, p_montant NUMERIC, p_type TEXT, p_ref UUID,
+                                       p_ref_type TEXT, p_desc TEXT, p_par UUID, p_cle TEXT)
+RETURNS NUMERIC
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_solde NUMERIC;
+BEGIN
+  UPDATE profiles SET virtual_balance = virtual_balance + p_montant
+   WHERE id = p_uid
+   RETURNING virtual_balance INTO v_solde;
+  IF NOT FOUND THEN RAISE EXCEPTION 'PROFILE_NOT_FOUND'; END IF;
+  INSERT INTO transactions (user_id, amount, balance_after, type, reference_id, reference_type,
+                            description, created_by, is_demo, idempotency_key)
+  VALUES (p_uid, p_montant, v_solde, p_type, p_ref, p_ref_type, p_desc, p_par, FALSE, p_cle);
+  RETURN v_solde;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION _grand_livre(UUID, NUMERIC, TEXT, UUID, TEXT, TEXT, UUID, TEXT) FROM PUBLIC, anon, authenticated;
+
 -- ============================================================
 -- 3) Un résident paie, de son propre solde
 -- ============================================================
@@ -146,13 +174,8 @@ BEGIN
   v_solde := (SELECT virtual_balance FROM profiles WHERE id = v_uid FOR UPDATE);
   IF COALESCE(v_solde, 0) < round(p_montant, 2) THEN RAISE EXCEPTION 'INSUFFICIENT_FUNDS'; END IF;
 
-  v_solde := adjust_balance(v_uid, -round(p_montant, 2), p_type, p_reference_id, p_reference_type,
-                            p_description, v_uid, FALSE);
-  IF p_cle IS NOT NULL THEN
-    UPDATE transactions SET idempotency_key = p_cle
-     WHERE id = (SELECT id FROM transactions WHERE user_id = v_uid ORDER BY created_at DESC, id DESC LIMIT 1);
-  END IF;
-  RETURN v_solde;
+  RETURN _grand_livre(v_uid, -round(p_montant, 2), p_type, p_reference_id, p_reference_type,
+                      p_description, v_uid, p_cle);
 END;
 $$;
 
@@ -197,13 +220,8 @@ BEGIN
               WHERE user_id = v_uid AND reference_id = p_reference_id);
   IF round(p_montant, 2) > v_net + 0.005 THEN RAISE EXCEPTION 'REMBOURSEMENT_EXCESSIF'; END IF;
 
-  v_solde := adjust_balance(v_uid, round(p_montant, 2), p_type, p_reference_id, p_reference_type,
-                            p_description, v_uid, FALSE);
-  IF p_cle IS NOT NULL THEN
-    UPDATE transactions SET idempotency_key = p_cle
-     WHERE id = (SELECT id FROM transactions WHERE user_id = v_uid ORDER BY created_at DESC, id DESC LIMIT 1);
-  END IF;
-  RETURN v_solde;
+  RETURN _grand_livre(v_uid, round(p_montant, 2), p_type, p_reference_id, p_reference_type,
+                      p_description, v_uid, p_cle);
 END;
 $$;
 
