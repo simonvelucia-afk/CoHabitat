@@ -5157,9 +5157,7 @@ async function loginDemo() {
   ];
   // La branche demonstration de loadAppModules n'etait jamais atteinte :
   // seul le parcours authentifie l'appelait. Les modules restaient donc
-  // aux valeurs par defaut, et window.lunchReglages n'existait pas — d'ou
-  // une machine annoncee « centrale injoignable » alors que le jeu de
-  // demonstration la donne en mode demonstration.
+  // aux valeurs par defaut.
   await loadAppModules();
   await loadNetworkData();
   showApp();
@@ -5549,116 +5547,16 @@ async function syncCentralBalanceToProfile() {
   currentProfile.virtual_balance = centralBal;
 }
 
-// Ou vit le kiosque de la Machine Lunch.
+// Ou vit le kiosque de la Machine Lunch : a l'adresse livree avec
+// l'instance (config.js, lunchMachine.kioskBase — LUNCH_KIOSK_URL sur une
+// appliance). La machine, ses cases et le solde vivent dans la base de
+// l'immeuble (sql/037) ; il n'y a plus de configuration a choisir.
 //
-// Deux configurations, choisies par l'administrateur dans les reglages :
-//
-//   locale   la machine est sur le reseau du batiment, a une adresse fixe
-//            saisie dans lunch_local_url. De l'exterieur on la joint par
-//            le VPN, comme le reste de l'immeuble.
-//
-//   centrale l'adresse livree avec l'instance (config.js) sert, et la
-//            connexion a la centrale Modulimo est requise.
-//
-// Dans les deux cas la machine, ses cases et le solde vivent dans la base
-// de l'immeuble (sql/037) : seule l'adresse du kiosque change.
-const MODES_LUNCH = ['demo', 'local', 'central'];
-
-function lireReglagesLunch(reglages) {
-  const val = (k) => (reglages || []).find(r => r.key === k)?.value;
-  const m = val('lunch_mode');
-  window.lunchReglages = {
-    mode: MODES_LUNCH.includes(m) ? m : 'central',
-    url:  (val('lunch_local_url') || '').trim()
-  };
-}
-
+// La demonstration n'est pas un reglage de l'immeuble : elle s'ouvre depuis
+// la page de connexion (loginDemo), et le kiosque d'essai
+// (lunchMachine.demoUrl) avec elle — voir openKiosk.
 function adresseKiosque() {
-  const r = window.lunchReglages || { mode: 'central' };
-  if (r.mode === 'demo') return CohabitatConfig.lunchMachine.demoUrl;
-  // Une adresse locale vide ferait ouvrir « ?machine=... » sur rien : on
-  // retombe alors sur l'adresse livree, plutot que sur une page blanche.
-  if (r.mode === 'local' && r.url) return r.url;
   return CohabitatConfig.lunchMachine.kioskBase;
-}
-
-// Le kiosque tourne sur des donnees fictives quand la machine est en
-// demonstration : c'est le seul mode ou aucune transaction n'a lieu.
-function kiosqueEnDemonstration() {
-  return (window.lunchReglages || {}).mode === 'demo';
-}
-
-// Etat de la liaison : constate, jamais choisi. En local il n'y a rien a
-// joindre, en demonstration rien a dire ; seul le mode central depend
-// d'un lien, et window._centralOnline le porte deja.
-function etatLiaisonLunch() {
-  const r = window.lunchReglages || { mode: 'central' };
-  if (r.mode === 'demo')  return { texte: 'Données fictives — aucune transaction, aucun lien requis.', couleur: 'var(--text3)' };
-  if (r.mode === 'local') return r.url
-    ? { texte: 'Machine jointe à ' + r.url + '. Machine et solde vivent dans la base de l\'immeuble.', couleur: 'var(--text3)' }
-    : { texte: 'Aucune adresse saisie : l\'adresse livrée avec l\'instance sera employée.', couleur: 'var(--accent3, #e07060)' };
-  if (window._centralOnline === true)  return { texte: '● Liaison à la centrale établie.', couleur: '#7eb8a0' };
-  if (window._centralOnline === false) return { texte: '● Centrale injoignable — les achats seront refusés.', couleur: 'var(--accent3, #e07060)' };
-  return { texte: '○ Liaison à la centrale non encore vérifiée.', couleur: 'var(--text3)' };
-}
-
-function afficherEtatLiaisonLunch() {
-  const el = document.getElementById('lunch-etat-liaison');
-  if (!el) return;
-  const e = etatLiaisonLunch();
-  el.textContent = e.texte;
-  el.style.color = e.couleur;
-}
-
-// Enregistrement du mode. Meme ecriture en deux temps que les
-// interrupteurs de modules : UPDATE puis INSERT si la ligne manque.
-async function enregistrerModeLunch(mode) {
-  if (!MODES_LUNCH.includes(mode)) return;
-  const precedent = (window.lunchReglages || {}).mode || 'central';
-
-  // Passer de local a central demande une consolidation des donnees : en
-  // mode local la machine a vendu sur ses propres registres, que la
-  // centrale ignore. Basculer sans les remonter laisserait des ventes
-  // sans contrepartie et des soldes qui ne concordent pas.
-  //
-  // Cette consolidation n'existe pas encore : elle vit du cote de la
-  // machine et de la centrale, pas ici. Faute de pouvoir la declencher,
-  // l'ecran le dit et demande une confirmation explicite plutot que de
-  // laisser croire qu'elle a lieu.
-  if (precedent === 'local' && mode === 'central') {
-    const ok = confirm(
-      'Passage du mode local au mode central.\n\n'
-      + 'En mode local, la machine a pu enregistrer des ventes que la centrale '
-      + 'ignore. Une consolidation de ces donnees est necessaire avant que les '
-      + 'soldes concordent — elle n\'est pas effectuee par ce changement.\n\n'
-      + 'Confirmer le changement de configuration ?');
-    if (!ok) {
-      const sel = document.getElementById('lunch-mode');
-      if (sel) sel.value = precedent;
-      return;
-    }
-  }
-
-  const groupe = document.getElementById('lunch-url-groupe');
-  if (groupe) groupe.style.display = (mode === 'local') ? 'block' : 'none';
-
-  const payload = { value: mode, updated_by: currentProfile?.id || null,
-                    updated_at: new Date().toISOString() };
-  let { data: touchees, error } = await sb.from('system_settings')
-    .update(payload).eq('key', 'lunch_mode').select('key');
-  if (!error && (!touchees || touchees.length === 0)) {
-    ({ error } = await sb.from('system_settings').insert({
-      key: 'lunch_mode', description: 'Configuration de la Machine Lunch', ...payload }));
-  }
-  if (error) {
-    const s = document.getElementById('lunch-mode');
-    if (s) s.value = (window.lunchReglages || {}).mode || 'central';
-    toast('Erreur: ' + error.message, 'error');
-    return;
-  }
-  window.lunchReglages = { ...(window.lunchReglages || {}), mode };
-  afficherEtatLiaisonLunch();
-  toast('Configuration de la machine enregistrée', 'success');
 }
 
 async function loadAppModules() {
@@ -5668,22 +5566,19 @@ async function loadAppModules() {
     // immeuble sans serre ou sans mobilite partagee selon l'interlocuteur.
     const { data: reglages } = await sb.from('system_settings')
       .select('key, value')
-      .in('key', ['module_trips', 'module_lunch', 'module_serre', 'module_energie',
-                  'lunch_mode', 'lunch_local_url']);
+      .in('key', ['module_trips', 'module_lunch', 'module_serre', 'module_energie']);
     const actif = (k) => (reglages || []).find(r => r.key === k)?.value !== 'false';
     window.appModules.trips = actif('module_trips');
     window.appModules.lunch = actif('module_lunch');
     window.appModules.serre = actif('module_serre');
     // Coupé tant qu'il n'est pas explicitement activé, comme en production.
     window.appModules.energie = (reglages || []).find(r => r.key === 'module_energie')?.value === 'true';
-    lireReglagesLunch(reglages);
     return;
   }
   // 1. Lire les préférences locales (admin local peut désactiver dans son enveloppe)
   const { data: localSettings } = await sb.from('system_settings')
     .select('key, value')
-    .in('key', ['module_trips', 'module_lunch', 'module_serre', 'module_energie', 'finance_central_enabled',
-                'lunch_mode', 'lunch_local_url']);
+    .in('key', ['module_trips', 'module_lunch', 'module_serre', 'module_energie', 'finance_central_enabled']);
   const localTrips = localSettings?.find(s => s.key === 'module_trips')?.value !== 'false';
   const localLunch = localSettings?.find(s => s.key === 'module_lunch')?.value !== 'false';
   const localSerre = localSettings?.find(s => s.key === 'module_serre')?.value !== 'false';
@@ -5692,7 +5587,6 @@ async function loadAppModules() {
   // Phase 3C : si finance_central_enabled=true, l'UI lit le solde depuis
   // la centrale Modulimo via finance-bridge au lieu de profiles.virtual_balance.
   window._financeCentralEnabled = localSettings?.find(s => s.key === 'finance_central_enabled')?.value === 'true';
-  lireReglagesLunch(localSettings);
 
   // 2. Vérifier la licence centrale (définit l'enveloppe max)
   const licence = await checkLicence();
@@ -8630,8 +8524,7 @@ function pageName(page) {
 // ═══════════════════════════════════════════════
 //  LUNCH MACHINE — iframe responsive
 // ═══════════════════════════════════════════════
-// Adresse livree avec l'instance. L'adresse effectivement employee passe
-// par adresseKiosque(), qui tient compte du reglage local de l'immeuble.
+// Adresse livree avec l'instance (voir adresseKiosque).
 const LM_KIOSK_BASE = CohabitatConfig.lunchMachine.kioskBase;
 const LM_CENTRAL_URL  = CohabitatConfig.lunchMachine.centralUrl;
 // LM_CENTRAL_URL pointe vers le meme projet Supabase que CENTRAL_URL
@@ -9089,7 +8982,7 @@ async function openKiosk(machineId, _ignoredPreOpenedTab) {
   const base = adresseKiosque();
   if (!base) {
     typeof toast === 'function' && toast(
-      'Aucune adresse de kiosque configurée — voir les réglages', 'error');
+      'Aucune adresse de kiosque configurée (config.js : lunchMachine.kioskBase)', 'error');
     return;
   }
   // La langue voyage avec l'adresse : le kiosque est servi depuis un autre
@@ -17104,29 +16997,13 @@ async function loadSettings() {
         </label>
       </div>`).join('')}
     </div>` : '';
-  // Machine Lunch : un choix a trois branches, pas un interrupteur. La
-  // liaison a la centrale n'en fait pas partie — elle ne se choisit pas,
-  // elle se constate, et l'application l'affiche.
-  const modeCourant = (data || []).find(s => s.key === 'lunch_mode')?.value || 'central';
-  const urlCourante = (data || []).find(s => s.key === 'lunch_local_url')?.value || '';
+  // Machine Lunch : les machines de l'immeuble. L'adresse du kiosque vient
+  // de l'instance (config.js) et la demonstration de la page de connexion :
+  // plus de configuration a choisir ici.
   const lunchHtml = window.appModules.lunch ? `
     <div style="margin-bottom:20px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:12px;">Machine Lunch</div>
-      <div class="form-group" style="margin-bottom:12px;">
-        <label for="lunch-mode">Configuration de la machine</label>
-        <select id="lunch-mode" onchange="enregistrerModeLunch(this.value)">
-          <option value="demo"    ${modeCourant === 'demo'    ? 'selected' : ''}>Démonstration — données fictives, aucune transaction</option>
-          <option value="local"   ${modeCourant === 'local'   ? 'selected' : ''}>Local — machine sur le réseau du bâtiment</option>
-          <option value="central" ${modeCourant === 'central' ? 'selected' : ''}>Central — adresse livrée avec l'instance</option>
-        </select>
-      </div>
-      <div class="form-group" id="lunch-url-groupe" style="margin-bottom:10px;display:${modeCourant === 'local' ? 'block' : 'none'};">
-        <label for="setting-lunch_local_url">Adresse du kiosque sur le réseau du bâtiment</label>
-        <input type="text" id="setting-lunch_local_url" value="${escHtml(urlCourante)}"
-               placeholder="https://lunch.immeuble.lan/">
-      </div>
-      <div id="lunch-etat-liaison" style="font-size:12px;color:var(--text3);"></div>
-      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+      <div>
         <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Machines de l'immeuble</div>
         <div id="lunch-machines-admin" style="font-size:13px;color:var(--text3);">Chargement…</div>
         <div class="form-row" style="margin-top:10px;">
@@ -17148,7 +17025,6 @@ async function loadSettings() {
     </div>
   `).join('');
   settingsCache = Object.fromEntries((data || []).map(s => [s.key, s]));
-  afficherEtatLiaisonLunch();
   if (window.appModules.lunch) lunchMachinesAdmin();
 }
 
