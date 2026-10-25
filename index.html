@@ -4009,6 +4009,49 @@ const _balanceOps = (function () {
   }
 })();
 
+// ── Ou vit le solde : un seul interrupteur ───────────────────────────
+// Le solde des residents vit dans la base de l'immeuble. La centrale ne
+// le tient que si l'immeuble l'a demande explicitement :
+// system_settings.finance_central_enabled = 'true' (lu par
+// loadAppModules). Brancher la centrale (config.js) pour les licences,
+// les contrats ou le reseau ne deplace PAS le solde.
+//
+// Avant, la mobilite et les espaces debitaient la centrale des que
+// central.enabled etait vrai, alors que les paiements de l'admin et la
+// paie des emplois suivaient finance_central_enabled : deux reglages
+// pour un meme solde, qui divergeait des qu'ils ne disaient pas la meme
+// chose. Tout passe maintenant par soldeOps, qui ne consulte que
+// soldeCentral().
+function soldeCentral() {
+  return !!(_balanceOps && window._financeCentralEnabled);
+}
+
+// Ecriture au grand livre de l'immeuble. Meme contrat de retour que
+// balanceOps ({ ok, virtual_balance } ou { ok:false, error }), pour que
+// les appelants n'aient qu'un seul chemin a lire. Pas d'outbox : la base
+// de l'immeuble est celle-la meme qui vient de servir la page.
+async function soldeLocal({ amount, type, description, reference_id, reference_type }) {
+  const montant = Math.round(Number(amount) * 100) / 100;
+  if (montant < 0 && (Number(currentProfile?.virtual_balance) || 0) + montant < -0.005) {
+    return { ok: false, error: 'INSUFFICIENT_FUNDS', retryable: false };
+  }
+  const { data, error } = await sb.rpc('adjust_balance', {
+    p_user_id: currentProfile.id,
+    p_amount: montant,
+    p_type: type,
+    p_reference_id: reference_id || null,
+    p_reference_type: reference_type || null,
+    p_description: description || null
+  });
+  if (error) return { ok: false, error: error.message, retryable: false };
+  return { ok: true, virtual_balance: typeof data === 'number' ? data : null };
+}
+
+const soldeOps = {
+  commit: (op) => soldeCentral() ? _balanceOps.commit(op) : soldeLocal(op),
+  refund: (op) => soldeCentral() ? _balanceOps.refund(op) : soldeLocal(op),
+};
+
 // ── HEALTH PROBE CENTRALE ────────────────────────────────────────────
 // Etat global mis a jour par probeCentralHealth(). Utilise pour gater
 // les boutons transactionnels (transfert dependant, reservation espace,
@@ -4088,9 +4131,13 @@ function renderCentralBanner() {
     if (!banner && bande) {
       banner = document.createElement('div');
       banner.id = 'central-offline-banner';
-      banner.textContent = '🔴 CENTRALE HORS-LIGNE — Achats, reservations et transferts indisponibles. Reessayez sous peu.';
       bande.appendChild(banner);
     }
+    // Avec le solde et la Machine Lunch dans l'immeuble, seul le reseau
+    // entre immeubles depend encore de la centrale.
+    if (banner) banner.textContent = soldeCentral()
+      ? '🔴 CENTRALE HORS-LIGNE — Achats, reservations et transferts indisponibles. Reessayez sous peu.'
+      : '🔴 CENTRALE HORS-LIGNE — Réservations entre immeubles indisponibles. Le reste fonctionne.';
   } else if (banner) {
     banner.remove();
   }
@@ -5491,7 +5538,7 @@ async function fetchCentralBalance(depExternalId) {
 // and-forget : en cas d'echec on garde la valeur locale. Logge une
 // divergence si central et local ne correspondent pas (outil de debug).
 async function syncCentralBalanceToProfile() {
-  if (!currentProfile) return;
+  if (!currentProfile || !soldeCentral()) return;   // le solde de l'immeuble fait foi
   const central = await fetchCentralBalance(null);
   if (!central) return;
   const localBal   = Number(currentProfile.virtual_balance || 0);
@@ -5513,8 +5560,8 @@ async function syncCentralBalanceToProfile() {
 //   centrale l'adresse livree avec l'instance (config.js) sert, et la
 //            connexion a la centrale Modulimo est requise.
 //
-// Dans les deux cas le solde vit sur la centrale : le mode local rend le
-// kiosque joignable sans internet, il ne rend pas les achats autonomes.
+// Dans les deux cas la machine, ses cases et le solde vivent dans la base
+// de l'immeuble (sql/037) : seule l'adresse du kiosque change.
 const MODES_LUNCH = ['demo', 'local', 'central'];
 
 function lireReglagesLunch(reglages) {
@@ -5548,7 +5595,7 @@ function etatLiaisonLunch() {
   const r = window.lunchReglages || { mode: 'central' };
   if (r.mode === 'demo')  return { texte: 'Données fictives — aucune transaction, aucun lien requis.', couleur: 'var(--text3)' };
   if (r.mode === 'local') return r.url
-    ? { texte: 'Machine jointe à ' + r.url + ' — le solde reste géré par la centrale.', couleur: 'var(--text3)' }
+    ? { texte: 'Machine jointe à ' + r.url + '. Machine et solde vivent dans la base de l\'immeuble.', couleur: 'var(--text3)' }
     : { texte: 'Aucune adresse saisie : l\'adresse livrée avec l\'instance sera employée.', couleur: 'var(--accent3, #e07060)' };
   if (window._centralOnline === true)  return { texte: '● Liaison à la centrale établie.', couleur: '#7eb8a0' };
   if (window._centralOnline === false) return { texte: '● Centrale injoignable — les achats seront refusés.', couleur: 'var(--accent3, #e07060)' };
@@ -8713,26 +8760,15 @@ async function onLunchPageShow() {
   container.innerHTML = '<div style="color:var(--text3);font-size:13px;">Chargement…</div>';
 
   try {
-    let buildingFilter = null;
-    try {
-      const { data } = await sb.from('system_settings').select('value').eq('key', 'building_id').maybeSingle();
-      if (data?.value) buildingFilter = data.value;
-    } catch(e) {}
-
     let machines;
     if (window._demoMode && typeof demoRest === 'function') {
-      // Les machines sont declarees sur la centrale Modulimo, hors de
-      // portee en demonstration.
       machines = await demoRest('lunch_machines?active=eq.true&order=name');
     } else {
-      const query = buildingFilter
-        ? `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&building_id=eq.${buildingFilter}&select=id,name,building_id&order=name`
-        : `${LM_CENTRAL_URL}/rest/v1/lunch_machines?active=eq.true&select=id,name,building_id&order=name`;
-
-      const res = await fetch(query, {
-        headers: { 'apikey': CENTRAL_KEY }
-      });
-      machines = await res.json();
+      // Les machines vivent dans la base de l'immeuble (sql/037).
+      const { data, error } = await sb.from('lunch_machines')
+        .select('id, name, building_id').eq('active', true).order('name');
+      if (error) console.warn('[lunch] machines :', error.message);
+      machines = data || [];
     }
 
     if (!machines || !machines.length) {
@@ -9039,10 +9075,8 @@ async function openKiosk(machineId, _ignoredPreOpenedTab) {
     return expliquerKiosqueDemo(machineId);
   }
 
-  // Sans centrale joignable, le kiosque ne pourra pas debiter — on refuse
-  // d'ouvrir l'onglet plutot que de laisser l'usager arriver devant un
-  // bouton "Acheter" qui echouera.
-  if (!ensureCentralOnline('kiosque lunch')) return;
+  // Le kiosque vend dans la base de l'immeuble (sql/037) : la centrale
+  // n'est plus requise pour l'ouvrir.
   if (!currentUser || !currentProfile) {
     console.warn('[openKiosk] pas de currentUser/currentProfile');
     typeof toast === 'function' && toast('Connexion requise', 'error');
@@ -10671,7 +10705,7 @@ async function serreRentZone(zoneId, code, frais, dateFinPrevue) {
   // Débit du premier mois (type whitelisté finance-bridge : space_reservation)
   if (fee > 0) {
     const ym = monthIso.slice(0, 7);
-    const debit = await _balanceOps.commit({
+    const debit = await soldeOps.commit({
       amount: -fee, type: 'space_reservation',
       description: `Serre — location zone ${code} (frais mensuel ${ym})`,
       reference_id: loc.id, reference_type: 'serre_location',
@@ -10679,7 +10713,7 @@ async function serreRentZone(zoneId, code, frais, dateFinPrevue) {
     });
     if (!debit.ok && !debit.queued) {
       await sb.from('serre_locations').update({ statut: 'annulee', date_fin: todayIso }).eq('id', loc.id);
-      toast(debit.error === 'INSUFFICIENT_FUNDS' ? 'Solde insuffisant (central) — location annulée' : `Débit refusé (${debit.error || 'inconnue'}) — location annulée`, 'error');
+      toast(debit.error === 'INSUFFICIENT_FUNDS' ? 'Solde insuffisant — location annulée' : `Débit refusé (${debit.error || 'inconnue'}) — location annulée`, 'error');
       await loadSerre(); serreOpenZone(zoneId); return;
     }
     if (typeof debit.virtual_balance === 'number') currentProfile.virtual_balance = debit.virtual_balance;
@@ -10726,7 +10760,7 @@ async function serreSaveLecture() {
 // locations actives. Idempotent via idempotency_key = serre-fee:<loc>:<AAAA-MM>,
 // donc rejouable sans double débit même si la page est rechargée.
 async function serreChargeDueFees(myLocs) {
-  if (isDemo || !currentProfile || !_balanceOps) return;
+  if (isDemo || !currentProfile) return;
   const now = new Date();
   const curMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   let charged = false;
@@ -10744,7 +10778,7 @@ async function serreChargeDueFees(myLocs) {
       const ym = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0');
       if (fee > 0) {
         if ((currentProfile.virtual_balance || 0) < fee) { toast(`Solde insuffisant pour le frais serre ${ym}`, 'error'); break; }
-        const debit = await _balanceOps.commit({
+        const debit = await soldeOps.commit({
           amount: -fee, type: 'space_reservation',
           description: `Serre — frais mensuel ${ym}`,
           reference_id: loc.id, reference_type: 'serre_location',
@@ -10936,7 +10970,7 @@ async function confirmNetworkBookSpace() {
     // 3. Débiter via balanceOps. La cle d'idempotence est deterministe sur
     // l'id de reservation reseau (ou sur user+startDT en fallback) pour que
     // tout retry de l'outbox tombe sur la meme transaction cote central.
-    const debit = await _balanceOps.commit({
+    const debit = await soldeOps.commit({
       amount: -cost,
       type: 'space_reservation',
       description: 'Réservation réseau — ' + nb.spaceName,
@@ -10954,8 +10988,8 @@ async function confirmNetworkBookSpace() {
           });
         } catch (e) { console.warn('rollback résa réseau:', e); }
       }
-      if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant (central)', 'error');
-      else toast(`Erreur débit central (${debit.error || 'inconnue'}) — réservation annulée`, 'error');
+      if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant', 'error');
+      else toast(`Débit refusé (${debit.error || 'inconnue'}) — réservation annulée`, 'error');
       return;
     }
     if (debit.queued) {
@@ -11018,7 +11052,7 @@ document.getElementById('book-start').addEventListener('change', updateBookCostP
 document.getElementById('book-end').addEventListener('change', updateBookCostPreview);
 
 async function confirmBookSpace() {
-  if (!ensureCentralOnline('reservation')) return;
+  if (soldeCentral() && !ensureCentralOnline('reservation')) return;
   // Si c'est une réservation réseau, rediriger vers confirmNetworkBookSpace
   if (window._networkBooking?.isNetwork) {
     await confirmNetworkBookSpace();
@@ -11072,7 +11106,7 @@ async function confirmBookSpace() {
   // Debit via balanceOps. Source de verite : central. La cle d'idempotence
   // est deterministe sur l'id de reservation pour que tout retry retombe
   // sur la meme transaction.
-  const debit = await _balanceOps.commit({
+  const debit = await soldeOps.commit({
     amount: -cost,
     type: 'space_reservation',
     description: `Reservation ${space?.name}`,
@@ -11091,8 +11125,8 @@ async function confirmBookSpace() {
       cancelled_at: new Date().toISOString(),
       cancel_reason: 'Débit central refusé — annulation automatique'
     }).eq('id', res.id);
-    if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant (central)', 'error');
-    else toast(`Erreur debit central (${debit.error || 'inconnue'}) — reservation annulee`, 'error');
+    if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant', 'error');
+    else toast(`Débit refusé (${debit.error || 'inconnue'}) — reservation annulee`, 'error');
     return;
   }
   if (debit.queued) {
@@ -11360,35 +11394,17 @@ let mobTablesManquantes = false;
 
 // Debiter ou crediter le solde pour une reservation de vehicule.
 //
-// Deux chemins, selon l'installation : avec centrale, on passe par
-// balanceOps (idempotence, outbox, rejeu) ; sans centrale — instance
-// autonome — le solde est local et adjust_balance() fait le travail.
-// confirmBookSpace() ne connait que le premier, ce qui le casse sur une
-// appliance ; on ne reproduit pas ce trou.
-//
-// Le type 'vehicle_reservation' doit figurer dans la liste blanche de
-// finance-bridge (cote centrale) en plus du CHECK de transactions.type
-// pose par sql/031_mobilite_partagee.sql. S'il manque, le debit est
-// refuse et la reservation s'annule d'elle-meme, avec le message
-// d'erreur de la centrale.
+// Le solde vit dans l'immeuble (adjust_balance) sauf si l'immeuble a
+// choisi la finance centrale — voir soldeCentral(). Dans ce dernier cas,
+// le type 'vehicle_reservation' doit figurer dans la liste blanche de
+// finance-bridge, sans quoi le debit est refuse et la reservation
+// s'annule d'elle-meme.
 async function mobAjusterSolde({ amount, type, description, reference_id, idempotency_key }) {
-  if (_balanceOps) {
-    return await _balanceOps.commit({
-      amount, type, description, reference_id,
-      reference_type: 'vehicle_reservation',
-      idempotency_key
-    });
-  }
-  const { data, error } = await sb.rpc('adjust_balance', {
-    p_user_id: currentProfile.id,
-    p_amount: amount,
-    p_type: type,
-    p_reference_id: reference_id,
-    p_reference_type: 'vehicle_reservation',
-    p_description: description
+  return await soldeOps.commit({
+    amount, type, description, reference_id,
+    reference_type: 'vehicle_reservation',
+    idempotency_key
   });
-  if (error) return { ok: false, error: error.message, retryable: false };
-  return { ok: true, virtual_balance: typeof data === 'number' ? data : null };
 }
 
 function mobType(v)      { return MOB_TYPES.includes(v?.vehicle_type) ? v.vehicle_type : 'auto'; }
@@ -11734,7 +11750,7 @@ async function mobConfirmReturn() {
           idempotency_key: `vehicle-resv-final:${r.id}`
         });
     if (!reglement.ok && !reglement.queued) {
-      toast(`Erreur debit central (${reglement.error || 'inconnue'})`, 'error');
+      toast(`Débit refusé (${reglement.error || 'inconnue'})`, 'error');
     } else if (typeof reglement.virtual_balance === 'number') {
       currentProfile.virtual_balance = reglement.virtual_balance;
       const pastille = document.getElementById('nav-balance');
@@ -11821,7 +11837,7 @@ function updateVehicleCostPreview() {
 });
 
 async function confirmBookVehicle() {
-  if (!isDemo && !ensureCentralOnline('reservation')) return;
+  if (!isDemo && soldeCentral() && !ensureCentralOnline('reservation')) return;
 
   const c = mobCreneauSaisi();
   if (!c) { toast(pt('mobErrFields'), 'error'); return; }
@@ -11887,8 +11903,8 @@ async function confirmBookVehicle() {
       cancelled_at: new Date().toISOString(),
       cancel_reason: 'Débit central refusé — annulation automatique'
     }).eq('id', res.id);
-    if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant (central)', 'error');
-    else toast(`Erreur debit central (${debit.error || 'inconnue'}) — reservation annulee`, 'error');
+    if (debit.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant', 'error');
+    else toast(`Débit refusé (${debit.error || 'inconnue'}) — reservation annulee`, 'error');
     return;
   }
   if (debit.queued) {
@@ -12611,7 +12627,7 @@ async function saveTripData(tripId, andConfirm) {
   // declenche la facturation (passagers + credit chauffeur). On bloque
   // donc la confirmation si central est hors-ligne pour ne pas rouvrir
   // la fenetre de divergence.
-  if (andConfirm && !ensureCentralOnline('facturation trajet')) return;
+  if (andConfirm && soldeCentral() && !ensureCentralOnline('facturation trajet')) return;
   const actualKm        = parseFloat(document.getElementById('td-actual-km')?.value) || null;
   const takenAt         = document.getElementById('td-taken-at')?.value || null;
   const returnedAt      = document.getElementById('td-returned-at')?.value || null;
@@ -12657,19 +12673,27 @@ async function saveTripData(tripId, andConfirm) {
       const cost = (bKm * pKm) + (durationMin * pMin * dShare);
       if (cost > 0) {
         await sb.from('trip_bookings').update({ total_cost: cost }).eq('id', b.id);
-        // Debit passager : reste en local meme avec finance_central_enabled.
-        // L'endpoint finance-bridge/debit exige claims.client_id == target,
-        // or ici le chauffeur (caller) debite le passager (target). La
-        // propagation vers central passe donc par finance-sync (Phase 3B,
-        // cron 5 min) : verifier que dual_write_enabled=true cote central
-        // et que le pg_cron tourne (cf modulimo-admin/sql/011 commentaires).
-        await sb.rpc('adjust_balance', { p_user_id: b.passenger_id, p_amount: -cost, p_description: 'Covoiturage #' + tripId.slice(0,8), p_type: 'trip_booking' }).catch(() => {});
+        // Debit passager, au grand livre de l'immeuble : c'est le
+        // chauffeur qui confirme, et il debite un autre que lui. Avec la
+        // finance centrale, finance-bridge refuserait (claims.client_id
+        // doit valoir la cible) ; la propagation passe alors par
+        // finance-sync (cf modulimo-admin/sql/011).
+        const { error: debErr } = await sb.rpc('adjust_balance', {
+          p_user_id: b.passenger_id, p_amount: -Math.round(cost * 100) / 100,
+          p_description: 'Covoiturage #' + tripId.slice(0,8), p_type: 'trip_booking',
+          p_reference_id: tripId, p_reference_type: 'trip'
+        });
+        if (debErr) {
+          console.warn('[trip] debit passager echoue:', debErr.message);
+          toast(`Débit d'un passager échoué (${debErr.message})`, 'error');
+        }
       }
     }
 
-    // Driver reduction credit. Le chauffeur agit sur son propre solde, donc
-    // claims.client_id == target cote central — chemin /debit avec type refund
-    // 'trip_driver_earning' (cf. ALLOWED_REFUND_TYPES dans finance-bridge).
+    // Credit du chauffeur, par soldeOps : au grand livre de l'immeuble, ou
+    // a la centrale si l'immeuble l'a choisie (le chauffeur agit alors sur
+    // son propre solde, claims.client_id == target, type refund
+    // 'trip_driver_earning' — cf. ALLOWED_REFUND_TYPES de finance-bridge).
     // Idempotency_key deterministe sur l'id du trip pour que tout retry
     // converge sur la meme transaction.
     const grossCost   = (durationMin * pMin) + (actualKm * pKm);
@@ -12678,7 +12702,7 @@ async function saveTripData(tripId, andConfirm) {
     if (driverCredit > 0 && tripRow?.driver_id) {
       const desc = 'Réduction chauffeur #' + tripId.slice(0,8);
       if (tripRow.driver_id === currentProfile.id) {
-        const credit = await _balanceOps.refund({
+        const credit = await soldeOps.refund({
           amount: driverCredit,                     // > 0 = refund cote central
           type: 'trip_driver_earning',
           description: desc,
@@ -12694,8 +12718,8 @@ async function saveTripData(tripId, andConfirm) {
           // Erreur metier definitive : on ne bloque pas la confirmation —
           // les passagers ont deja ete debites cote local (le cron sync
           // de Phase 3B propagera). Admin peut re-crediter manuellement.
-          console.warn('[trip] crédit chauffeur central echoué:', credit);
-          toast(`Crédit chauffeur central échoué (${credit.error || 'inconnue'})`, 'error');
+          console.warn('[trip] crédit chauffeur echoué:', credit);
+          toast(`Crédit chauffeur échoué (${credit.error || 'inconnue'})`, 'error');
         }
       } else {
         // 'trip_driver_earning' : seul type accepte par transactions_type_check
@@ -13382,7 +13406,8 @@ function txLabel(type, description) {
     space_cancel_refund: 'Remboursement espace', trip_booking: 'Réservation covoiturage',
     trip_cancel_refund: 'Remboursement trajet', trip_cancel_charge: 'Frais annulation',
     trip_driver_earning: 'Gain chauffeur', trip_driver_charge: 'Frais chauffeur annulation',
-    emploi_remuneration: 'Rémunération — emploi', demo: 'Transaction démo'
+    emploi_remuneration: 'Rémunération — emploi', lunch_purchase: 'Machine Lunch',
+    lunch_cancel_refund: 'Remboursement Machine Lunch', demo: 'Transaction démo'
   };
   return labels[type] || type;
 }
@@ -13866,7 +13891,7 @@ async function loadDependents() {
   // Si central est injoignable, on garde la valeur locale (le banner
   // "CENTRALE HORS-LIGNE" signale a l'usager que les soldes sont peut-etre
   // perimes).
-  if (!isDemo) {
+  if (!isDemo && soldeCentral()) {
     await Promise.all(data.map(async (d) => {
       const central = await fetchCentralBalance(d.id);
       if (central && typeof central.virtual_balance === 'number') {
@@ -13975,11 +14000,33 @@ function openTransfer(depId, depName, depBalance) {
 }
 
 async function confirmTransfer() {
-  if (!ensureCentralOnline('transfert')) return;
+  if (soldeCentral() && !ensureCentralOnline('transfert')) return;
   const depId = document.getElementById('transfer-dep-id').value;
   const amount = parseFloat(document.getElementById('transfer-amount').value);
   if (!amount || amount <= 0) { toast('Montant invalide', 'error'); return; }
   if (amount > (currentProfile?.virtual_balance || 0)) { toast('Solde insuffisant', 'error'); return; }
+
+  // Solde de l'immeuble : transfer_to_dependent debite le parent et
+  // credite le dependant dans une meme transaction.
+  if (!soldeCentral()) {
+    const { data: solde, error } = await sb.rpc('transfer_to_dependent', {
+      p_parent_id: currentProfile.id,
+      p_dependent_id: depId,
+      p_amount: amount
+    });
+    if (error) {
+      toast(/INSUFFICIENT_FUNDS/.test(error.message) ? 'Solde insuffisant' : 'Erreur transfert : ' + error.message, 'error');
+      return;
+    }
+    currentProfile.virtual_balance = typeof solde === 'number' ? solde : currentProfile.virtual_balance - amount;
+    const pill = document.getElementById('nav-balance');
+    if (pill) pill.textContent = `${currentProfile.virtual_balance.toFixed(2)}`;
+    document.getElementById('prof-balance-display').textContent = currentProfile.virtual_balance.toFixed(2);
+    toast(`${amount.toFixed(2)} $ transféré avec succès`, 'success');
+    closeModal('modal-transfer');
+    loadDependents();
+    return;
+  }
 
   // Transfer atomique cote central via balanceOps (RPC transfer_to_dependent_central :
   // 2 jambes ledger parent->dep dans une seule transaction PG, idempotent).
@@ -13995,7 +14042,7 @@ async function confirmTransfer() {
     idempotency_key: idem,
   });
   if (!tr.ok && !tr.queued) {
-    if (tr.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant (central)', 'error');
+    if (tr.error === 'INSUFFICIENT_FUNDS') toast('Solde insuffisant', 'error');
     else toast(`Erreur transfert central (${tr.error || 'inconnue'})`, 'error');
     return;
   }
@@ -17079,6 +17126,18 @@ async function loadSettings() {
                placeholder="https://lunch.immeuble.lan/">
       </div>
       <div id="lunch-etat-liaison" style="font-size:12px;color:var(--text3);"></div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Machines de l'immeuble</div>
+        <div id="lunch-machines-admin" style="font-size:13px;color:var(--text3);">Chargement…</div>
+        <div class="form-row" style="margin-top:10px;">
+          <div class="form-group" style="margin:0"><label for="lunch-nouv-id">Numéro de série (sur la machine)</label><input type="text" id="lunch-nouv-id" placeholder="LM-2026-00123-7" autocomplete="off" style="text-transform:uppercase" oninput="lunchSerieApercu(this)"><div id="lunch-nouv-id-etat" style="font-size:11px;margin-top:4px;"></div></div>
+          <div class="form-group" style="margin:0"><label for="lunch-nouv-nom">Nom</label><input type="text" id="lunch-nouv-nom" placeholder="Machine du hall" autocomplete="off"></div>
+        </div>
+        <div class="form-row" style="margin-top:8px;">
+          <div class="form-group" style="margin:0"><label for="lunch-nouv-pin">PIN administrateur (4 chiffres)</label><input type="text" id="lunch-nouv-pin" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+          <div style="display:flex;align-items:flex-end;"><button class="btn btn-secondary btn-sm" onclick="lunchAjouterMachine()">+ Ajouter la machine</button></div>
+        </div>
+      </div>
     </div>` : '';
 
   form.innerHTML = moduleHtml + lunchHtml
@@ -17090,11 +17149,96 @@ async function loadSettings() {
   `).join('');
   settingsCache = Object.fromEntries((data || []).map(s => [s.key, s]));
   afficherEtatLiaisonLunch();
+  if (window.appModules.lunch) lunchMachinesAdmin();
+}
+
+// ── Machines Lunch de l'immeuble (sql/037) ─────────────────────────────
+async function lunchMachinesAdmin() {
+  const el = document.getElementById('lunch-machines-admin');
+  if (!el) return;
+  const { data, error } = await sb.from('lunch_machines').select('id, name, active, numero_serie').order('name');
+  if (error) {
+    el.innerHTML = /does not exist|schema cache/i.test(error.message)
+      ? 'Jouez la migration <code>sql/037_lunch_immeuble.sql</code> pour gérer les machines ici.'
+      : 'Erreur : ' + escHtml(error.message);
+    return;
+  }
+  el.innerHTML = (data || []).length
+    ? data.map(m => `<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;color:var(--text);">
+        <span style="min-width:0;overflow-wrap:anywhere;">🖥 ${escHtml(m.name)}
+          <span style="color:var(--text3)">${m.numero_serie ? '· n° ' + escHtml(m.numero_serie) : '(' + escHtml(m.id) + ')'}</span></span>
+        <span style="display:flex;gap:6px;align-items:center;">
+          ${m.numero_serie ? '' : `<button class="btn btn-secondary btn-sm" onclick="lunchAssocierSerie('${escHtml(m.id).replace(/'/g, '')}')">Associer un n° de série</button>`}
+          <span class="badge ${m.active ? 'badge-green' : 'badge-gray'}">${m.active ? 'Active' : 'Inactive'}</span>
+        </span></div>`).join('')
+    : 'Aucune machine pour l\'instant. Ajoutez-la avec le numéro de série inscrit sur la machine.';
+}
+
+// Clé de contrôle des numéros de série (ISO 7064 MOD 37,36). Même calcul
+// que lunch_serie_cle() (sql/038) et deploy/scripts/numero-serie-lunch.mjs :
+// l'aperçu signale une faute de frappe avant l'envoi, la base tranche.
+function lunchSerieValide(texte) {
+  const m = /^LM-(\d{4})-(\d{5})-([0-9A-Z])$/.exec(String(texte || '').trim().toUpperCase());
+  if (!m) return false;
+  const A = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let p = 36;
+  for (const ch of 'LM' + m[1] + m[2]) {
+    let s = (p + A.indexOf(ch)) % 36;
+    if (s === 0) s = 36;
+    p = (s * 2) % 37;
+  }
+  return A[(37 - p) % 36] === m[3];
+}
+
+function lunchSerieApercu(champ) {
+  const etat = document.getElementById('lunch-nouv-id-etat');
+  if (!etat) return;
+  const v = champ.value.trim();
+  if (!v) { etat.textContent = ''; return; }
+  const ok = lunchSerieValide(v);
+  etat.textContent = ok ? '✓ Numéro reconnu' : 'Format attendu : LM-AAAA-NNNNN-C — vérifiez la saisie';
+  etat.style.color = ok ? 'var(--accent2)' : 'var(--text3)';
+}
+
+function lunchErreurSerie(message) {
+  return /SERIE_INVALIDE/.test(message) ? 'Numéro de série non reconnu — vérifiez la saisie'
+       : /SERIE_DEJA_AJOUTEE/.test(message) ? 'Cette machine est déjà ajoutée'
+       : /PIN_INVALIDE/.test(message) ? 'Le PIN doit avoir 4 chiffres'
+       : /FORBIDDEN/.test(message) ? 'Réservé aux administrateurs'
+       : 'Erreur : ' + message;
+}
+
+async function lunchAssocierSerie(machineId) {
+  const numero = prompt('Numéro de série de la machine ' + machineId + ' :', '');
+  if (numero === null) return;
+  if (!lunchSerieValide(numero)) { toast('Numéro de série non reconnu — vérifiez la saisie', 'error'); return; }
+  const { error } = await sb.rpc('lunch_machine_associer_serie', { p_machine_id: machineId, p_numero: numero });
+  if (error) { toast(lunchErreurSerie(error.message), 'error'); return; }
+  toast('Numéro de série associé ✓', 'success');
+  lunchMachinesAdmin();
+}
+
+// Ajout d'une machine achetée, par son numéro de série — sans la centrale :
+// la base de l'immeuble reconnaît le numéro (sql/038).
+async function lunchAjouterMachine() {
+  const numero = document.getElementById('lunch-nouv-id').value.trim().toUpperCase();
+  const name = document.getElementById('lunch-nouv-nom').value.trim();
+  const pin = document.getElementById('lunch-nouv-pin').value.trim();
+  if (!numero || !name) { toast('Numéro de série et nom requis', 'error'); return; }
+  if (!lunchSerieValide(numero)) { toast('Numéro de série non reconnu — vérifiez la saisie', 'error'); return; }
+  if (!/^\d{4}$/.test(pin)) { toast('Le PIN doit avoir 4 chiffres', 'error'); return; }
+  const { error } = await sb.rpc('lunch_machine_ajouter', { p_numero: numero, p_nom: name, p_pin: pin });
+  if (error) { toast(lunchErreurSerie(error.message), 'error'); return; }
+  toast('Machine ajoutée ✓ — ouvrez le kiosque avec ?machine=' + numero, 'success');
+  const etat = document.getElementById('lunch-nouv-id-etat');
+  if (etat) etat.textContent = '';
+  ['lunch-nouv-id', 'lunch-nouv-nom', 'lunch-nouv-pin'].forEach(k => { document.getElementById(k).value = ''; });
+  lunchMachinesAdmin();
 }
 
 const MODULE_DESCRIPTIONS = {
   module_trips: 'Module Mobilité partagée : réservation de véhicules, covoiturage et demandes de passagers',
-  module_lunch: 'Module Machine Lunch : kiosque et commandes (nécessite la centrale Modulimo)',
+  module_lunch: 'Module Machine Lunch : kiosque et commandes',
   module_serre: 'Module Serre : zones de culture louées au mois et capteurs',
   module_energie: 'Module Énergie et confort : état de l’immeuble, eau chaude par logement et alertes'
 };
@@ -17829,7 +17973,7 @@ async function empAdminCharger() {
   // Avec la finance centralisee, le solde de reference vit a la centrale :
   // crediter le solde local creerait un ecart. On n'y offre que le
   // paiement hors application.
-  const central = !!window._financeCentralEnabled;
+  const central = soldeCentral();
   html += `<div class="emp-bloc"><div class="emp-bloc-titre">À rémunérer</div>`;
   html += Object.keys(parPersonne).length ? `<div class="card">${Object.entries(parPersonne).map(([uid, p]) => `
     <div class="emp-ligne">
