@@ -1384,6 +1384,68 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   font-size: 0.95rem;
 }
 
+/* ===== EMPLOIS DE L'IMMEUBLE ===== */
+/* Une offre se lit comme une offre d'emploi : le poste et le taux d'un
+   coup d'oeil, puis ce dont on repond et ce qu'on fait. Au babillard,
+   le detail reste replie pour ne pas noyer les messages des voisins. */
+.emp-bloc { margin-bottom: 24px; }
+.emp-bloc-titre {
+  font-size: 0.82rem;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+.emp-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.emp-carte {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.emp-carte-tete { display: flex; align-items: flex-start; gap: 10px; }
+.emp-carte-icone { font-size: 1.5rem; line-height: 1; flex-shrink: 0; }
+.emp-carte-titre { font-weight: 600; font-size: 0.98rem; color: var(--text); overflow-wrap: anywhere; }
+.emp-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.emp-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.82rem; color: var(--text2); }
+.emp-taux { color: var(--accent2); font-weight: 600; }
+.emp-texte { font-size: 0.88rem; line-height: 1.55; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.emp-carte details summary { cursor: pointer; font-size: 0.85rem; color: var(--accent); }
+.emp-carte h4 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text2); margin: 10px 0 4px; }
+.emp-carte ul { margin: 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.55; }
+.emp-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 6px; }
+.emp-compteurs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 6px 0 4px;
+}
+.emp-compteur { background: var(--surface2); border-radius: 8px; padding: 10px 12px; }
+.emp-compteur-val { font-family: var(--font-serif); font-size: 1.35rem; color: var(--text); }
+.emp-compteur-lib { font-size: 0.75rem; color: var(--text2); margin-top: 2px; }
+.emp-ligne {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.86rem;
+}
+.emp-ligne-info { min-width: 0; flex: 1 1 200px; overflow-wrap: anywhere; }
+.emp-ligne-sous { font-size: 0.78rem; color: var(--text3); margin-top: 2px; }
+
 /* ===== LAB (amelioration continue) ===== */
 /* Le LAB reprend la grammaire visuelle du babillard — meme surface, meme
    bordure, meme rythme vertical — parce qu'il vit dans le meme menu. Ce
@@ -2262,6 +2324,9 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         </div>
       </div>
 
+      <!-- Emplois offerts dans l'immeuble (publies par l'administration) -->
+      <div id="bb-emplois" class="emp-bloc" style="display:none"></div>
+
       <!-- Composer -->
       <div class="bb-compose" id="bb-compose-box">
         <div style="font-size:0.82rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;font-weight:500;margin-bottom:10px;" data-pt="bbNewLabel">Nouveau message</div>
@@ -2561,6 +2626,13 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         </div>
       </div>
 
+      <!-- Emplois de l'immeuble : postuler, declarer ses heures -->
+      <div id="prof-emplois" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:24px;">
+        <h3 style="font-size:1rem;color:var(--accent);">💼 Emplois de l'immeuble</h3>
+        <p style="font-size:0.85rem;color:var(--text2);margin:4px 0 16px;">Postulez aux postes offerts par l'administration. Une fois embauché·e, déclarez vos heures ici : elles sont approuvées puis rémunérées.</p>
+        <div id="prof-emplois-contenu"><div style="color:var(--text3);font-size:0.9rem;text-align:center;padding:20px;">Chargement...</div></div>
+      </div>
+
       <!-- Loi 25 : Telecharger mes donnees -->
       <div id="loi25-self-section" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:24px;display:none;">
         <h3 style="font-size:1rem;color:var(--text);margin-bottom:8px;">📥 Mes données personnelles (Loi 25)</h3>
@@ -2607,6 +2679,7 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
         <button class="admin-tab" onclick="adminTab('spaces-admin')" data-pt="Espaces">Espaces</button>
         <button class="admin-tab" onclick="adminTab('vehicles-admin')" data-pt="Véhicules">Véhicules</button>
         <button class="admin-tab" onclick="adminTab('production')">🌱 Production</button>
+        <button class="admin-tab" onclick="adminTab('emplois')">💼 Emplois <span id="emplois-pending-count" class="badge badge-yellow" style="display:none;font-size:10px;margin-left:4px;padding:1px 6px;"></span></button>
         <button class="admin-tab" onclick="adminTab('payments')" data-pt="Paiements">Paiements</button>
         <button class="admin-tab" onclick="adminTab('settings')" id="settings-tab" style="display:none" data-pt="Paramètres">Paramètres</button>
         <button class="admin-tab" onclick="adminTab('logs')" data-pt="Logs">Logs</button>
@@ -2775,6 +2848,16 @@ html[data-logo-colored] .logo-wrap { background:var(--logo-bg); padding:4px 8px;
       </div>
 
       <!-- Paiements -->
+      <!-- Emplois de l'immeuble -->
+      <div id="admin-emplois" class="admin-section" style="display:none">
+        <div class="section-header">
+          <div class="section-title"><h3 style="font-size:1.1rem">Emplois de l'immeuble</h3>
+            <p style="color:var(--text2);font-size:0.85rem">Les offres ouvertes s'affichent au babillard ; les résidents postulent et déclarent leurs heures depuis leur profil.</p></div>
+          <button class="btn btn-primary btn-sm" onclick="empAdminOuvrir()">+ Nouvelle offre</button>
+        </div>
+        <div id="emp-admin-contenu"></div>
+      </div>
+
       <div id="admin-payments" class="admin-section" style="display:none">
         <div class="section-header">
           <div class="section-title"><h3 style="font-size:1.1rem">Enregistrer un paiement réel</h3></div>
@@ -6089,6 +6172,15 @@ const PT = {
     // Babillard
     'bbTitle': '📌 Babillard',
     'bbSubtitle': 'Messages et annonces de la communauté',
+    'empBbTitle': '💼 Emplois offerts dans l\'immeuble',
+    'empBbDetails': 'Responsabilités et tâches',
+    'empBbApply': 'Postuler depuis mon profil',
+    'empPerHour': '$/h',
+    'empHoursWeek': 'h/sem.',
+    'empPositions': 'poste(s)',
+    'empStart': 'Début',
+    'empResp': 'Responsabilités',
+    'empTasks': 'Tâches',
     'bbNewLabel': 'Nouveau message',
     'bbPlaceholder': 'Partagez une annonce, une question ou un avis avec vos voisins…',
     'bbPublish': 'Publier',
@@ -6391,6 +6483,15 @@ const PT = {
     // Bulletin board
     'bbTitle': '📌 Bulletin board',
     'bbSubtitle': 'Community messages and announcements',
+    'empBbTitle': '💼 Jobs available in the building',
+    'empBbDetails': 'Responsibilities and tasks',
+    'empBbApply': 'Apply from my profile',
+    'empPerHour': '$/h',
+    'empHoursWeek': 'h/wk',
+    'empPositions': 'position(s)',
+    'empStart': 'Start',
+    'empResp': 'Responsibilities',
+    'empTasks': 'Tasks',
     'bbNewLabel': 'New message',
     'bbPlaceholder': 'Share an announcement, question or opinion with your neighbours…',
     'bbPublish': 'Post',
@@ -9974,7 +10075,7 @@ function renderSerre() {
     <div class="serre-sec" style="margin-top:0;">${pt('Conditions de la serre')}</div>
     <div class="el-eau" style="margin-bottom:18px">
       <span>🌡 Température de l'air : <strong>${L.temp_air == null ? '—' : L.temp_air + ' °C'}</strong></span>
-      <span style="color:var(--text3)">💧 Les réservoirs se lisent avec la sablonponie — c'est la même eau.</span>
+      <span style="color:var(--text3)">💧 Les réservoirs se lisent avec la sabloponie — c'est la même eau.</span>
     </div>
     ${_serre.isAdmin && !isDemo ? `<div style="font-size:11px;color:var(--text3);margin:-10px 0 18px;">${pt('Saisie manuelle : onglet Admin → 🌱 Serre')}</div>` : ''}
 
@@ -13280,7 +13381,8 @@ function txLabel(type, description) {
     admin_credit: 'Crédit par administrateur', space_reservation: 'Réservation espace',
     space_cancel_refund: 'Remboursement espace', trip_booking: 'Réservation covoiturage',
     trip_cancel_refund: 'Remboursement trajet', trip_cancel_charge: 'Frais annulation',
-    trip_driver_earning: 'Gain chauffeur', trip_driver_charge: 'Frais chauffeur annulation', demo: 'Transaction démo'
+    trip_driver_earning: 'Gain chauffeur', trip_driver_charge: 'Frais chauffeur annulation',
+    emploi_remuneration: 'Rémunération — emploi', demo: 'Transaction démo'
   };
   return labels[type] || type;
 }
@@ -13683,6 +13785,7 @@ async function loadProfilePage() {
   document.getElementById('prof-notes').value = currentProfile?.notes || '';
   document.getElementById('prof-balance-display').textContent = (currentProfile?.virtual_balance || 0).toFixed(2);
   renderLogoColorPicker();
+  empChargerProfil();
   // Read-only in demo
   const editableFields = ['prof-name','prof-phone','prof-notes'];
   editableFields.forEach(id => {
@@ -13992,6 +14095,7 @@ async function adminTab(tab) {
       await loadElevage('sablonponie');
       await loadElevage('poulailler');
       break;
+    case 'emplois': await empAdminCharger(); break;
     case 'payments': await loadAdminPayments(); break;
     case 'settings': await loadSettings(); break;
     case 'logs': await loadLogs(); break;
@@ -14013,7 +14117,7 @@ const ELEVAGE_META = {
   // les reaffiche plutot que de laisser croire a deux circuits distincts.
   poulailler:  { container: 'admin-poulailler', icon: '🐔', titre: 'Poulailler', animal: 'poule', lieu: 'poulailler', prod: 'ponte', adj1: 'nouvelle', adjN: 'nouvelles',
                  prodLabel: 'Ponte', prodUnite1: 'œuf', prodUniteN: 'œufs', eau: false, genre: 'f' },
-  sablonponie: { container: 'admin-poissons', icon: '🐟', titre: 'Poissons (sablonponie)', animal: 'poisson', lieu: 'bassin de sablonponie', prod: 'recolte', adj1: 'nouveau', adjN: 'nouveaux',
+  sablonponie: { container: 'admin-poissons', icon: '🐟', titre: 'Poissons (sabloponie)', animal: 'poisson', lieu: 'bassin de sabloponie', prod: 'recolte', adj1: 'nouveau', adjN: 'nouveaux',
                  prodLabel: 'Récolte', prodUnite1: 'kg', prodUniteN: 'kg', eau: true, genre: 'm' }
 };
 // Cinq paniers exclusifs dont la somme fait la cueillette. Le calibre
@@ -15145,7 +15249,7 @@ function elevageBabillardText(module, type, qty, desc) {
     return `${m.icon} ${q ? q + ' ' + adj + ' ' + m.animal + plural : 'Un ' + m.adj1 + ' ' + m.animal} au ${m.lieu} !${desc ? ' — ' + desc : ''}`;
   }
   if (type === 'ponte') return `🥚 Belle ponte au poulailler${q ? ' : ' + q + ' œufs' : ''} !${desc ? ' — ' + desc : ''}`;
-  if (type === 'recolte') return `${m.icon} Récolte de la sablonponie${q ? ' : ' + q + ' poissons' : ''} !${desc ? ' — ' + desc : ''}`;
+  if (type === 'recolte') return `${m.icon} Récolte de la sabloponie${q ? ' : ' + q + ' poissons' : ''} !${desc ? ' — ' + desc : ''}`;
   return `${m.icon} ${m.titre} — nouvelle activité.`;
 }
 
@@ -15305,8 +15409,8 @@ function renderSerreAdmin() {
       </div>
     </div>
 
-    <div class="sa-sec">Sablonponie — bassins et poissons</div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Les réservoirs sont les bassins de la sablonponie : la même eau irrigue les planches et fait vivre les poissons.</div>
+    <div class="sa-sec">Sabloponie — bassins et poissons</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Les réservoirs sont les bassins de la sabloponie : la même eau irrigue les planches et fait vivre les poissons.</div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Les conditions sont normalement remplies par les capteurs (Raspberry Pi + MQTT). Cette saisie est un dépannage si un capteur est absent ou hors service ; les locataires voient le résultat en lecture seule sur la page Espaces.</div>
     ${ConditionsSerre(_serreAdmin.lecture, false, SERRE_COND_ADMIN_PREFIX)}
 
@@ -17194,6 +17298,10 @@ async function loadBabillard() {
   if (!feed) return;
   feed.innerHTML = '<div class="bb-empty"><div class="empty-icon">📋</div>' + pt('bbLoading') + '</div>';
 
+  // Les offres d'emploi ouvertes, au-dessus du fil. Pas d'await : le fil
+  // n'a pas a attendre les offres, ni l'inverse.
+  empChargerBabillard();
+
   // Masquer le composeur en mode démo
   const compose = document.getElementById('bb-compose-box');
   if (compose) compose.style.display = isDemo ? 'none' : '';
@@ -17286,6 +17394,596 @@ async function bbDeletePost(id) {
   }
 }
 
+
+// ==========================================
+// EMPLOIS DE L'IMMEUBLE
+// ==========================================
+// L'administration publie des offres (sql/036_emplois.sql). Elles
+// s'affichent au babillard ; le resident postule depuis son profil, puis,
+// une fois embauche, y declare ses heures. L'admin approuve les heures et
+// les remunere, au solde de l'application ou hors application.
+const EMPLOI_SECTEURS = {
+  serre:       { icon: '🌱', label: 'Serre' },
+  poulailler:  { icon: '🐔', label: 'Poulailler' },
+  sabloponie:  { icon: '🐟', label: 'Sabloponie' },
+  mobilite:    { icon: '🚗', label: 'Covoiturage / mobilité partagée' },
+  lunch:       { icon: '🥪', label: 'Machine Lunch' },
+  entretien:   { icon: '🧹', label: 'Entretien' },
+  autre:       { icon: '💼', label: 'Autre' },
+};
+const EMPLOI_NIVEAUX = { responsable: 'Responsable', employe: 'Employé·e' };
+const EMPLOI_STATUT_CAND = {
+  en_attente: ['badge-yellow', 'En attente'],
+  retenue:    ['badge-green',  'Embauché·e'],
+  refusee:    ['badge-red',    'Non retenue'],
+  retiree:    ['badge-gray',   'Retirée'],
+};
+const EMPLOI_STATUT_HEURES = {
+  soumise:   ['badge-yellow', 'À approuver'],
+  approuvee: ['badge-green',  'Approuvée'],
+  refusee:   ['badge-red',    'Refusée'],
+  payee:     ['badge-gray',   'Payée'],
+};
+const EMPLOI_STATUT_OFFRE = {
+  ouvert: ['badge-green',  'Ouvert'],
+  pourvu: ['badge-yellow', 'Pourvu'],
+  ferme:  ['badge-gray',   'Fermé'],
+};
+// Profil : ce que le resident a sous les yeux, pour les modales.
+let empProfil = { emplois: [], candidatures: [], heures: [] };
+// Admin : idem, pour l'edition d'une offre.
+let empAdmin = { emplois: [] };
+
+// Table absente tant que la migration 036 n'a pas ete jouee.
+function empTableManquante(error) {
+  return error && (error.code === '42P01' || error.code === 'PGRST205'
+    || /does not exist|schema cache/i.test(error.message || ''));
+}
+
+function empArgent(n) { return (Number(n) || 0).toFixed(2) + ' $'; }
+function empHeures(n) {
+  const v = Number(n) || 0;
+  return (Number.isInteger(v) ? v : v.toFixed(2).replace(/0$/, '')) + ' h';
+}
+function empDate(d) {
+  if (!d) return '';
+  return new Date(d + (d.length === 10 ? 'T12:00:00' : '')).toLocaleDateString(appLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function empAujourdhui() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function empBadge(map, statut) {
+  const [cls, label] = map[statut] || ['badge-gray', statut];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+function empListe(texte) {
+  const lignes = String(texte || '').split('\n').map(l => l.replace(/^\s*[-•*]\s*/, '').trim()).filter(Boolean);
+  return lignes.length ? '<ul>' + lignes.map(l => `<li>${escHtml(l)}</li>`).join('') + '</ul>' : '';
+}
+
+// Une carte d'offre. `pied` : le HTML des boutons ; `replie` : detail
+// dans un <details> (babillard) plutot qu'a plat (profil, admin).
+function empCarte(e, { pied = '', replie = false, entete = '' } = {}) {
+  const sect = EMPLOI_SECTEURS[e.secteur] || EMPLOI_SECTEURS.autre;
+  const meta = [
+    `<span class="emp-taux">${(Number(e.taux_horaire) || 0).toFixed(2)} ${pt('empPerHour')}</span>`,
+    e.heures_semaine ? `<span>≈ ${Number(e.heures_semaine)} ${pt('empHoursWeek')}</span>` : '',
+    `<span>${e.nb_postes || 1} ${pt('empPositions')}</span>`,
+    e.date_debut ? `<span>${pt('empStart')} : ${empDate(e.date_debut)}</span>` : '',
+  ].filter(Boolean).join('');
+  const resp = empListe(e.responsabilites), taches = empListe(e.taches);
+  const detail = (resp ? `<h4>${pt('empResp')}</h4>${resp}` : '') + (taches ? `<h4>${pt('empTasks')}</h4>${taches}` : '');
+  return `
+  <div class="emp-carte" id="emp-offre-${e.id}">
+    <div class="emp-carte-tete">
+      <div class="emp-carte-icone">${sect.icon}</div>
+      <div style="min-width:0;flex:1">
+        <div class="emp-carte-titre">${escHtml(e.titre)}</div>
+        <div class="emp-badges">
+          <span class="badge badge-gray">${escHtml(sect.label)}</span>
+          <span class="badge ${e.niveau === 'responsable' ? 'badge-yellow' : 'badge-gray'}">${EMPLOI_NIVEAUX[e.niveau] || ''}</span>
+          ${entete}
+        </div>
+      </div>
+    </div>
+    <div class="emp-meta">${meta}</div>
+    ${e.description ? `<div class="emp-texte">${escHtml(e.description)}</div>` : ''}
+    ${detail ? (replie ? `<details><summary>${pt('empBbDetails')}</summary>${detail}</details>` : `<div>${detail}</div>`) : ''}
+    ${pied ? `<div class="emp-actions">${pied}</div>` : ''}
+  </div>`;
+}
+
+// Les postes que donnait l'exemple du conseil : un responsable et un
+// employe par unite d'affaires.
+function empDemoEmplois() {
+  const jours = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  return [
+    { id: 'demo-emp-1', titre: 'Responsable de la serre', secteur: 'serre', niveau: 'responsable', taux_horaire: 22, heures_semaine: 8, nb_postes: 1, date_debut: jours(14), statut: 'ouvert',
+      description: "Vous prenez la serre communautaire en charge : cultures, équipe et suivi dans l'application.",
+      responsabilites: "Santé des cultures et plan de rotation\nEncadrement des employés de la serre\nSuivi des réservoirs et des alertes",
+      taches: "Planifier les semis et les récoltes\nNoter les récoltes dans l'application\nCommander les intrants avec l'administration" },
+    { id: 'demo-emp-2', titre: 'Employé·e de la serre', secteur: 'serre', niveau: 'employe', taux_horaire: 18, heures_semaine: 4, nb_postes: 2, date_debut: null, statut: 'ouvert',
+      description: "Quelques heures par semaine pour garder la serre en santé.",
+      responsabilites: "Entretien quotidien des zones communes de la serre",
+      taches: "Arroser et fertiliser\nDésherber et nettoyer les bacs\nRécolter selon le plan" },
+    { id: 'demo-emp-3', titre: 'Responsable du poulailler', secteur: 'poulailler', niveau: 'responsable', taux_horaire: 21, heures_semaine: 5, nb_postes: 1, date_debut: null, statut: 'ouvert',
+      description: "Le bien-être des poules et la production d'œufs de l'immeuble.",
+      responsabilites: "Bien-être et santé du troupeau\nRespect du règlement municipal\nDistribution des œufs",
+      taches: "Inspecter le poulailler chaque jour\nNoter la ponte et les événements\nCoordonner les employés du poulailler" },
+    { id: 'demo-emp-4', titre: 'Employé·e du poulailler', secteur: 'poulailler', niveau: 'employe', taux_horaire: 17, heures_semaine: 3, nb_postes: 2, date_debut: null, statut: 'ouvert',
+      description: "Le soin quotidien des poules, en rotation.",
+      responsabilites: "Soins quotidiens selon l'horaire établi",
+      taches: "Nourrir et abreuver\nRamasser les œufs\nChanger la litière" },
+    { id: 'demo-emp-5', titre: "Responsable de l'unité d'affaires covoiturage", secteur: 'mobilite', niveau: 'responsable', taux_horaire: 23, heures_semaine: 6, nb_postes: 1, date_debut: null, statut: 'ouvert',
+      description: "Vous faites rouler la mobilité partagée de l'immeuble : véhicules, vélomobiles et covoiturage.",
+      responsabilites: "Disponibilité et entretien de la flotte\nRentabilité de l'unité d'affaires\nApprobation des chauffeurs avec l'administration",
+      taches: "Inspecter les véhicules chaque semaine\nPlanifier l'entretien et la recharge\nRépondre aux demandes des usagers" },
+    { id: 'demo-emp-6', titre: 'Responsable de la Machine Lunch', secteur: 'lunch', niveau: 'responsable', taux_horaire: 20, heures_semaine: 5, nb_postes: 1, date_debut: null, statut: 'ouvert',
+      description: "La Machine Lunch, garnie et propre.",
+      responsabilites: "Approvisionnement et salubrité de la machine\nSuivi des ventes et des invendus",
+      taches: "Remplir les cases\nNettoyer la machine\nSignaler les pannes" },
+  ];
+}
+
+function empAllerProfil() {
+  navigateTo('profile');
+  setTimeout(() => document.getElementById('prof-emplois')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+}
+
+// ---------- Babillard ----------
+async function empChargerBabillard() {
+  const box = document.getElementById('bb-emplois');
+  if (!box) return;
+  let offres;
+  if (isDemo) {
+    offres = empDemoEmplois();
+  } else {
+    const { data, error } = await sb.from('emplois').select('*').eq('statut', 'ouvert').order('created_at', { ascending: false });
+    if (error) {
+      if (!empTableManquante(error)) console.warn('[emplois] babillard:', error.message);
+      box.style.display = 'none';
+      return;
+    }
+    offres = data || [];
+  }
+  if (!offres.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="emp-bloc-titre">${pt('empBbTitle')}</div>
+    <div class="emp-grille">${offres.map(e => empCarte(e, {
+      replie: true,
+      pied: `<button class="btn btn-primary btn-sm" onclick="empAllerProfil()">${pt('empBbApply')}</button>`
+    })).join('')}</div>`;
+  box.style.display = '';
+}
+
+// ---------- Profil ----------
+async function empChargerProfil() {
+  const box = document.getElementById('prof-emplois-contenu');
+  if (!box) return;
+
+  if (isDemo) {
+    const offres = empDemoEmplois();
+    empProfil = {
+      emplois: offres,
+      candidatures: [
+        { id: 'demo-c1', emploi_id: 'demo-emp-2', statut: 'retenue', created_at: new Date().toISOString() },
+        { id: 'demo-c2', emploi_id: 'demo-emp-5', statut: 'en_attente', created_at: new Date().toISOString() },
+      ],
+      heures: [
+        { id: 'demo-h1', emploi_id: 'demo-emp-2', date_travail: new Date(Date.now() - 1 * 86400000).toISOString().slice(0, 10), heures: 2.5, taux_horaire: 18, montant: 45, statut: 'soumise', description: 'Arrosage et désherbage' },
+        { id: 'demo-h2', emploi_id: 'demo-emp-2', date_travail: new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10), heures: 3, taux_horaire: 18, montant: 54, statut: 'approuvee', description: 'Récolte des laitues' },
+        { id: 'demo-h3', emploi_id: 'demo-emp-2', date_travail: new Date(Date.now() - 10 * 86400000).toISOString().slice(0, 10), heures: 4, taux_horaire: 18, montant: 72, statut: 'payee', mode_paiement: 'solde', description: 'Nettoyage des bacs' },
+      ],
+    };
+    empRendreProfil();
+    return;
+  }
+
+  const uid = currentProfile?.id;
+  const [cand, heures] = await Promise.all([
+    sb.from('emploi_candidatures').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+    sb.from('emploi_heures').select('*').eq('user_id', uid).order('date_travail', { ascending: false }).limit(200),
+  ]);
+  const err = cand.error || heures.error;
+  if (err) {
+    box.innerHTML = empTableManquante(err)
+      ? '<div style="color:var(--text3);font-size:0.9rem;">Les emplois ne sont pas encore activés pour cet immeuble.</div>'
+      : `<div style="color:var(--accent3);font-size:0.9rem;">Erreur de chargement : ${escHtml(err.message)}</div>`;
+    return;
+  }
+  // Les offres ouvertes, plus celles ou l'on a deja une candidature
+  // (meme pourvues ou fermees : on doit pouvoir y declarer ses heures).
+  const ids = [...new Set((cand.data || []).map(c => c.emploi_id))];
+  let q = sb.from('emplois').select('*').order('created_at', { ascending: false });
+  q = ids.length ? q.or(`statut.eq.ouvert,id.in.(${ids.join(',')})`) : q.eq('statut', 'ouvert');
+  const { data: offres, error: errOffres } = await q;
+  if (errOffres) {
+    box.innerHTML = `<div style="color:var(--accent3);font-size:0.9rem;">Erreur de chargement : ${escHtml(errOffres.message)}</div>`;
+    return;
+  }
+  empProfil = { emplois: offres || [], candidatures: cand.data || [], heures: heures.data || [] };
+  empRendreProfil();
+}
+
+function empRendreProfil() {
+  const box = document.getElementById('prof-emplois-contenu');
+  if (!box) return;
+  const { emplois, candidatures, heures } = empProfil;
+  const parId = Object.fromEntries(emplois.map(e => [e.id, e]));
+  const candPar = Object.fromEntries(candidatures.map(c => [c.emploi_id, c]));
+  const retenues = candidatures.filter(c => c.statut === 'retenue' && parId[c.emploi_id]);
+  const autres = candidatures.filter(c => c.statut !== 'retenue' && parId[c.emploi_id]);
+  const ouvertes = emplois.filter(e => e.statut === 'ouvert' && (!candPar[e.id] || candPar[e.id].statut === 'retiree'));
+  let html = '';
+
+  // 1) Mes emplois : compteurs et heures
+  if (retenues.length) {
+    const somme = (st) => heures.filter(h => h.statut === st).reduce((a, h) => a + Number(h.montant || 0), 0);
+    const hSomme = (st) => heures.filter(h => h.statut === st).reduce((a, h) => a + Number(h.heures || 0), 0);
+    html += `<div class="emp-bloc">
+      <div class="emp-bloc-titre">Mes emplois</div>
+      <div class="emp-badges" style="margin-bottom:10px">${retenues.map(c => {
+        const e = parId[c.emploi_id]; const s = EMPLOI_SECTEURS[e.secteur] || EMPLOI_SECTEURS.autre;
+        return `<span class="badge badge-green">${s.icon} ${escHtml(e.titre)} · ${(Number(e.taux_horaire) || 0).toFixed(2)} $/h</span>`;
+      }).join('')}</div>
+      <div class="emp-compteurs">
+        <div class="emp-compteur"><div class="emp-compteur-val">${empHeures(hSomme('soumise'))}</div><div class="emp-compteur-lib">En attente d'approbation (${empArgent(somme('soumise'))})</div></div>
+        <div class="emp-compteur"><div class="emp-compteur-val">${empArgent(somme('approuvee'))}</div><div class="emp-compteur-lib">À recevoir · ${empHeures(hSomme('approuvee'))} approuvées</div></div>
+        <div class="emp-compteur"><div class="emp-compteur-val">${empArgent(somme('payee'))}</div><div class="emp-compteur-lib">Déjà payé · ${empHeures(hSomme('payee'))}</div></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin:10px 0 4px">
+        <button class="btn btn-success btn-sm" onclick="empHeuresOuvrir()">+ Déclarer des heures</button>
+      </div>
+      ${heures.length ? heures.map(h => {
+        const e = parId[h.emploi_id];
+        const motif = h.statut === 'refusee' && h.motif_refus ? ` — ${escHtml(h.motif_refus)}` : '';
+        const paye = h.statut === 'payee' ? (h.mode_paiement === 'solde' ? ' · crédité au solde' : ' · payé hors application') : '';
+        return `<div class="emp-ligne">
+          <div class="emp-ligne-info">
+            <div><strong>${empDate(h.date_travail)}</strong> · ${empHeures(h.heures)} · ${empArgent(h.montant)}</div>
+            <div class="emp-ligne-sous">${escHtml(e?.titre || '')}${h.description ? ' — ' + escHtml(h.description) : ''}${motif}${paye}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            ${empBadge(EMPLOI_STATUT_HEURES, h.statut)}
+            ${h.statut === 'soumise' ? `<button class="btn btn-danger btn-sm btn-icon" title="Retirer" onclick="empHeuresRetirer('${h.id}')">✕</button>` : ''}
+          </div>
+        </div>`;
+      }).join('') : '<div style="color:var(--text3);font-size:0.85rem;padding:8px 0">Aucune heure déclarée pour l\'instant.</div>'}
+    </div>`;
+  }
+
+  // 2) Mes candidatures
+  if (autres.length) {
+    html += `<div class="emp-bloc"><div class="emp-bloc-titre">Mes candidatures</div>
+      ${autres.map(c => {
+        const e = parId[c.emploi_id];
+        return `<div class="emp-ligne">
+          <div class="emp-ligne-info">
+            <div><strong>${escHtml(e.titre)}</strong></div>
+            <div class="emp-ligne-sous">Envoyée le ${empDate(c.created_at)}${c.note_admin ? ' — ' + escHtml(c.note_admin) : ''}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            ${empBadge(EMPLOI_STATUT_CAND, c.statut)}
+            ${c.statut === 'en_attente' ? `<button class="btn btn-secondary btn-sm" onclick="empRetirerCandidature('${c.id}')">Retirer</button>` : ''}
+          </div>
+        </div>`;
+      }).join('')}</div>`;
+  }
+
+  // 3) Offres ouvertes
+  html += `<div class="emp-bloc" style="margin-bottom:0"><div class="emp-bloc-titre">Postes offerts</div>
+    ${ouvertes.length
+      ? `<div class="emp-grille">${ouvertes.map(e => empCarte(e, {
+          pied: `<button class="btn btn-primary btn-sm" onclick="empPostulerOuvrir('${e.id}')">Postuler</button>`
+        })).join('')}</div>`
+      : '<div style="color:var(--text3);font-size:0.85rem;">Aucun poste ouvert pour le moment. Les nouvelles offres paraissent aussi au babillard.</div>'}
+  </div>`;
+
+  box.innerHTML = html;
+}
+
+function empPostulerOuvrir(id) {
+  if (isDemo) { toast('Non disponible en mode démo', 'info'); return; }
+  const e = empProfil.emplois.find(x => x.id === id);
+  if (!e) return;
+  document.getElementById('emp-postuler-id').value = id;
+  document.getElementById('emp-postuler-poste').textContent = e.titre;
+  document.getElementById('emp-postuler-message').value = '';
+  openModal('modal-emploi-postuler');
+}
+
+async function empPostulerEnvoyer() {
+  const id = document.getElementById('emp-postuler-id').value;
+  const message = document.getElementById('emp-postuler-message').value.trim();
+  const { error } = await sb.rpc('emploi_postuler', { p_emploi_id: id, p_message: message || null });
+  if (error) {
+    const m = /EMPLOI_FERME/.test(error.message) ? 'Ce poste n\'est plus ouvert.'
+            : /DEJA_POSTULE/.test(error.message) ? 'Vous avez déjà postulé à ce poste.'
+            : 'Erreur : ' + error.message;
+    toast(m, 'error');
+    return;
+  }
+  closeModal('modal-emploi-postuler');
+  toast('Candidature envoyée ✓', 'success');
+  trackFeature('emplois', 'candidature_envoyee', {});
+  empChargerProfil();
+}
+
+async function empRetirerCandidature(id) {
+  if (isDemo) { toast('Non disponible en mode démo', 'info'); return; }
+  if (!confirm('Retirer cette candidature ?')) return;
+  const { error } = await sb.rpc('emploi_retirer_candidature', { p_candidature_id: id });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  toast('Candidature retirée', 'success');
+  empChargerProfil();
+}
+
+function empHeuresApercu() {
+  const e = empProfil.emplois.find(x => x.id === document.getElementById('emp-heures-emploi').value);
+  const h = parseFloat(document.getElementById('emp-heures-nb').value) || 0;
+  document.getElementById('emp-heures-apercu').textContent = e && h > 0
+    ? `${empHeures(h)} × ${(Number(e.taux_horaire) || 0).toFixed(2)} $/h = ${empArgent(h * Number(e.taux_horaire || 0))}, après approbation.`
+    : '';
+}
+
+function empHeuresOuvrir() {
+  if (isDemo) { toast('Non disponible en mode démo', 'info'); return; }
+  const parId = Object.fromEntries(empProfil.emplois.map(e => [e.id, e]));
+  const postes = empProfil.candidatures.filter(c => c.statut === 'retenue' && parId[c.emploi_id]).map(c => parId[c.emploi_id]);
+  const sel = document.getElementById('emp-heures-emploi');
+  sel.innerHTML = postes.map(e => `<option value="${e.id}">${escHtml(e.titre)}</option>`).join('');
+  const date = document.getElementById('emp-heures-date');
+  date.value = empAujourdhui();
+  date.max = empAujourdhui();
+  document.getElementById('emp-heures-nb').value = '';
+  document.getElementById('emp-heures-descr').value = '';
+  sel.onchange = empHeuresApercu;
+  document.getElementById('emp-heures-nb').oninput = empHeuresApercu;
+  empHeuresApercu();
+  openModal('modal-emploi-heures');
+}
+
+async function empHeuresEnvoyer() {
+  const emploi_id = document.getElementById('emp-heures-emploi').value;
+  const date_travail = document.getElementById('emp-heures-date').value;
+  const heures = parseFloat(document.getElementById('emp-heures-nb').value);
+  const description = document.getElementById('emp-heures-descr').value.trim();
+  if (!emploi_id || !date_travail) { toast('Choisissez le poste et la date', 'error'); return; }
+  if (!(heures > 0 && heures <= 24)) { toast('Entre 0,25 et 24 heures par déclaration', 'error'); return; }
+  if (date_travail > empAujourdhui()) { toast('On ne déclare pas des heures à venir', 'error'); return; }
+  const { error } = await sb.from('emploi_heures').insert({
+    emploi_id, user_id: currentProfile.id, date_travail,
+    heures: Math.round(heures * 100) / 100, description: description || null
+  });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  closeModal('modal-emploi-heures');
+  toast('Heures soumises pour approbation ✓', 'success');
+  trackFeature('emplois', 'heures_declarees', { heures });
+  empChargerProfil();
+}
+
+async function empHeuresRetirer(id) {
+  if (isDemo) { toast('Non disponible en mode démo', 'info'); return; }
+  if (!confirm('Retirer cette déclaration ?')) return;
+  const { error } = await sb.from('emploi_heures').delete().eq('id', id).eq('statut', 'soumise');
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  empChargerProfil();
+}
+
+// ---------- Administration ----------
+async function empAdminCharger() {
+  const box = document.getElementById('emp-admin-contenu');
+  if (!box) return;
+  box.innerHTML = '<div style="color:var(--text3);padding:20px;text-align:center">Chargement...</div>';
+  const [off, cand, heures] = await Promise.all([
+    sb.from('emplois').select('*').order('created_at', { ascending: false }),
+    sb.from('emploi_candidatures').select('*, profiles!emploi_candidatures_user_id_fkey(full_name, unit)').order('created_at', { ascending: true }),
+    sb.from('emploi_heures').select('*, profiles!emploi_heures_user_id_fkey(full_name, unit)')
+      .in('statut', ['soumise', 'approuvee']).order('date_travail', { ascending: true }),
+  ]);
+  const err = off.error || cand.error || heures.error;
+  if (err) {
+    box.innerHTML = empTableManquante(err)
+      ? '<div class="card">Les tables des emplois sont absentes : jouez la migration <code>sql/036_emplois.sql</code>.</div>'
+      : `<div class="card" style="color:var(--accent3)">Erreur : ${escHtml(err.message)}</div>`;
+    return;
+  }
+  const emplois = off.data || [], cands = cand.data || [], hrs = heures.data || [];
+  empAdmin.emplois = emplois;
+  const parId = Object.fromEntries(emplois.map(e => [e.id, e]));
+  const nom = (p) => escHtml(p?.full_name || '—') + (p?.unit ? ` <span style="color:var(--text3)">(${escHtml(p.unit)})</span>` : '');
+
+  // Pastille de l'onglet : candidatures et heures qui attendent l'admin.
+  const enAttente = cands.filter(c => c.statut === 'en_attente').length + hrs.filter(h => h.statut === 'soumise').length;
+  const pastille = document.getElementById('emplois-pending-count');
+  if (pastille) { pastille.textContent = enAttente; pastille.style.display = enAttente ? '' : 'none'; }
+
+  let html = '';
+
+  // 1) Heures a approuver
+  const soumises = hrs.filter(h => h.statut === 'soumise');
+  html += `<div class="emp-bloc"><div class="emp-bloc-titre">Heures à approuver (${soumises.length})</div>`;
+  html += soumises.length ? `<div class="card">${soumises.map(h => `
+    <div class="emp-ligne">
+      <div class="emp-ligne-info">
+        <div><strong>${nom(h.profiles)}</strong> · ${empDate(h.date_travail)} · ${empHeures(h.heures)} · ${empArgent(h.montant)}</div>
+        <div class="emp-ligne-sous">${escHtml(parId[h.emploi_id]?.titre || '')}${h.description ? ' — ' + escHtml(h.description) : ''}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-success btn-sm" onclick="empAdminHeures('${h.id}', 'approuvee')">Approuver</button>
+        <button class="btn btn-danger btn-sm" onclick="empAdminHeures('${h.id}', 'refusee')">Refuser</button>
+      </div>
+    </div>`).join('')}</div>` : '<div style="color:var(--text3);font-size:0.85rem">Rien à approuver.</div>';
+  html += '</div>';
+
+  // 2) A remunerer, par personne
+  const approuvees = hrs.filter(h => h.statut === 'approuvee');
+  const parPersonne = {};
+  approuvees.forEach(h => {
+    const k = h.user_id;
+    (parPersonne[k] ||= { profil: h.profiles, ids: [], heures: 0, total: 0 });
+    parPersonne[k].ids.push(h.id);
+    parPersonne[k].heures += Number(h.heures || 0);
+    parPersonne[k].total += Number(h.montant || 0);
+  });
+  // Avec la finance centralisee, le solde de reference vit a la centrale :
+  // crediter le solde local creerait un ecart. On n'y offre que le
+  // paiement hors application.
+  const central = !!window._financeCentralEnabled;
+  html += `<div class="emp-bloc"><div class="emp-bloc-titre">À rémunérer</div>`;
+  html += Object.keys(parPersonne).length ? `<div class="card">${Object.entries(parPersonne).map(([uid, p]) => `
+    <div class="emp-ligne">
+      <div class="emp-ligne-info">
+        <div><strong>${nom(p.profil)}</strong> · ${empHeures(p.heures)} approuvées · <span class="emp-taux">${empArgent(p.total)}</span></div>
+        <div class="emp-ligne-sous">${p.ids.length} déclaration(s)</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" ${central ? 'disabled title="Finance centralisée : payez hors application"' : ''} onclick="empAdminPayer('${uid}', 'solde')">Créditer au solde</button>
+        <button class="btn btn-secondary btn-sm" onclick="empAdminPayer('${uid}', 'externe')">Payé hors application</button>
+      </div>
+    </div>`).join('')}</div>` : '<div style="color:var(--text3);font-size:0.85rem">Aucune heure approuvée en attente de paiement.</div>';
+  html += '</div>';
+  window._empAPayer = Object.fromEntries(Object.entries(parPersonne).map(([k, v]) => [k, v]));
+
+  // 3) Offres et candidatures
+  html += `<div class="emp-bloc"><div class="emp-bloc-titre">Offres (${emplois.length})</div>`;
+  html += emplois.length ? `<div class="emp-grille">${emplois.map(e => {
+    const lesCands = cands.filter(c => c.emploi_id === e.id && c.statut !== 'retiree');
+    const retenus = lesCands.filter(c => c.statut === 'retenue').length;
+    const liste = lesCands.length ? lesCands.map(c => `
+      <div class="emp-ligne">
+        <div class="emp-ligne-info">
+          <div>${nom(c.profiles)} ${empBadge(EMPLOI_STATUT_CAND, c.statut)}</div>
+          ${c.message ? `<div class="emp-ligne-sous" style="white-space:pre-wrap">${escHtml(c.message)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:6px">
+          ${c.statut !== 'retenue' ? `<button class="btn btn-success btn-sm" onclick="empAdminCandidature('${c.id}', 'retenue')">Embaucher</button>` : ''}
+          ${c.statut === 'en_attente' ? `<button class="btn btn-danger btn-sm" onclick="empAdminCandidature('${c.id}', 'refusee')">Refuser</button>` : ''}
+          ${c.statut === 'retenue' ? `<button class="btn btn-secondary btn-sm" onclick="empAdminCandidature('${c.id}', 'refusee')" title="Met fin à l'emploi : la personne ne peut plus déclarer d'heures">Fin d'emploi</button>` : ''}
+        </div>
+      </div>`).join('') : '<div class="emp-ligne-sous" style="padding-top:6px">Aucune candidature.</div>';
+    return empCarte(e, {
+      entete: empBadge(EMPLOI_STATUT_OFFRE, e.statut) + ` <span class="badge badge-gray">${retenus}/${e.nb_postes} embauché(s)</span>`,
+      pied: `<button class="btn btn-secondary btn-sm" onclick="empAdminOuvrir('${e.id}')">Modifier</button>
+             ${e.statut === 'ouvert'
+               ? `<button class="btn btn-secondary btn-sm" onclick="empAdminStatut('${e.id}', 'ferme')">Fermer</button>`
+               : `<button class="btn btn-secondary btn-sm" onclick="empAdminStatut('${e.id}', 'ouvert')">Rouvrir</button>`}
+             <button class="btn btn-danger btn-sm btn-icon" title="Supprimer" onclick="empAdminSupprimer('${e.id}')">🗑</button>
+             <div style="width:100%"><h4>Candidatures</h4>${liste}</div>`
+    });
+  }).join('')}</div>` : '<div style="color:var(--text3);font-size:0.85rem">Aucune offre. Créez-en une : elle paraîtra au babillard.</div>';
+  html += '</div>';
+
+  box.innerHTML = html;
+}
+
+function empAdminOuvrir(id) {
+  const e = id ? empAdmin.emplois.find(x => x.id === id) : null;
+  const sel = document.getElementById('emp-offre-secteur');
+  sel.innerHTML = Object.entries(EMPLOI_SECTEURS).map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('');
+  document.getElementById('emp-offre-titre-modal').textContent = e ? 'Modifier l\'offre' : 'Nouvelle offre d\'emploi';
+  document.getElementById('emp-offre-id').value = e?.id || '';
+  document.getElementById('emp-offre-titre').value = e?.titre || '';
+  sel.value = e?.secteur || 'serre';
+  document.getElementById('emp-offre-niveau').value = e?.niveau || 'employe';
+  document.getElementById('emp-offre-taux').value = e ? Number(e.taux_horaire).toFixed(2) : '';
+  document.getElementById('emp-offre-hsem').value = e?.heures_semaine ?? '';
+  document.getElementById('emp-offre-postes').value = e?.nb_postes || 1;
+  document.getElementById('emp-offre-debut').value = e?.date_debut || '';
+  document.getElementById('emp-offre-descr').value = e?.description || '';
+  document.getElementById('emp-offre-resp').value = e?.responsabilites || '';
+  document.getElementById('emp-offre-taches').value = e?.taches || '';
+  document.getElementById('emp-offre-statut').value = e?.statut || 'ouvert';
+  openModal('modal-emploi-offre');
+}
+
+async function empAdminEnregistrer() {
+  const id = document.getElementById('emp-offre-id').value;
+  const v = (k) => document.getElementById(k).value.trim();
+  const ligne = {
+    titre: v('emp-offre-titre'),
+    secteur: v('emp-offre-secteur'),
+    niveau: v('emp-offre-niveau'),
+    taux_horaire: parseFloat(v('emp-offre-taux')),
+    heures_semaine: v('emp-offre-hsem') ? parseFloat(v('emp-offre-hsem')) : null,
+    nb_postes: parseInt(v('emp-offre-postes'), 10) || 1,
+    date_debut: v('emp-offre-debut') || null,
+    description: v('emp-offre-descr') || null,
+    responsabilites: v('emp-offre-resp') || null,
+    taches: v('emp-offre-taches') || null,
+    statut: v('emp-offre-statut'),
+  };
+  if (ligne.titre.length < 3) { toast('Donnez un titre au poste', 'error'); return; }
+  if (!(ligne.taux_horaire >= 0)) { toast('Indiquez le taux horaire', 'error'); return; }
+  const { error } = id
+    ? await sb.from('emplois').update(ligne).eq('id', id)
+    : await sb.from('emplois').insert({ ...ligne, created_by: currentProfile.id });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  closeModal('modal-emploi-offre');
+  toast(id ? 'Offre mise à jour ✓' : (ligne.statut === 'ouvert' ? 'Offre publiée au babillard ✓' : 'Offre enregistrée ✓'), 'success');
+  trackFeature('emplois', id ? 'offre_modifiee' : 'offre_creee', { secteur: ligne.secteur });
+  empAdminCharger();
+}
+
+async function empAdminStatut(id, statut) {
+  const { error } = await sb.from('emplois').update({ statut }).eq('id', id);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  empAdminCharger();
+}
+
+async function empAdminSupprimer(id) {
+  if (!confirm('Supprimer cette offre et ses candidatures ?')) return;
+  const { error } = await sb.from('emplois').delete().eq('id', id);
+  if (error) {
+    // emploi_heures bloque la suppression (ON DELETE RESTRICT) : on ne
+    // perd pas la trace d'heures travaillees.
+    toast(error.code === '23503' ? 'Des heures sont rattachées à ce poste : fermez-le plutôt que de le supprimer.' : 'Erreur : ' + error.message, 'error');
+    return;
+  }
+  empAdminCharger();
+}
+
+async function empAdminCandidature(id, statut) {
+  let note_admin = null;
+  if (statut === 'refusee') {
+    note_admin = prompt('Un mot pour la personne (facultatif) :', '');
+    if (note_admin === null) return;
+    note_admin = note_admin.trim() || null;
+  }
+  const { error } = await sb.from('emploi_candidatures')
+    .update({ statut, note_admin, decided_by: currentProfile.id, decided_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  toast(statut === 'retenue' ? 'Personne embauchée ✓' : 'Candidature mise à jour', 'success');
+  empAdminCharger();
+}
+
+async function empAdminHeures(id, statut) {
+  const maj = { statut, approuvee_par: currentProfile.id, approuvee_le: new Date().toISOString() };
+  if (statut === 'refusee') {
+    const motif = prompt('Motif du refus (visible par la personne) :', '');
+    if (motif === null) return;
+    maj.motif_refus = motif.trim() || null;
+  }
+  const { error } = await sb.from('emploi_heures').update(maj).eq('id', id).eq('statut', 'soumise');
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  empAdminCharger();
+}
+
+async function empAdminPayer(uid, mode) {
+  const p = window._empAPayer?.[uid];
+  if (!p) return;
+  const qui = p.profil?.full_name || 'cette personne';
+  const msg = mode === 'solde'
+    ? `Créditer ${empArgent(p.total)} au solde de ${qui} ?`
+    : `Confirmer que ${empArgent(p.total)} ont été versés à ${qui} hors de l'application ?`;
+  if (!confirm(msg)) return;
+  const { data, error } = await sb.rpc('emploi_payer_heures', { p_ids: p.ids, p_mode: mode });
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  toast(`${data?.lignes ?? 0} déclaration(s) payée(s) — ${empArgent(data?.total)}`, 'success');
+  trackFeature('emplois', 'heures_payees', { mode, lignes: data?.lignes });
+  empAdminCharger();
+}
 
 // ==========================================
 // LAB — AMELIORATION CONTINUE
@@ -18134,6 +18832,137 @@ async function _tkRefreshBadge() {
 </script>
 
 <!-- Modal nouvelle idee LAB -->
+<!-- Modal emplois : postuler -->
+<div class="modal-overlay" id="modal-emploi-postuler">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h3 class="modal-title">Postuler</h3>
+      <button class="btn-icon btn-secondary" onclick="closeModal('modal-emploi-postuler')">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+      <input type="hidden" id="emp-postuler-id">
+      <div id="emp-postuler-poste" style="font-weight:600"></div>
+      <div class="form-group" style="margin:0">
+        <label>Message à l'administration (facultatif)</label>
+        <textarea id="emp-postuler-message" rows="5" maxlength="2000" placeholder="Vos disponibilités, votre expérience, pourquoi ce poste vous intéresse…" style="resize:vertical;min-height:100px;"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal('modal-emploi-postuler')">Annuler</button>
+        <button class="btn btn-primary" style="flex:1" onclick="empPostulerEnvoyer()">Envoyer ma candidature</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal emplois : declarer des heures -->
+<div class="modal-overlay" id="modal-emploi-heures">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3 class="modal-title">Déclarer des heures</h3>
+      <button class="btn-icon btn-secondary" onclick="closeModal('modal-emploi-heures')">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+      <div class="form-group" style="margin:0">
+        <label>Poste</label>
+        <select id="emp-heures-emploi"></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin:0">
+          <label>Date</label>
+          <input type="date" id="emp-heures-date">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Heures</label>
+          <input type="number" id="emp-heures-nb" min="0.25" max="24" step="0.25" placeholder="2.5">
+        </div>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Travail effectué (facultatif)</label>
+        <textarea id="emp-heures-descr" rows="3" maxlength="1000" placeholder="Arrosage, récolte, nettoyage des bacs…" style="resize:vertical;"></textarea>
+      </div>
+      <div id="emp-heures-apercu" style="font-size:0.85rem;color:var(--text2)"></div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal('modal-emploi-heures')">Annuler</button>
+        <button class="btn btn-primary" style="flex:1" onclick="empHeuresEnvoyer()">Soumettre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal emplois : creer / modifier une offre (admin) -->
+<div class="modal-overlay" id="modal-emploi-offre">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <h3 class="modal-title" id="emp-offre-titre-modal">Nouvelle offre d'emploi</h3>
+      <button class="btn-icon btn-secondary" onclick="closeModal('modal-emploi-offre')">✕</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+      <input type="hidden" id="emp-offre-id">
+      <div class="form-group" style="margin:0">
+        <label>Titre du poste</label>
+        <input type="text" id="emp-offre-titre" maxlength="160" placeholder="Responsable de la serre" autocomplete="off">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin:0">
+          <label>Secteur</label>
+          <select id="emp-offre-secteur"></select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Niveau</label>
+          <select id="emp-offre-niveau">
+            <option value="responsable">Responsable</option>
+            <option value="employe">Employé·e</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin:0">
+          <label>Taux horaire ($/h)</label>
+          <input type="number" id="emp-offre-taux" min="0" step="0.05" placeholder="18.00">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Heures par semaine (approx.)</label>
+          <input type="number" id="emp-offre-hsem" min="0.5" step="0.5" placeholder="6">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin:0">
+          <label>Nombre de postes</label>
+          <input type="number" id="emp-offre-postes" min="1" max="50" step="1" value="1">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Entrée en fonction</label>
+          <input type="date" id="emp-offre-debut">
+        </div>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Description du poste</label>
+        <textarea id="emp-offre-descr" rows="3" maxlength="4000" style="resize:vertical;" placeholder="En quelques phrases : le contexte et ce qu'on attend de la personne."></textarea>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Responsabilités (une par ligne)</label>
+        <textarea id="emp-offre-resp" rows="4" maxlength="4000" style="resize:vertical;" placeholder="Veiller à la santé des cultures&#10;Coordonner l'équipe de la serre"></textarea>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Tâches (une par ligne)</label>
+        <textarea id="emp-offre-taches" rows="4" maxlength="4000" style="resize:vertical;" placeholder="Arroser et fertiliser&#10;Noter les récoltes dans l'application"></textarea>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Statut</label>
+        <select id="emp-offre-statut">
+          <option value="ouvert">Ouvert — affiché au babillard</option>
+          <option value="pourvu">Pourvu</option>
+          <option value="ferme">Fermé</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-secondary" style="flex:1" onclick="closeModal('modal-emploi-offre')">Annuler</button>
+        <button class="btn btn-primary" style="flex:1" onclick="empAdminEnregistrer()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-lab-idee">
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
