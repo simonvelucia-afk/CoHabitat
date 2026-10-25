@@ -16,9 +16,12 @@
 -- dont l'algorithme doit rester identique à lunch_serie_cle().
 --
 -- Une machine ajoutée par numéro a ce numéro pour identifiant : c'est
--- lui qu'on passe au kiosque (?machine=LM-...). Une machine déjà en
--- service garde son identifiant et reçoit son numéro par
--- lunch_machine_associer_serie().
+-- lui qu'on passe au kiosque (?machine=LM-...). Une machine qui serait
+-- en base sans numéro le reçoit par lunch_machine_associer_serie().
+--
+-- Aucune machine n'etant encore en service, rien n'est importe de la
+-- centrale : une premiere version de 037 portait une fonction d'import,
+-- retiree ici si elle a ete creee.
 --
 -- Idempotente : peut être rejouée sans erreur.
 
@@ -81,10 +84,10 @@ ALTER TABLE lunch_machines ADD CONSTRAINT lunch_machines_numero_serie_valide
 -- Le numéro se lit comme le reste de la machine (pas le PIN).
 GRANT SELECT (numero_serie, ajoutee_le) ON lunch_machines TO anon, authenticated;
 
--- Une machine n'entre plus en base que par son numéro (ou par l'import
--- des machines existantes, lunch_importer, 037) : plus d'insertion
--- directe.
+-- Une machine n'entre plus en base que par son numéro : plus
+-- d'insertion directe.
 REVOKE INSERT ON lunch_machines FROM authenticated;
+DROP FUNCTION IF EXISTS lunch_importer(JSONB);
 
 -- ============================================================
 -- 3) Ajouter une machine

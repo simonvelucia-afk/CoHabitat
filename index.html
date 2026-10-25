@@ -17137,8 +17137,6 @@ async function loadSettings() {
           <div class="form-group" style="margin:0"><label for="lunch-nouv-pin">PIN administrateur (4 chiffres)</label><input type="text" id="lunch-nouv-pin" inputmode="numeric" maxlength="4" autocomplete="off"></div>
           <div style="display:flex;align-items:flex-end;"><button class="btn btn-secondary btn-sm" onclick="lunchAjouterMachine()">+ Ajouter la machine</button></div>
         </div>
-        ${CENTRAL_ENABLED ? `<div style="margin-top:12px;font-size:12px;color:var(--text3);line-height:1.5;">Machines déjà en service avant ce changement : elles étaient déclarées à la centrale Modulimo. Importez-les une fois (machine, zones, cases et menus), puis donnez-leur leur numéro de série.</div>
-        <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="lunchImporterCentrale()">⇩ Importer depuis la centrale</button>` : ''}
       </div>
     </div>` : '';
 
@@ -17236,37 +17234,6 @@ async function lunchAjouterMachine() {
   if (etat) etat.textContent = '';
   ['lunch-nouv-id', 'lunch-nouv-nom', 'lunch-nouv-pin'].forEach(k => { document.getElementById(k).value = ''; });
   lunchMachinesAdmin();
-}
-
-// Copie unique depuis la centrale : machine(s), zones, cases et menus.
-// Rejouable — lunch_importer() met a jour ce qui existe deja.
-async function lunchImporterCentrale() {
-  if (currentProfile?.role !== 'principal_admin') { toast('Réservé à l\'administrateur principal', 'info'); return; }
-  if (!confirm('Copier les machines Lunch de la centrale dans la base de l\'immeuble ?')) return;
-  const lire = async (chemin) => {
-    const res = await fetch(LM_CENTRAL_URL + '/rest/v1/' + chemin, { headers: { apikey: CENTRAL_KEY } });
-    if (!res.ok) throw new Error(chemin.split('?')[0] + ' : HTTP ' + res.status);
-    return res.json();
-  };
-  try {
-    let filtre = '';
-    const { data: bid } = await sb.from('system_settings').select('value').eq('key', 'building_id').maybeSingle();
-    if (bid?.value) filtre = '&building_id=eq.' + encodeURIComponent(bid.value);
-    const machines = await lire('lunch_machines?select=*' + filtre);
-    if (!machines.length) { toast('Aucune machine à importer pour cet immeuble', 'info'); return; }
-    const ids = machines.map(m => '"' + String(m.id).replace(/"/g, '') + '"').join(',');
-    const [zones, slots, menus] = await Promise.all([
-      lire('lunch_zones?select=*&machine_id=in.(' + ids + ')'),
-      lire('lunch_slots?select=*&machine_id=in.(' + ids + ')'),
-      lire('lunch_menus?select=*&active=eq.true'),
-    ]);
-    const { data, error } = await sb.rpc('lunch_importer', { p_donnees: { machines, zones, slots, menus } });
-    if (error) throw new Error(error.message);
-    toast(`Importé : ${data.machines} machine(s), ${data.cases} case(s), ${data.menus} menu(s) ✓`, 'success');
-    lunchMachinesAdmin();
-  } catch (e) {
-    toast('Import impossible : ' + e.message, 'error');
-  }
 }
 
 const MODULE_DESCRIPTIONS = {

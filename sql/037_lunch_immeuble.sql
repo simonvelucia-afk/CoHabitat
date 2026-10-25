@@ -10,7 +10,7 @@
 --
 --   1. les tables de la machine : lunch_machines, lunch_zones,
 --      lunch_slots, lunch_menus — memes colonnes que sur la centrale,
---      pour que l'import soit une simple copie ;
+--      que le kiosque connait deja ;
 --   2. lunch_acheter() : l'achat, en UNE transaction — la case est
 --      verrouillee, le prix lu en base (jamais celui du client), le solde
 --      verifie et debite, la case videe. Deux residents ne peuvent pas
@@ -23,8 +23,6 @@
 --      kiosque (cases, menus, reglages), permises a un administrateur, a
 --      la personne embauchee a la Machine Lunch (036), ou a qui connait le
 --      PIN de la machine ;
---   6. lunch_importer() : la copie unique depuis la centrale, lancee par
---      l'administrateur principal depuis CoHabitat.
 --
 -- Ce qu'elle ferme : lunch_purchase() et lunch_get_balance() (001)
 -- etaient ouvertes a la cle anon et prenaient le payeur et le montant du
@@ -499,92 +497,7 @@ END;
 $$;
 
 -- ============================================================
--- 8) Import unique depuis la centrale
--- ============================================================
--- p_donnees = { machines: [...], zones: [...], slots: [...], menus: [...] }
--- tels que la centrale les renvoie. Reserve a l'administrateur principal.
--- Rejouable : chaque ligne est inseree ou mise a jour.
-CREATE OR REPLACE FUNCTION lunch_importer(p_donnees JSONB)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  r  JSONB;
-  nm INT := 0; nz INT := 0; ns INT := 0; nn INT := 0;
-BEGIN
-  IF get_my_role() <> 'principal_admin' THEN RAISE EXCEPTION 'FORBIDDEN'; END IF;
-
-  FOR r IN SELECT * FROM jsonb_array_elements(COALESCE(p_donnees->'machines', '[]'::jsonb)) LOOP
-    INSERT INTO lunch_machines (id, name, pin, building_id, active, box_max, box_count, gantry_auto_speed, color_ranges)
-    VALUES (r->>'id', COALESCE(r->>'name', r->>'id'), r->>'pin', NULLIF(r->>'building_id','')::UUID,
-            COALESCE((r->>'active')::BOOLEAN, TRUE), COALESCE((r->>'box_max')::INT, 30),
-            COALESCE((r->>'box_count')::INT, 30), COALESCE((r->>'gantry_auto_speed')::INT, 5),
-            COALESCE(r->'color_ranges',
-              '{"blue":{"min":-10,"max":10},"violet":{"min":11,"max":25},"orange":{"min":26,"max":55},"red":{"min":56,"max":100}}'::jsonb))
-    ON CONFLICT (id) DO UPDATE SET
-      name = EXCLUDED.name, pin = COALESCE(EXCLUDED.pin, lunch_machines.pin), building_id = EXCLUDED.building_id,
-      active = EXCLUDED.active, box_max = EXCLUDED.box_max, box_count = EXCLUDED.box_count,
-      gantry_auto_speed = EXCLUDED.gantry_auto_speed, color_ranges = EXCLUDED.color_ranges;
-    nm := nm + 1;
-  END LOOP;
-
-  FOR r IN SELECT * FROM jsonb_array_elements(COALESCE(p_donnees->'zones', '[]'::jsonb)) LOOP
-    CONTINUE WHEN NOT EXISTS (SELECT 1 FROM lunch_machines WHERE id = r->>'machine_id');
-    INSERT INTO lunch_zones (machine_id, zone_key, name, setpoint, setpoint_min, setpoint_max, actual, slot_count)
-    VALUES (r->>'machine_id', r->>'zone_key', r->>'name', (r->>'setpoint')::NUMERIC, (r->>'setpoint_min')::NUMERIC,
-            (r->>'setpoint_max')::NUMERIC, (r->>'actual')::NUMERIC, COALESCE((r->>'slot_count')::INT, 0))
-    ON CONFLICT (machine_id, zone_key) DO UPDATE SET
-      name = EXCLUDED.name, setpoint = EXCLUDED.setpoint, setpoint_min = EXCLUDED.setpoint_min,
-      setpoint_max = EXCLUDED.setpoint_max, actual = EXCLUDED.actual, slot_count = EXCLUDED.slot_count;
-    nz := nz + 1;
-  END LOOP;
-
-  FOR r IN SELECT * FROM jsonb_array_elements(COALESCE(p_donnees->'slots', '[]'::jsonb)) LOOP
-    CONTINUE WHEN NOT EXISTS (SELECT 1 FROM lunch_machines WHERE id = r->>'machine_id');
-    INSERT INTO lunch_slots (machine_id, slot_num, zone_key, description, price, photo_url, chef, prep_date,
-                             exp_date, ingredients, allergens, calories, proteines, glucides, lipides,
-                             reserved, reserved_by)
-    VALUES (r->>'machine_id', (r->>'slot_num')::INT, r->>'zone_key', COALESCE(r->>'description',''),
-            COALESCE((r->>'price')::NUMERIC, 0), r->>'photo_url', r->>'chef', NULLIF(r->>'prep_date',''),
-            NULLIF(r->>'exp_date','')::DATE, r->>'ingredients',
-            CASE WHEN jsonb_typeof(r->'allergens') = 'array' THEN r->'allergens' ELSE '[]'::jsonb END,
-            (r->>'calories')::NUMERIC, (r->>'proteines')::NUMERIC, (r->>'glucides')::NUMERIC,
-            (r->>'lipides')::NUMERIC, COALESCE((r->>'reserved')::BOOLEAN, FALSE), r->>'reserved_by')
-    ON CONFLICT (machine_id, slot_num) DO UPDATE SET
-      zone_key = EXCLUDED.zone_key, description = EXCLUDED.description, price = EXCLUDED.price,
-      photo_url = EXCLUDED.photo_url, chef = EXCLUDED.chef, prep_date = EXCLUDED.prep_date,
-      exp_date = EXCLUDED.exp_date, ingredients = EXCLUDED.ingredients, allergens = EXCLUDED.allergens,
-      calories = EXCLUDED.calories, proteines = EXCLUDED.proteines, glucides = EXCLUDED.glucides,
-      lipides = EXCLUDED.lipides, reserved = EXCLUDED.reserved, reserved_by = EXCLUDED.reserved_by,
-      updated_at = now();
-    ns := ns + 1;
-  END LOOP;
-
-  FOR r IN SELECT * FROM jsonb_array_elements(COALESCE(p_donnees->'menus', '[]'::jsonb)) LOOP
-    INSERT INTO lunch_menus (id, machine_id, description, price, photo, chef, ingredients, allergens,
-                             calories, proteines, glucides, lipides, exp_date, active)
-    VALUES (r->>'id', r->>'machine_id', COALESCE(r->>'description',''), COALESCE((r->>'price')::NUMERIC, 0),
-            r->>'photo', r->>'chef', r->>'ingredients',
-            CASE WHEN jsonb_typeof(r->'allergens') = 'array' THEN r->'allergens' ELSE '[]'::jsonb END,
-            (r->>'calories')::NUMERIC, (r->>'proteines')::NUMERIC, (r->>'glucides')::NUMERIC,
-            (r->>'lipides')::NUMERIC, NULLIF(r->>'exp_date','')::DATE, COALESCE((r->>'active')::BOOLEAN, TRUE))
-    ON CONFLICT (id) DO UPDATE SET
-      machine_id = EXCLUDED.machine_id, description = EXCLUDED.description, price = EXCLUDED.price,
-      photo = EXCLUDED.photo, chef = EXCLUDED.chef, ingredients = EXCLUDED.ingredients,
-      allergens = EXCLUDED.allergens, calories = EXCLUDED.calories, proteines = EXCLUDED.proteines,
-      glucides = EXCLUDED.glucides, lipides = EXCLUDED.lipides, exp_date = EXCLUDED.exp_date,
-      active = EXCLUDED.active, updated_at = now();
-    nn := nn + 1;
-  END LOOP;
-
-  RETURN jsonb_build_object('machines', nm, 'zones', nz, 'cases', ns, 'menus', nn);
-END;
-$$;
-
--- ============================================================
--- 9) Droits d'execution
+-- 8) Droits d'execution
 -- ============================================================
 REVOKE ALL ON FUNCTION lunch_peut_gerer(TEXT, TEXT)                  FROM public, anon, authenticated;
 REVOKE ALL ON FUNCTION lunch_pin_valide(TEXT, TEXT)                  FROM public;
@@ -592,7 +505,6 @@ REVOKE ALL ON FUNCTION lunch_kiosque_ecrire(TEXT, TEXT, TEXT, JSONB) FROM public
 REVOKE ALL ON FUNCTION lunch_mon_solde(UUID)                         FROM public, anon;
 REVOKE ALL ON FUNCTION lunch_acheter(TEXT, INT, UUID, TEXT, TEXT)    FROM public, anon;
 REVOKE ALL ON FUNCTION lunch_rembourser(UUID)                        FROM public, anon;
-REVOKE ALL ON FUNCTION lunch_importer(JSONB)                         FROM public, anon;
 
 -- Le kiosque en mode PIN n'a pas de session : PIN et ecritures
 -- d'administration restent ouverts a anon, la fonction verifie le PIN.
@@ -601,7 +513,6 @@ GRANT EXECUTE ON FUNCTION lunch_kiosque_ecrire(TEXT, TEXT, TEXT, JSONB) TO anon,
 GRANT EXECUTE ON FUNCTION lunch_mon_solde(UUID)                         TO authenticated;
 GRANT EXECUTE ON FUNCTION lunch_acheter(TEXT, INT, UUID, TEXT, TEXT)    TO authenticated;
 GRANT EXECUTE ON FUNCTION lunch_rembourser(UUID)                        TO authenticated;
-GRANT EXECUTE ON FUNCTION lunch_importer(JSONB)                         TO authenticated;
 
 -- Les anciennes portes (001) se ferment.
 DO $old$
@@ -615,7 +526,7 @@ BEGIN
 END $old$;
 
 -- ============================================================
--- 10) Ledger : le remboursement d'un achat Lunch
+-- 9) Ledger : le remboursement d'un achat Lunch
 -- ============================================================
 -- Liste de 036, augmentee de 'lunch_cancel_refund'.
 DO $ck$

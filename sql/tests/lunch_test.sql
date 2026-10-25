@@ -20,21 +20,13 @@ VALUES ('a1000000-0000-0000-0000-0000000000d1', 'a1000000-0000-0000-0000-0000000
 CREATE TEMP TABLE lunch_test_ctx (cle TEXT PRIMARY KEY, val TEXT);
 GRANT ALL ON lunch_test_ctx TO anon, authenticated;
 
--- ── 1) Import par l'administrateur principal ─────────────────────────
+-- ── 1) Une machine sans numero de serie (cf. 038 : associer) ─────────
+INSERT INTO lunch_machines (id, name, pin, active) VALUES ('LM-T', 'Machine test', '4321', TRUE);
+INSERT INTO lunch_zones (machine_id, zone_key, name, setpoint, slot_count) VALUES ('LM-T', 'froid', 'Froid', 4, 2);
+INSERT INTO lunch_slots (machine_id, slot_num, zone_key, description, price) VALUES
+  ('LM-T', 1, 'froid', 'Sandwich', 6.5),
+  ('LM-T', 2, 'froid', 'Œufs', 0);
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims',
-  '{"sub":"a1000000-0000-0000-0000-0000000000ad","role":"authenticated"}', TRUE);
-DO $$
-DECLARE r JSONB;
-BEGIN
-  r := lunch_importer('{
-    "machines":[{"id":"LM-T","name":"Machine test","pin":"4321","active":true}],
-    "zones":[{"machine_id":"LM-T","zone_key":"froid","name":"Froid","setpoint":4,"slot_count":2}],
-    "slots":[{"machine_id":"LM-T","slot_num":1,"zone_key":"froid","description":"Sandwich","price":6.5},
-             {"machine_id":"LM-T","slot_num":2,"zone_key":"froid","description":"Œufs","price":0}],
-    "menus":[{"id":"m_1","machine_id":"LM-T","description":"Soupe","price":4}]}'::jsonb);
-  IF (r->>'cases')::INT <> 2 OR (r->>'machines')::INT <> 1 THEN RAISE EXCEPTION 'ECHEC import %', r; END IF;
-END $$;
 
 -- ── 2) Le kiosque sans session lit tout, sauf le PIN ─────────────────
 SET LOCAL ROLE anon;
@@ -193,7 +185,7 @@ BEGIN
   -- Plus d'insertion directe, même pour un admin.
   BEGIN INSERT INTO lunch_machines (id, name) VALUES ('X', 'Directe'); RAISE EXCEPTION 'ECHEC insertion directe';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
-  -- La machine déjà en service (importée) reçoit son numéro.
+  -- Une machine en base sans numéro le reçoit.
   PERFORM lunch_machine_associer_serie('LM-T', 'LM-2026-00003-N');
   IF (SELECT numero_serie FROM lunch_machines WHERE id = 'LM-T') <> 'LM-2026-00003-N' THEN
     RAISE EXCEPTION 'ECHEC : association';

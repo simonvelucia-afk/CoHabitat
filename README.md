@@ -143,10 +143,10 @@ La machine, ses zones, ses cases, ses menus et le solde des acheteurs vivent dan
 - **Administration du kiosque** (cases, menus, réglages) : un administrateur, la personne embauchée au poste Machine Lunch, ou le PIN de la machine. Le PIN n'est plus lisible et se vérifie en base ; dix erreurs en dix minutes bloquent la machine
 - **Ajouter une machine achetée** (Paramètres → Machine Lunch) : l'administrateur saisit le **numéro de série** inscrit sur la machine, un nom et un PIN. Rien ne passe par la centrale : la base de l'immeuble reconnaît le numéro (`sql/038_lunch_numero_serie.sql`). Le numéro devient l'identifiant de la machine, à passer au kiosque (`?machine=LM-…`)
 - **Numéro de série** : `LM-AAAA-NNNNN-C` — année de fabrication, rang dans l'année, clé de contrôle ISO 7064 MOD 37,36. La clé repère les fautes de frappe (toute faute d'un caractère, 99,8 % des inversions de chiffres voisins) ; elle n'est pas secrète. Modulimo fabrique les numéros avec `node deploy/scripts/numero-serie-lunch.mjs generer 2026 1 20`
-- **Machines déjà en service** : import unique depuis la centrale (machines, zones, cases, menus), puis « Associer un n° de série » sur chacune
+- Aucune machine n'étant encore en service, rien n'est importé de la centrale : chaque machine entre par son numéro de série
 - Les anciennes fonctions `lunch_purchase` et `lunch_get_balance`, ouvertes sans connexion, perdent leurs droits
 
-**Ordre de mise en service :** jouer `037`, publier CoHabitat, importer depuis la centrale (Paramètres → Machine Lunch), puis publier le kiosque (dépôt LunchMachine).
+**Ordre de mise en service :** jouer `037` puis `038`, publier CoHabitat et le kiosque (dépôt LunchMachine), puis ajouter chaque machine par son numéro de série (Paramètres → Machine Lunch).
 
 ### Mobilité partagée (MaaS)
 
