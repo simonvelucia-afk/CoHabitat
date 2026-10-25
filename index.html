@@ -17130,14 +17130,14 @@ async function loadSettings() {
         <div style="font-size:12px;font-weight:600;margin-bottom:8px;">Machines de l'immeuble</div>
         <div id="lunch-machines-admin" style="font-size:13px;color:var(--text3);">Chargement…</div>
         <div class="form-row" style="margin-top:10px;">
-          <div class="form-group" style="margin:0"><label for="lunch-nouv-id">Identifiant (étiquette)</label><input type="text" id="lunch-nouv-id" placeholder="LM-001" autocomplete="off"></div>
+          <div class="form-group" style="margin:0"><label for="lunch-nouv-id">Numéro de série (sur la machine)</label><input type="text" id="lunch-nouv-id" placeholder="LM-2026-00123-7" autocomplete="off" style="text-transform:uppercase" oninput="lunchSerieApercu(this)"><div id="lunch-nouv-id-etat" style="font-size:11px;margin-top:4px;"></div></div>
           <div class="form-group" style="margin:0"><label for="lunch-nouv-nom">Nom</label><input type="text" id="lunch-nouv-nom" placeholder="Machine du hall" autocomplete="off"></div>
         </div>
         <div class="form-row" style="margin-top:8px;">
           <div class="form-group" style="margin:0"><label for="lunch-nouv-pin">PIN administrateur (4 chiffres)</label><input type="text" id="lunch-nouv-pin" inputmode="numeric" maxlength="4" autocomplete="off"></div>
           <div style="display:flex;align-items:flex-end;"><button class="btn btn-secondary btn-sm" onclick="lunchAjouterMachine()">+ Ajouter la machine</button></div>
         </div>
-        ${CENTRAL_ENABLED ? `<div style="margin-top:12px;font-size:12px;color:var(--text3);line-height:1.5;">Les machines étaient déclarées à la centrale Modulimo. Importez-les une fois : machine, zones, cases et menus sont copiés dans la base de l'immeuble.</div>
+        ${CENTRAL_ENABLED ? `<div style="margin-top:12px;font-size:12px;color:var(--text3);line-height:1.5;">Machines déjà en service avant ce changement : elles étaient déclarées à la centrale Modulimo. Importez-les une fois (machine, zones, cases et menus), puis donnez-leur leur numéro de série.</div>
         <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="lunchImporterCentrale()">⇩ Importer depuis la centrale</button>` : ''}
       </div>
     </div>` : '';
@@ -17158,7 +17158,7 @@ async function loadSettings() {
 async function lunchMachinesAdmin() {
   const el = document.getElementById('lunch-machines-admin');
   if (!el) return;
-  const { data, error } = await sb.from('lunch_machines').select('id, name, active').order('name');
+  const { data, error } = await sb.from('lunch_machines').select('id, name, active, numero_serie').order('name');
   if (error) {
     el.innerHTML = /does not exist|schema cache/i.test(error.message)
       ? 'Jouez la migration <code>sql/037_lunch_immeuble.sql</code> pour gérer les machines ici.'
@@ -17166,21 +17166,74 @@ async function lunchMachinesAdmin() {
     return;
   }
   el.innerHTML = (data || []).length
-    ? data.map(m => `<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;color:var(--text);">
-        <span>🖥 ${escHtml(m.name)} <span style="color:var(--text3)">(${escHtml(m.id)})</span></span>
-        <span class="badge ${m.active ? 'badge-green' : 'badge-gray'}">${m.active ? 'Active' : 'Inactive'}</span></div>`).join('')
-    : 'Aucune machine dans la base de l\'immeuble.';
+    ? data.map(m => `<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;color:var(--text);">
+        <span style="min-width:0;overflow-wrap:anywhere;">🖥 ${escHtml(m.name)}
+          <span style="color:var(--text3)">${m.numero_serie ? '· n° ' + escHtml(m.numero_serie) : '(' + escHtml(m.id) + ')'}</span></span>
+        <span style="display:flex;gap:6px;align-items:center;">
+          ${m.numero_serie ? '' : `<button class="btn btn-secondary btn-sm" onclick="lunchAssocierSerie('${escHtml(m.id).replace(/'/g, '')}')">Associer un n° de série</button>`}
+          <span class="badge ${m.active ? 'badge-green' : 'badge-gray'}">${m.active ? 'Active' : 'Inactive'}</span>
+        </span></div>`).join('')
+    : 'Aucune machine pour l\'instant. Ajoutez-la avec le numéro de série inscrit sur la machine.';
 }
 
+// Clé de contrôle des numéros de série (ISO 7064 MOD 37,36). Même calcul
+// que lunch_serie_cle() (sql/038) et deploy/scripts/numero-serie-lunch.mjs :
+// l'aperçu signale une faute de frappe avant l'envoi, la base tranche.
+function lunchSerieValide(texte) {
+  const m = /^LM-(\d{4})-(\d{5})-([0-9A-Z])$/.exec(String(texte || '').trim().toUpperCase());
+  if (!m) return false;
+  const A = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let p = 36;
+  for (const ch of 'LM' + m[1] + m[2]) {
+    let s = (p + A.indexOf(ch)) % 36;
+    if (s === 0) s = 36;
+    p = (s * 2) % 37;
+  }
+  return A[(37 - p) % 36] === m[3];
+}
+
+function lunchSerieApercu(champ) {
+  const etat = document.getElementById('lunch-nouv-id-etat');
+  if (!etat) return;
+  const v = champ.value.trim();
+  if (!v) { etat.textContent = ''; return; }
+  const ok = lunchSerieValide(v);
+  etat.textContent = ok ? '✓ Numéro reconnu' : 'Format attendu : LM-AAAA-NNNNN-C — vérifiez la saisie';
+  etat.style.color = ok ? 'var(--accent2)' : 'var(--text3)';
+}
+
+function lunchErreurSerie(message) {
+  return /SERIE_INVALIDE/.test(message) ? 'Numéro de série non reconnu — vérifiez la saisie'
+       : /SERIE_DEJA_AJOUTEE/.test(message) ? 'Cette machine est déjà ajoutée'
+       : /PIN_INVALIDE/.test(message) ? 'Le PIN doit avoir 4 chiffres'
+       : /FORBIDDEN/.test(message) ? 'Réservé aux administrateurs'
+       : 'Erreur : ' + message;
+}
+
+async function lunchAssocierSerie(machineId) {
+  const numero = prompt('Numéro de série de la machine ' + machineId + ' :', '');
+  if (numero === null) return;
+  if (!lunchSerieValide(numero)) { toast('Numéro de série non reconnu — vérifiez la saisie', 'error'); return; }
+  const { error } = await sb.rpc('lunch_machine_associer_serie', { p_machine_id: machineId, p_numero: numero });
+  if (error) { toast(lunchErreurSerie(error.message), 'error'); return; }
+  toast('Numéro de série associé ✓', 'success');
+  lunchMachinesAdmin();
+}
+
+// Ajout d'une machine achetée, par son numéro de série — sans la centrale :
+// la base de l'immeuble reconnaît le numéro (sql/038).
 async function lunchAjouterMachine() {
-  const id = document.getElementById('lunch-nouv-id').value.trim();
+  const numero = document.getElementById('lunch-nouv-id').value.trim().toUpperCase();
   const name = document.getElementById('lunch-nouv-nom').value.trim();
   const pin = document.getElementById('lunch-nouv-pin').value.trim();
-  if (!id || !name) { toast('Identifiant et nom requis', 'error'); return; }
+  if (!numero || !name) { toast('Numéro de série et nom requis', 'error'); return; }
+  if (!lunchSerieValide(numero)) { toast('Numéro de série non reconnu — vérifiez la saisie', 'error'); return; }
   if (!/^\d{4}$/.test(pin)) { toast('Le PIN doit avoir 4 chiffres', 'error'); return; }
-  const { error } = await sb.from('lunch_machines').insert({ id, name, pin, active: true });
-  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
-  toast('Machine ajoutée ✓', 'success');
+  const { error } = await sb.rpc('lunch_machine_ajouter', { p_numero: numero, p_nom: name, p_pin: pin });
+  if (error) { toast(lunchErreurSerie(error.message), 'error'); return; }
+  toast('Machine ajoutée ✓ — ouvrez le kiosque avec ?machine=' + numero, 'success');
+  const etat = document.getElementById('lunch-nouv-id-etat');
+  if (etat) etat.textContent = '';
   ['lunch-nouv-id', 'lunch-nouv-nom', 'lunch-nouv-pin'].forEach(k => { document.getElementById(k).value = ''; });
   lunchMachinesAdmin();
 }

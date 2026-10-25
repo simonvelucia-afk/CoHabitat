@@ -153,6 +153,55 @@ BEGIN
   END IF;
 END $$;
 
+-- ── 5) Ajout par numéro de série (038) ───────────────────────────────
+-- Numéros fabriqués par deploy/scripts/numero-serie-lunch.mjs : la base
+-- doit retrouver la même clé.
+DO $$
+BEGIN
+  IF NOT lunch_serie_valide('LM-2026-00001-R') OR NOT lunch_serie_valide('lm-2026-00123-7')
+     OR NOT lunch_serie_valide('LM-2026-00005-J') THEN
+    RAISE EXCEPTION 'ECHEC : clé différente du script de génération';
+  END IF;
+  IF lunch_serie_valide('LM-2026-00132-7') OR lunch_serie_valide('LM-2026-00001-S')
+     OR lunch_serie_valide('LM-2026-0001-R') OR lunch_serie_valide(NULL) THEN
+    RAISE EXCEPTION 'ECHEC : numéro faux accepté';
+  END IF;
+END $$;
+
+-- Un résident n'ajoute pas de machine.
+DO $$
+BEGIN
+  PERFORM lunch_machine_ajouter('LM-2026-00002-P', 'Pirate', '1234');
+  RAISE EXCEPTION 'ECHEC : résident a ajouté une machine';
+EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'FORBIDDEN' THEN RAISE; END IF;
+END $$;
+
+SELECT set_config('request.jwt.claims',
+  '{"sub":"a1000000-0000-0000-0000-0000000000ad","role":"authenticated"}', TRUE);
+DO $$
+BEGIN
+  IF lunch_machine_ajouter(' lm-2026-00002-p ', 'Machine du hall', '2468') <> 'LM-2026-00002-P' THEN
+    RAISE EXCEPTION 'ECHEC : ajout';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM lunch_machines WHERE id = 'LM-2026-00002-P' AND numero_serie = 'LM-2026-00002-P') THEN
+    RAISE EXCEPTION 'ECHEC : machine absente';
+  END IF;
+  BEGIN PERFORM lunch_machine_ajouter('LM-2026-00002-P', 'Doublon', '2468'); RAISE EXCEPTION 'ECHEC doublon';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'SERIE_DEJA_AJOUTEE' THEN RAISE; END IF; END;
+  BEGIN PERFORM lunch_machine_ajouter('LM-2026-00002-Q', 'Faute', '2468'); RAISE EXCEPTION 'ECHEC clé';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'SERIE_INVALIDE' THEN RAISE; END IF; END;
+  -- Plus d'insertion directe, même pour un admin.
+  BEGIN INSERT INTO lunch_machines (id, name) VALUES ('X', 'Directe'); RAISE EXCEPTION 'ECHEC insertion directe';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  -- La machine déjà en service (importée) reçoit son numéro.
+  PERFORM lunch_machine_associer_serie('LM-T', 'LM-2026-00003-N');
+  IF (SELECT numero_serie FROM lunch_machines WHERE id = 'LM-T') <> 'LM-2026-00003-N' THEN
+    RAISE EXCEPTION 'ECHEC : association';
+  END IF;
+  BEGIN PERFORM lunch_machine_associer_serie('LM-T', 'LM-2026-00002-P'); RAISE EXCEPTION 'ECHEC numéro pris';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'SERIE_DEJA_AJOUTEE' THEN RAISE; END IF; END;
+END $$;
+
 RESET ROLE;
 DO $$ BEGIN RAISE NOTICE 'lunch_test : OK'; END $$;
 
