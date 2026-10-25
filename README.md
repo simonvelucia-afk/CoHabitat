@@ -85,6 +85,14 @@ Mettre `central.enabled` à `false` rend l'instance entièrement autonome :
 plus aucune requête ne sort, la finance reste locale et le contrôle de
 licence est court-circuité.
 
+**Qui peut toucher à un solde (`sql/040_soldes_securises.sql`).** Personne
+directement : `adjust_balance` n'est appelable que depuis la base. Un
+résident paie de son propre solde (`solde_debiter`) et n'est remboursé que
+de ce qu'il a payé pour la même réservation (`solde_rembourser`) ; un
+administrateur crédite (`admin_crediter`) ; un covoiturage se facture en
+base, une seule fois (`trajet_confirmer`). Aucune fonction de solde ou de
+rôle n'est appelable sans connexion. Test : `sql/tests/soldes_test.sql`.
+
 **Où vit le solde des résidents.** Dans la base de l'immeuble, par
 défaut, même quand la centrale est branchée : la centrale sert alors aux
 licences, aux contrats et au réseau entre immeubles,

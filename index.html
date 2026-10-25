@@ -4030,20 +4030,27 @@ function soldeCentral() {
 // balanceOps ({ ok, virtual_balance } ou { ok:false, error }), pour que
 // les appelants n'aient qu'un seul chemin a lire. Pas d'outbox : la base
 // de l'immeuble est celle-la meme qui vient de servir la page.
-async function soldeLocal({ amount, type, description, reference_id, reference_type }) {
+//
+// Le resident ne touche jamais au grand livre directement (sql/040) :
+//   montant < 0 → solde_debiter : il paie, de son propre solde ;
+//   montant > 0 → solde_rembourser : il est rembourse, jamais au-dela de
+//                 ce qu'il a paye pour cette meme reference.
+// La cle d'idempotence suit : une operation rejouee ne debite pas deux fois.
+async function soldeLocal({ amount, type, description, reference_id, reference_type, idempotency_key }) {
   const montant = Math.round(Number(amount) * 100) / 100;
-  if (montant < 0 && (Number(currentProfile?.virtual_balance) || 0) + montant < -0.005) {
-    return { ok: false, error: 'INSUFFICIENT_FUNDS', retryable: false };
-  }
-  const { data, error } = await sb.rpc('adjust_balance', {
-    p_user_id: currentProfile.id,
-    p_amount: montant,
+  if (!montant) return { ok: true, virtual_balance: currentProfile?.virtual_balance ?? null };
+  const { data, error } = await sb.rpc(montant < 0 ? 'solde_debiter' : 'solde_rembourser', {
+    p_montant: Math.abs(montant),
     p_type: type,
     p_reference_id: reference_id || null,
     p_reference_type: reference_type || null,
-    p_description: description || null
+    p_description: description || null,
+    p_cle: idempotency_key || null
   });
-  if (error) return { ok: false, error: error.message, retryable: false };
+  if (error) {
+    const code = /INSUFFICIENT_FUNDS/.test(error.message) ? 'INSUFFICIENT_FUNDS' : error.message;
+    return { ok: false, error: code, retryable: false };
+  }
   return { ok: true, virtual_balance: typeof data === 'number' ? data : null };
 }
 
@@ -12534,99 +12541,39 @@ async function saveTripData(tripId, andConfirm) {
     if (!vehicleReturned) { toast('Confirmez le retour du véhicule', 'error'); return; }
   }
 
+  // Le statut « termine » n'est plus pose ici : c'est trajet_confirmer
+  // qui le pose, en meme temps qu'il facture (sql/040).
   const updatePayload = {
     actual_km: actualKm,
     vehicle_taken_at: takenAt ? new Date(takenAt).toISOString() : null,
     vehicle_returned_at: returnedAt ? new Date(returnedAt).toISOString() : null,
     vehicle_returned_confirmed: vehicleReturned,
-    driver_note: driverNote,
-    ...(andConfirm ? { status: 'completed', confirmed_at: new Date().toISOString() } : {})
+    driver_note: driverNote
   };
 
   const { error } = await sb.from('trips').update(updatePayload).eq('id', tripId);
   if (error) { toast('Erreur: ' + error.message, 'error'); return; }
 
   if (andConfirm && actualKm && takenAt && returnedAt) {
-    const { data: bookings } = await sb.from('trip_bookings')
-      .select('id, passenger_id, seats_requested, actual_km')
-      .eq('trip_id', tripId).neq('status', 'cancelled').gt('seats_requested', 0);
-    const { data: tripRow }  = await sb.from('trips').select('driver_id, vehicle_id').eq('id', tripId).single();
-    const { data: pricing }  = tripRow?.vehicle_id
-      ? await sb.from('vehicle_pricing').select('*').eq('vehicle_id', tripRow.vehicle_id).single()
-      : { data: null };
-    const pMin   = pricing?.price_per_minute || 0;
-    const pKm    = pricing?.price_per_km || 0;
-    const redPct = pricing?.driver_reduction_pct ?? 25;
-    const totalSeats  = (bookings || []).reduce((s, b) => s + (b.seats_requested || 0), 0);
-    const durationMin = (new Date(returnedAt) - new Date(takenAt)) / 60000;
-
-    for (const b of (bookings || [])) {
-      const bKm  = b.actual_km || 0;
-      const dShare = totalSeats > 0 ? (b.seats_requested || 0) / totalSeats : 0;
-      const cost = (bKm * pKm) + (durationMin * pMin * dShare);
-      if (cost > 0) {
-        await sb.from('trip_bookings').update({ total_cost: cost }).eq('id', b.id);
-        // Debit passager, au grand livre de l'immeuble : c'est le
-        // chauffeur qui confirme, et il debite un autre que lui. Avec la
-        // finance centrale, finance-bridge refuserait (claims.client_id
-        // doit valoir la cible) ; la propagation passe alors par
-        // finance-sync (cf modulimo-admin/sql/011).
-        const { error: debErr } = await sb.rpc('adjust_balance', {
-          p_user_id: b.passenger_id, p_amount: -Math.round(cost * 100) / 100,
-          p_description: 'Covoiturage #' + tripId.slice(0,8), p_type: 'trip_booking',
-          p_reference_id: tripId, p_reference_type: 'trip'
-        });
-        if (debErr) {
-          console.warn('[trip] debit passager echoue:', debErr.message);
-          toast(`Débit d'un passager échoué (${debErr.message})`, 'error');
-        }
-      }
+    // La base calcule le prix de chaque passager a partir des tarifs du
+    // vehicule et des kilometres declares, debite les passagers, credite
+    // le chauffeur et termine le trajet — en une transaction, une seule
+    // fois (sql/040, trajet_confirmer). Avant, la page du chauffeur
+    // calculait les montants et debitait les passagers elle-meme.
+    const { data: bilan, error: errFact } = await sb.rpc('trajet_confirmer', { p_trip_id: tripId });
+    if (errFact) {
+      const m = errFact.message || '';
+      toast(/TRAJET_DEJA_FACTURE/.test(m) ? 'Ce trajet est déjà facturé'
+          : /TRAJET_INCOMPLET/.test(m) ? 'Kilomètres et heures requis avant de confirmer'
+          : /HEURES_INVALIDES/.test(m) ? 'L\'heure de retour doit suivre l\'heure de prise'
+          : 'Facturation impossible : ' + m, 'error');
+      return;
     }
-
-    // Credit du chauffeur, par soldeOps : au grand livre de l'immeuble, ou
-    // a la centrale si l'immeuble l'a choisie (le chauffeur agit alors sur
-    // son propre solde, claims.client_id == target, type refund
-    // 'trip_driver_earning' — cf. ALLOWED_REFUND_TYPES de finance-bridge).
-    // Idempotency_key deterministe sur l'id du trip pour que tout retry
-    // converge sur la meme transaction.
-    const grossCost   = (durationMin * pMin) + (actualKm * pKm);
-    const driverShare = totalSeats > 0 ? 1 / (totalSeats + 1) : 1;
-    const driverCredit = grossCost * driverShare * (redPct / 100);
-    if (driverCredit > 0 && tripRow?.driver_id) {
-      const desc = 'Réduction chauffeur #' + tripId.slice(0,8);
-      if (tripRow.driver_id === currentProfile.id) {
-        const credit = await soldeOps.refund({
-          amount: driverCredit,                     // > 0 = refund cote central
-          type: 'trip_driver_earning',
-          description: desc,
-          reference_id: tripId,
-          reference_type: 'trip',
-          idempotency_key: 'trip-driver-earning:' + tripId
-        });
-        if (credit.ok && typeof credit.virtual_balance === 'number') {
-          currentProfile.virtual_balance = credit.virtual_balance;
-        } else if (credit.queued) {
-          toast('Crédit chauffeur en cours de synchronisation', 'info');
-        } else {
-          // Erreur metier definitive : on ne bloque pas la confirmation —
-          // les passagers ont deja ete debites cote local (le cron sync
-          // de Phase 3B propagera). Admin peut re-crediter manuellement.
-          console.warn('[trip] crédit chauffeur echoué:', credit);
-          toast(`Crédit chauffeur échoué (${credit.error || 'inconnue'})`, 'error');
-        }
-      } else {
-        // 'trip_driver_earning' : seul type accepte par transactions_type_check
-        // ('trip_driver_reduction' violait la contrainte et le credit etait
-        // perdu en silence).
-        const { error: redErr } = await sb.rpc('adjust_balance', { p_user_id: tripRow.driver_id, p_amount: driverCredit, p_description: desc, p_type: 'trip_driver_earning' });
-        if (redErr) {
-          console.warn('[trip] crédit chauffeur local échoué:', redErr.message);
-          toast(`Crédit chauffeur échoué (${redErr.message})`, 'error');
-        }
-      }
+    if (bilan && typeof bilan.solde_chauffeur === 'number' && tripId && bilan.credit_chauffeur > 0) {
+      currentProfile.virtual_balance = bilan.solde_chauffeur;
     }
-
-    toast('Trajet confirmé et facturé !', 'success');
+    trackFeature('trips', 'trip_billed', { passengers: bilan?.passagers || 0 });
+    toast(`Trajet confirmé et facturé — ${bilan?.passagers || 0} passager(s), ${(Number(bilan?.total_passagers) || 0).toFixed(2)} $`, 'success');
     closeModal('modal-trip-detail');
     switchTripsTab('history');
   } else {
@@ -16912,13 +16859,11 @@ async function recordPayment() {
       }
       // Miroir local : credite profiles.virtual_balance + insert real_payments
       // pour que la liste "Paiements" et le solde local restent alignes.
-      await sb.rpc('adjust_balance', {
+      await sb.rpc('admin_crediter', {
         p_user_id: tenantId,
-        p_amount: virtual,
-        p_type: 'admin_credit',
-        p_description: `Paiement enregistré par admin — ${method}${notes ? ': ' + notes : ''}`,
-        p_created_by: currentProfile.id
-      }).then(() => {}).catch((e) => console.warn('[recordPayment] miroir local adjust_balance:', e?.message));
+        p_montant: virtual,
+        p_description: `Paiement enregistré par admin — ${method}${notes ? ': ' + notes : ''}`
+      }).then(() => {}).catch((e) => console.warn('[recordPayment] miroir local admin_crediter:', e?.message));
       await sb.from('real_payments').insert({
         tenant_id: tenantId,
         amount_real: real,
@@ -16932,12 +16877,10 @@ async function recordPayment() {
       return;
     }
   } else {
-    const { error: e1 } = await sb.rpc('adjust_balance', {
+    const { error: e1 } = await sb.rpc('admin_crediter', {
       p_user_id: tenantId,
-      p_amount: virtual,
-      p_type: 'admin_credit',
-      p_description: `Paiement enregistré par admin — ${method}${notes ? ': ' + notes : ''}`,
-      p_created_by: currentProfile.id
+      p_montant: virtual,
+      p_description: `Paiement enregistré par admin — ${method}${notes ? ': ' + notes : ''}`
     });
     if (e1) { toast('Erreur crédit: ' + e1.message, 'error'); return; }
     await sb.from('real_payments').insert({
