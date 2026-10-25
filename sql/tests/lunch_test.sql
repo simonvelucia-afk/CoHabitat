@@ -194,6 +194,40 @@ BEGIN
   EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'SERIE_DEJA_AJOUTEE' THEN RAISE; END IF; END;
 END $$;
 
+-- ── 6) Retrait d'une machine (039) ───────────────────────────────────
+-- Toujours en admin. LM-T contient encore la case 3 (Salade) : il faut
+-- confirmer. L'historique des achats reste.
+DO $$
+DECLARE r JSONB; v_achats INT;
+BEGIN
+  v_achats := (SELECT COUNT(*) FROM lunch_transactions WHERE machine_id = 'LM-T');
+  r := lunch_machine_retirer('LM-T');
+  IF (r->>'retiree')::BOOLEAN OR (r->>'cases_pleines')::INT < 1 THEN RAISE EXCEPTION 'ECHEC : retrait sans confirmation %', r; END IF;
+  r := lunch_machine_retirer('LM-T', TRUE);
+  IF NOT (r->>'retiree')::BOOLEAN THEN RAISE EXCEPTION 'ECHEC : retrait confirmé %', r; END IF;
+  IF EXISTS (SELECT 1 FROM lunch_machines WHERE id = 'LM-T') OR EXISTS (SELECT 1 FROM lunch_slots WHERE machine_id = 'LM-T') THEN
+    RAISE EXCEPTION 'ECHEC : machine ou cases encore présentes';
+  END IF;
+  IF (SELECT COUNT(*) FROM lunch_transactions WHERE machine_id = 'LM-T') <> v_achats OR v_achats = 0 THEN
+    RAISE EXCEPTION 'ECHEC : historique perdu';
+  END IF;
+  -- Le numéro est libre : la machine peut revenir.
+  PERFORM lunch_machine_ajouter('LM-2026-00003-N', 'De retour', '1357');
+  -- Machine vide : retrait direct.
+  r := lunch_machine_retirer('LM-2026-00002-P');
+  IF NOT (r->>'retiree')::BOOLEAN THEN RAISE EXCEPTION 'ECHEC : machine vide non retirée'; END IF;
+END $$;
+
+-- Un résident ne retire rien.
+SELECT set_config('request.jwt.claims',
+  '{"sub":"a1000000-0000-0000-0000-0000000000a1","role":"authenticated"}', TRUE);
+DO $$
+BEGIN
+  PERFORM lunch_machine_retirer('LM-2026-00003-N', TRUE);
+  RAISE EXCEPTION 'ECHEC : résident a retiré une machine';
+EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'FORBIDDEN' THEN RAISE; END IF;
+END $$;
+
 RESET ROLE;
 DO $$ BEGIN RAISE NOTICE 'lunch_test : OK'; END $$;
 
